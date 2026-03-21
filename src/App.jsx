@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react"
 import { stLoad, stSave } from "./storage.js"
- 
+  
 const uid = () => Math.random().toString(36).slice(2,9) + Date.now().toString(36)
 const fmtD = d => d ? new Date(d).toLocaleDateString("pt-BR") : "—"
 const fmtC = v => v ? `R$ ${Number(v).toLocaleString("pt-BR", {minimumFractionDigits:0})}` : "—"
