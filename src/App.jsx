@@ -7,6 +7,8 @@ import BuscaGPT from "./components/BuscaGPT.jsx"
 import { useAuth } from "./lib/AuthContext.jsx"
 import Login from "./pages/Login.jsx"
 import { getImoveis, saveImovel, deleteImovel } from "./lib/supabase.js"
+import Tarefas from "./pages/Tarefas.jsx"
+import AdminPanel from "./pages/AdminPanel.jsx"
     
 const uid = () => Math.random().toString(36).slice(2,9) + Date.now().toString(36)
 const fmtD = d => d ? new Date(d).toLocaleDateString("pt-BR") : "—"
@@ -733,8 +735,8 @@ export default function App() {
       {view==="comparar"&&<Comparativo props={props}/>}
     {view==="busca"&&<BuscaGPT onAnalisar={(link)=>{nav("novo");setTimeout(()=>{},100)}}/>}
     {view==="graficos"&&<div><div style={{padding:"22px 28px 16px",borderBottom:`1px solid ${K.bd}`}}><div style={{fontWeight:700,fontSize:19,color:K.wh}}>📊 Gráficos</div></div><div style={{padding:"20px 28px"}}><Charts properties={props}/></div></div>}
-    {view==="tarefas"&&<div style={{color:K.tx,padding:'24px'}}>Tarefas (em breve)</div>}
-    {view==="admin"&&isAdmin&&<div style={{color:K.tx,padding:'24px'}}>Admin Panel (em breve)</div>}
+    {view==="tarefas"&&<Tarefas/>}
+    {view==="admin"&&isAdmin&&<AdminPanel/>}
     </div>
 
     {toast&&<div style={{position:"fixed",bottom:"16px",right:"16px",background:toast.c===K.trello?K.trello:toast.c,color:toast.c===K.teal||toast.c===K.trello?"#000":"#fff",padding:"12px 20px",borderRadius:"8px",fontSize:"13px",fontWeight:"600",zIndex:9999,boxShadow:"0 8px 32px rgba(0,0,0,.6)",maxWidth:"340px"}}>{toast.msg}</div>}
