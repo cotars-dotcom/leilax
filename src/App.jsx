@@ -95,7 +95,7 @@ Se score_juridico < 4 → score_total *= 0.75. Se ocupado → score_total *= 0.8
 
   const r = await fetch(ANTHROPIC_API, {
     method:"POST",
-    headers:{"Content-Type":"application/json","x-api-key":apiKey,"anthropic-version":"2023-06-01"},
+    headers:{"Content-Type":"application/json","x-api-key":apiKey,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
     body:JSON.stringify({
       model:"claude-sonnet-4-6", max_tokens:4000, system:sys,
       tools:[{type:"web_search_20250305",name:"web_search"}],
