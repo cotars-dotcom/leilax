@@ -275,6 +275,7 @@ function TrelloModal({config,onSave,onClose}) {
       </>}
 
       {error&&<div style={{background:`${K.red}15`,border:`1px solid ${K.red}40`,borderRadius:"6px",padding:"10px",marginTop:"12px",fontSize:"12px",color:K.red}}>⚠️ {error}</div>}
+ {error&&(error.includes('credit balance')||error.includes('balance is too low')||error.includes('insufficient_quota')||error.includes('billing'))&&<div style={{background:'rgba(245,166,35,0.1)',border:'1px solid rgba(245,166,35,0.3)',borderRadius:8,padding:'12px 14px',marginBottom:14}}><div style={{color:'#F5A623',fontWeight:700,marginBottom:4,fontSize:13}}>💳 Saldo da API insuficiente</div><div style={{color:'rgba(221,228,240,0.7)',fontSize:12,lineHeight:1.6}}>Adicione créditos em <b style={{color:'#fff'}}>console.anthropic.com → Plans & Billing</b><br/>O app volta a funcionar automaticamente após adicionar saldo.</div></div>}
     </div>
   </div>
 }
@@ -693,7 +694,22 @@ useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("param
     {showTrello&&<TrelloModal config={trello} onSave={saveTrello} onClose={()=>setShowTrello(false)}/>}
     {showApiKey&&<ApiKeyModal onClose={()=>setShowApiKey(false)}/>}
 
-    {/* SIDEBAR */}
+{/* SIDEBAR */}
+<div style={{width:220,minWidth:220,maxWidth:220,height:'100vh',background:'#0F1420',borderRight:'1px solid rgba(0,229,187,0.12)',display:'flex',flexDirection:'column',overflow:'hidden',flexShrink:0}}>
+{/* LOGO */}
+<div style={{padding:'18px 16px 10px',flexShrink:0}}>
+<div style={{fontWeight:800,fontSize:22,color:'#fff',letterSpacing:'-0.5px'}}>LEI<span style={{color:'#00E5BB'}}>LAX</span></div>
+<div style={{fontSize:9,color:'#3D4E6A',letterSpacing:'2px',textTransform:'uppercase',marginTop:2}}>Análise de Leilões · IA</div>
+</div>
+{/* NAV ITEMS */}
+<div style={{flex:1,overflowY:'auto',padding:'4px 8px',display:'flex',flexDirection:'column',gap:2}}>
+{navItems.map(item=>(
+<div key={item.v} onClick={()=>nav(item.v)} style={{display:'flex',alignItems:'center',gap:10,padding:'9px 12px',borderRadius:8,cursor:'pointer',background:isAct(item.v)?'rgba(0,229,187,0.12)':'transparent',color:isAct(item.v)?'#00E5BB':'rgba(221,228,240,0.72)',fontSize:13,fontWeight:isAct(item.v)?700:400,border:isAct(item.v)?'1px solid rgba(0,229,187,0.2)':'1px solid transparent',transition:'all 0.15s'}}>
+<span style={{fontSize:16,flexShrink:0}}>{item.i}</span>
+<span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{item.l}</span>
+</div>
+))}
+</div>
 {/* RODAPE DA SIDEBAR */}
 <div style={{flexShrink:0,padding:'8px',borderTop:'1px solid rgba(0,229,187,0.10)',display:'flex',flexDirection:'column',gap:'6px'}}>
 {/* Trello */}
@@ -731,6 +747,8 @@ useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("param
 <div>⭐ {props.filter(p=>(p.score_total||0)>=7).length} score forte</div>
 </div>
 </div>
+</div>
+{/* FIM SIDEBAR */}
 
     {/* CONTENT */}
     <div style={{flex:1,overflowY:"auto",background:K.bg,display:"flex",flexDirection:"column",minWidth:0}}>
