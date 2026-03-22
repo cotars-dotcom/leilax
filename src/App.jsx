@@ -10,6 +10,7 @@ import { getImoveis, saveImovel, deleteImovel } from "./lib/supabase.js"
 import Tarefas from "./pages/Tarefas.jsx"
 import AdminPanel from "./pages/AdminPanel.jsx"
 import { analisarImovelCompleto } from "./lib/dualAI.js"
+import { setupBoardLeilax, criarCardImovel } from "./lib/trelloService.js"
     
 const uid = () => Math.random().toString(36).slice(2,9) + Date.now().toString(36)
 const fmtD = d => d ? new Date(d).toLocaleDateString("pt-BR") : "—"
@@ -211,9 +212,15 @@ function TrelloModal({config,onSave,onClose}) {
 
   const connect = async () => {
     if(!key.trim()||!token.trim()){setError("Informe a chave e o token");return}
+    if(key.trim().length<=20){setError("API Key inválida (muito curta)");return}
+    if(token.trim().length<=30){setError("Token inválido (muito curto)");return}
     setLoading(true);setError("")
     try { const b=await tGet("/members/me/boards?fields=id,name",key.trim(),token.trim()); setBoards(b);setStep(2) }
-    catch(e){setError(e.message)}
+    catch(e){
+      if(e.message&&(e.message.includes("Failed to fetch")||e.message.includes("NetworkError")||e.message.includes("CORS")||e.message.includes("blocked")||e.name==="TypeError")){
+        setStep(2);setBoards([])
+      } else {setError(e.message)}
+    }
     setLoading(false)
   }
 
@@ -222,13 +229,17 @@ function TrelloModal({config,onSave,onClose}) {
     if(!bid)return
     setLoading(true)
     try { const l=await tGet(`/boards/${bid}/lists?fields=id,name`,key,token); setLists(l); if(l.length)setListId(l[0].id) }
-    catch(e){setError(e.message)}
+    catch(e){
+      if(e.message&&(e.message.includes("Failed to fetch")||e.message.includes("NetworkError")||e.message.includes("CORS")||e.message.includes("blocked")||e.name==="TypeError")){
+        setLists([])
+      } else {setError(e.message)}
+    }
     setLoading(false)
   }
 
   const save = () => {
     if(!key||!token||!boardId||!listId){setError("Preencha todos os campos");return}
-    onSave({key,token,boardId,listId,boardName:boards.find(b=>b.id===boardId)?.name||"",listName:lists.find(l=>l.id===listId)?.name||""})
+    onSave({key,token,boardId,listId,boardName:boards.find(b=>b.id===boardId)?.name||boardId,listName:lists.find(l=>l.id===listId)?.name||listId})
   }
 
   return <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.75)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:"20px"}}>
@@ -254,20 +265,27 @@ function TrelloModal({config,onSave,onClose}) {
 
       {step===1&&<button style={btn("trello")} onClick={connect} disabled={loading}>{loading?"Conectando...":"Conectar ao Trello →"}</button>}
 
-      {step===2&&boards.length>0&&<>
+      {step===2&&<>
+        {boards.length===0&&<div style={{background:`${K.amb}15`,border:`1px solid ${K.amb}40`,borderRadius:"6px",padding:"10px",marginBottom:"12px",fontSize:"12px",color:K.amb}}>⚠️ Não foi possível listar boards (possível bloqueio CORS). Insira os IDs manualmente.</div>}
         <div style={{marginBottom:"12px"}}>
           <div style={{fontSize:"10px",color:K.t3,textTransform:"uppercase",letterSpacing:"1px",marginBottom:"5px"}}>Board</div>
-          <select style={{...inp,cursor:"pointer"}} value={boardId} onChange={e=>fetchLists(e.target.value)}>
-            <option value="">— Selecione o board —</option>
-            {boards.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}
-          </select>
+          {boards.length>0
+            ?<select style={{...inp,cursor:"pointer"}} value={boardId} onChange={e=>fetchLists(e.target.value)}>
+              <option value="">— Selecione o board —</option>
+              {boards.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}
+            </select>
+            :<input style={inp} placeholder="ID do board (ex: 5f4e3d2c1b0a)" value={boardId} onChange={e=>{setBoardId(e.target.value);setLists([]);setListId("")}}/>
+          }
         </div>
-        {lists.length>0&&<div style={{marginBottom:"18px"}}>
+        <div style={{marginBottom:"18px"}}>
           <div style={{fontSize:"10px",color:K.t3,textTransform:"uppercase",letterSpacing:"1px",marginBottom:"5px"}}>Lista de Destino</div>
-          <select style={{...inp,cursor:"pointer"}} value={listId} onChange={e=>setListId(e.target.value)}>
-            {lists.map(l=><option key={l.id} value={l.id}>{l.name}</option>)}
-          </select>
-        </div>}
+          {lists.length>0
+            ?<select style={{...inp,cursor:"pointer"}} value={listId} onChange={e=>setListId(e.target.value)}>
+              {lists.map(l=><option key={l.id} value={l.id}>{l.name}</option>)}
+            </select>
+            :<input style={inp} placeholder="ID da lista (ex: 5f4e3d2c1b0b)" value={listId} onChange={e=>setListId(e.target.value)}/>
+          }
+        </div>
         <div style={{display:"flex",gap:"10px"}}>
           <button style={btn("trello")} onClick={save} disabled={!listId}>💾 Salvar</button>
           <button style={btn("s")} onClick={()=>setStep(1)}>← Voltar</button>
@@ -338,12 +356,11 @@ function NovoImovel({onSave,onCancel,trello,parametrosBanco,criteriosBanco}) {
         const data = await analisarImovelCompleto(url.trim(), hasKey, openaiKey, parametrosBanco, criteriosBanco, (msg) => setStep(msg), anexos)
       data.fonte_url = url.trim()
       const property = {...data, id:uid(), createdAt:new Date().toISOString()}
-      if(trello?.listId) {
+      if(trello?.listId&&trello?.boardId) {
         setStep("🔷 Enviando para o Trello...")
         try {
-          const cd = buildTrelloCard(property)
-          await tPost("/cards",trello.key,trello.token,{idList:trello.listId,name:cd.name,desc:cd.desc})
-          setTrelloMsg("✓ Card criado no Trello")
+          await criarCardImovel(property,trello.listId,trello.boardId,trello.key,trello.token)
+          setTrelloMsg("✓ Card criado no Trello com etiquetas")
         } catch(e){ setTrelloMsg(`⚠️ Salvo no app, erro Trello: ${e.message}`) }
       }
       onSave(property)
@@ -396,6 +413,7 @@ function NovoImovel({onSave,onCancel,trello,parametrosBanco,criteriosBanco}) {
       </div>
 
       {error&&<div style={{background:`${K.red}15`,border:`1px solid ${K.red}40`,borderRadius:"6px",padding:"12px",marginBottom:"14px",fontSize:"12.5px",color:K.red}}>⚠️ {error}</div>}
+      {error&&(error.includes('credit balance')||error.includes('balance is too low')||error.includes('insufficient')||error.includes('billing'))&&<div style={{background:'rgba(245,166,35,0.1)',border:'1px solid rgba(245,166,35,0.3)',borderRadius:8,padding:'12px 14px',marginBottom:14}}><div style={{color:'#F5A623',fontWeight:700,marginBottom:4,fontSize:13}}>💳 Saldo insuficiente</div><div style={{color:'rgba(221,228,240,0.7)',fontSize:12,lineHeight:1.6}}>Acesse <b style={{color:'#fff'}}>console.anthropic.com → Plans & Billing</b> para adicionar créditos.<br/>O app volta a funcionar automaticamente após adicionar saldo.</div></div>}
       {trelloMsg&&<div style={{background:`${K.teal}10`,border:`1px solid ${K.teal}30`,borderRadius:"6px",padding:"10px",marginBottom:"14px",fontSize:"12px",color:K.teal}}>{trelloMsg}</div>}
 
       {loading&&<div style={{background:`${K.teal}10`,border:`1px solid ${K.teal}30`,borderRadius:"7px",padding:"16px",marginBottom:"16px"}}>
@@ -493,8 +511,10 @@ function Detail({p,onDelete,onNav,trello}) {
   const sendTrello=async()=>{
     if(!trello?.listId){setMsg("Trello não configurado");return}
     setSending(true);setMsg("")
-    try { const cd=buildTrelloCard(p); await tPost("/cards",trello.key,trello.token,{idList:trello.listId,name:cd.name,desc:cd.desc}); setMsg("✓ Card enviado ao Trello!") }
-    catch(e){setMsg(`Erro: ${e.message}`)}
+    try {
+      if(trello.boardId) { await criarCardImovel(p,trello.listId,trello.boardId,trello.key,trello.token); setMsg("✓ Card enviado ao Trello com etiquetas!") }
+      else { const cd=buildTrelloCard(p); await tPost("/cards",trello.key,trello.token,{idList:trello.listId,name:cd.name,desc:cd.desc}); setMsg("✓ Card enviado ao Trello!") }
+    } catch(e){setMsg(`Erro: ${e.message}`)}
     setSending(false)
   }
   return <div>
@@ -680,17 +700,39 @@ export default function App() {
   const [showApiKey,setShowApiKey]=useState(false)
 const [parametrosBanco,setParametrosBanco]=useState([])
 const [criteriosBanco,setCriteriosBanco]=useState([])
-  const apiOk = localStorage.getItem("leilax-api-key")
+  const [apiOk,setApiKey]=useState(localStorage.getItem("leilax-api-key"))
 useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("parametros_score").select("*");if(pr)setParametrosBanco(pr);const{data:cr}=await supabase.from("criterios_avaliacao").select("*");if(cr)setCriteriosBanco(cr)}catch(e){console.warn("parametros:",e)}}lp()},[])
+
+  // FIX 1: Sync API keys from Supabase (cross-device)
+  useEffect(()=>{
+    if(!session) return
+    import('./lib/supabase.js').then(({getAppSetting})=>{
+      getAppSetting('anthropic_api_key').then(k=>{
+        if(k&&k.length>10){localStorage.setItem('leilax-api-key',k);setApiKey(k)}
+      }).catch(()=>{})
+      getAppSetting('openai_api_key').then(k=>{
+        if(k&&k.length>10){localStorage.setItem('leilax-openai-key',k)}
+      }).catch(()=>{})
+    }).catch(()=>{})
+  },[session])
 
   const showToast=(msg,c)=>{setToast({msg,c:c||K.teal});setTimeout(()=>setToast(null),4500)}
   const nav=(v,p={})=>{setView(v);setVp(p)}
 
   useEffect(()=>{(async()=>{
     const [p,t]=await Promise.all([stLoad("leilax-props"),stLoad("leilax-trello")])
-    if(p)setProps(p); if(t)setTrello(t); setL(true)
+    if(t)setTrello(t); setL(true)
     // Mostrar modal de API key se não tiver
     if(!localStorage.getItem("leilax-api-key")) setTimeout(()=>setShowApiKey(true),1000)
+    // FIX 2B: Load imóveis from Supabase (shared database)
+    if(session) {
+      import('./lib/supabase.js').then(({getImoveis:gi})=>{
+        gi().then(data=>{
+          if(data&&data.length>0) setProps(data)
+          else if(p) setProps(p)
+        }).catch(()=>{ if(p) setProps(p) })
+      }).catch(()=>{ if(p) setProps(p) })
+    } else { if(p) setProps(p) }
   })()},[])
 
   useEffect(()=>{if(loaded)stSave("leilax-props",props)},[props,loaded])
@@ -700,9 +742,22 @@ useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("param
     setProps(ps=>[p,...ps])
     showToast(`✓ ${p.titulo||"Imóvel"} — Score ${(p.score_total||0).toFixed(1)} · ${p.recomendacao}`)
     nav("detail",{id:p.id})
+    // FIX 2A: Save to Supabase
+    if(session) {
+      import('./lib/supabase.js').then(({saveImovel:si})=>{
+        si(p,session.user.id).catch(e=>console.warn('Supabase save:',e.message))
+      })
+    }
   }
   const delProp=async(id)=>{deleteImovel(id).catch(()=>{});setProps(ps=>ps.filter(p=>p.id!==id));showToast("Excluído",K.red);nav("imoveis")}
-  const saveTrello=cfg=>{setTrello(cfg);setShowTrello(false);showToast("✓ Trello configurado — "+cfg.boardName,K.trello)}
+  const saveTrello=cfg=>{
+    setTrello(cfg);setShowTrello(false);showToast("✓ Trello configurado — "+cfg.boardName,K.trello)
+    if(cfg.boardId&&cfg.key&&cfg.token){
+      setupBoardLeilax(cfg.boardId,cfg.key,cfg.token)
+        .then(()=>console.log('[LEILAX] Board Trello configurado'))
+        .catch(e=>console.warn('[LEILAX] Setup Trello:',e.message))
+    }
+  }
 
   const navItems=[
     {i:'🏠',l:'Dashboard',v:'dashboard'},

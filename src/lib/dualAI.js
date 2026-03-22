@@ -77,7 +77,7 @@ Retorne APENAS JSON vÃ¡lido (sem markdown):
 
 // ââ FASE 2: Claude analisa o link com todos os dados âââââââââââââ
 
-export async function analisarComClaude(url, claudeKey, parametros, criterios, dadosGPT) {
+export async function analisarComClaude(url, claudeKey, parametros, criterios, dadosGPT, anexos) {
   const pesosInfo = (parametros || [])
     .map(p => `  - ${p.nome}: peso ${p.peso}% (dimensao: ${p.dimensao})`)
     .join('\n')
@@ -270,7 +270,7 @@ export async function analisarImovelCompleto(url, claudeKey, openaiKey, parametr
     progress('â ï¸ ChatGPT indisponÃ­vel. Claude analisando com dados internos...')
   }
 
-  const analise = await analisarComClaude(url, claudeKey, parametros, criterios, dadosGPT)
+  const analise = await analisarComClaude(url, claudeKey, parametros, criterios, dadosGPT, anexos)
 
   progress('ð Calculando score com parÃ¢metros do grupo...')
   const score_total = calcularScore(analise, parametros)
