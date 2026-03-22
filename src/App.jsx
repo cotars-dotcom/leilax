@@ -323,6 +323,8 @@ function NovoImovel({onSave,onCancel,trello,parametrosBanco,criteriosBanco}) {
   const [step,setStep]=useState("")
   const [error,setError]=useState("")
   const [trelloMsg,setTrelloMsg]=useState("")
+  const [anexos,setAnexos]=useState([])
+  const fileRef=useRef(null)
 
   const analyze = async () => {
     if(!url.trim()){setError("Cole o link do leilão");return}
@@ -333,7 +335,7 @@ function NovoImovel({onSave,onCancel,trello,parametrosBanco,criteriosBanco}) {
     try {
       setStep("🧠 IA analisando: score, risco jurídico, mercado...")
       const openaiKey = localStorage.getItem("leilax-openai-key") || ""
-        const data = await analisarImovelCompleto(url.trim(), hasKey, openaiKey, parametrosBanco, criteriosBanco, (msg) => setStep(msg))
+        const data = await analisarImovelCompleto(url.trim(), hasKey, openaiKey, parametrosBanco, criteriosBanco, (msg) => setStep(msg), anexos)
       data.fonte_url = url.trim()
       const property = {...data, id:uid(), createdAt:new Date().toISOString()}
       if(trello?.listId) {
@@ -367,6 +369,30 @@ function NovoImovel({onSave,onCancel,trello,parametrosBanco,criteriosBanco}) {
         <div style={{fontSize:"10px",color:K.t3,textTransform:"uppercase",letterSpacing:"1px",marginBottom:"6px"}}>Link do Leilão *</div>
         <input style={{...inp,fontSize:"14px"}} placeholder="https://venda-imoveis.caixa.gov.br/..." value={url} onChange={e=>setUrl(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")analyze()}}/>
         <div style={{fontSize:"11px",color:K.t3,marginTop:"5px"}}>Portal CAIXA, sites de leiloeiros, qualquer anúncio público</div>
+
+      <div style={{marginTop:"12px"}}>
+        <label style={{fontSize:"13px",color:K.t2,fontWeight:600,display:"block",marginBottom:"6px"}}>📎 Anexar arquivos (opcional)</label>
+        <input ref={fileRef} type="file" multiple accept=".txt,.pdf,image/*" style={{display:"none"}} onChange={e=>{
+          const newFiles=[...anexos]
+          Array.from(e.target.files).forEach(f=>{
+            const reader=new FileReader()
+            if(f.type.startsWith("image/")){
+              reader.onload=()=>newFiles.push({name:f.name,type:"image",data:reader.result})&&setAnexos([...newFiles])
+              reader.readAsDataURL(f)
+            } else {
+              reader.onload=()=>newFiles.push({name:f.name,type:"text",data:reader.result})&&setAnexos([...newFiles])
+              reader.readAsText(f)
+            }
+          })
+        }}/>
+        <button type="button" style={{...btn("s"),fontSize:"13px",padding:"6px 14px"}} onClick={()=>fileRef.current?.click()}>Escolher arquivos</button>
+        {anexos.length>0 && <div style={{marginTop:"8px",display:"flex",flexWrap:"wrap",gap:"6px"}}>
+          {anexos.map((a,i)=><span key={i} style={{background:K.bg2,border:`1px solid ${K.border}`,borderRadius:"5px",padding:"3px 8px",fontSize:"12px",display:"flex",alignItems:"center",gap:"4px"}}>
+            {a.type==="image"?"🖼":"📄"} {a.name}
+            <span style={{cursor:"pointer",color:K.red,fontWeight:700}} onClick={()=>setAnexos(anexos.filter((_,j)=>j!==i))}>×</span>
+          </span>)}
+        </div>}
+      </div>
       </div>
 
       {error&&<div style={{background:`${K.red}15`,border:`1px solid ${K.red}40`,borderRadius:"6px",padding:"12px",marginBottom:"14px",fontSize:"12.5px",color:K.red}}>⚠️ {error}</div>}
@@ -675,7 +701,7 @@ useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("param
     showToast(`✓ ${p.titulo||"Imóvel"} — Score ${(p.score_total||0).toFixed(1)} · ${p.recomendacao}`)
     nav("detail",{id:p.id})
   }
-  const delProp=id=>{setProps(ps=>ps.filter(p=>p.id!==id));showToast("Excluído",K.red);nav("imoveis")}
+  const delProp=async(id)=>{deleteImovel(id).catch(()=>{});setProps(ps=>ps.filter(p=>p.id!==id));showToast("Excluído",K.red);nav("imoveis")}
   const saveTrello=cfg=>{setTrello(cfg);setShowTrello(false);showToast("✓ Trello configurado — "+cfg.boardName,K.trello)}
 
   const navItems=[
