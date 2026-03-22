@@ -211,9 +211,15 @@ function TrelloModal({config,onSave,onClose}) {
 
   const connect = async () => {
     if(!key.trim()||!token.trim()){setError("Informe a chave e o token");return}
+    if(key.trim().length<=20){setError("API Key inválida (muito curta)");return}
+    if(token.trim().length<=30){setError("Token inválido (muito curto)");return}
     setLoading(true);setError("")
     try { const b=await tGet("/members/me/boards?fields=id,name",key.trim(),token.trim()); setBoards(b);setStep(2) }
-    catch(e){setError(e.message)}
+    catch(e){
+      if(e.message&&(e.message.includes("Failed to fetch")||e.message.includes("NetworkError")||e.message.includes("CORS")||e.message.includes("blocked")||e.name==="TypeError")){
+        setStep(2);setBoards([])
+      } else {setError(e.message)}
+    }
     setLoading(false)
   }
 
@@ -222,13 +228,17 @@ function TrelloModal({config,onSave,onClose}) {
     if(!bid)return
     setLoading(true)
     try { const l=await tGet(`/boards/${bid}/lists?fields=id,name`,key,token); setLists(l); if(l.length)setListId(l[0].id) }
-    catch(e){setError(e.message)}
+    catch(e){
+      if(e.message&&(e.message.includes("Failed to fetch")||e.message.includes("NetworkError")||e.message.includes("CORS")||e.message.includes("blocked")||e.name==="TypeError")){
+        setLists([])
+      } else {setError(e.message)}
+    }
     setLoading(false)
   }
 
   const save = () => {
     if(!key||!token||!boardId||!listId){setError("Preencha todos os campos");return}
-    onSave({key,token,boardId,listId,boardName:boards.find(b=>b.id===boardId)?.name||"",listName:lists.find(l=>l.id===listId)?.name||""})
+    onSave({key,token,boardId,listId,boardName:boards.find(b=>b.id===boardId)?.name||boardId,listName:lists.find(l=>l.id===listId)?.name||listId})
   }
 
   return <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.75)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:"20px"}}>
@@ -254,20 +264,27 @@ function TrelloModal({config,onSave,onClose}) {
 
       {step===1&&<button style={btn("trello")} onClick={connect} disabled={loading}>{loading?"Conectando...":"Conectar ao Trello →"}</button>}
 
-      {step===2&&boards.length>0&&<>
+      {step===2&&<>
+        {boards.length===0&&<div style={{background:`${K.amb}15`,border:`1px solid ${K.amb}40`,borderRadius:"6px",padding:"10px",marginBottom:"12px",fontSize:"12px",color:K.amb}}>⚠️ Não foi possível listar boards (possível bloqueio CORS). Insira os IDs manualmente.</div>}
         <div style={{marginBottom:"12px"}}>
           <div style={{fontSize:"10px",color:K.t3,textTransform:"uppercase",letterSpacing:"1px",marginBottom:"5px"}}>Board</div>
-          <select style={{...inp,cursor:"pointer"}} value={boardId} onChange={e=>fetchLists(e.target.value)}>
-            <option value="">— Selecione o board —</option>
-            {boards.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}
-          </select>
+          {boards.length>0
+            ?<select style={{...inp,cursor:"pointer"}} value={boardId} onChange={e=>fetchLists(e.target.value)}>
+              <option value="">— Selecione o board —</option>
+              {boards.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}
+            </select>
+            :<input style={inp} placeholder="ID do board (ex: 5f4e3d2c1b0a)" value={boardId} onChange={e=>{setBoardId(e.target.value);setLists([]);setListId("")}}/>
+          }
         </div>
-        {lists.length>0&&<div style={{marginBottom:"18px"}}>
+        <div style={{marginBottom:"18px"}}>
           <div style={{fontSize:"10px",color:K.t3,textTransform:"uppercase",letterSpacing:"1px",marginBottom:"5px"}}>Lista de Destino</div>
-          <select style={{...inp,cursor:"pointer"}} value={listId} onChange={e=>setListId(e.target.value)}>
-            {lists.map(l=><option key={l.id} value={l.id}>{l.name}</option>)}
-          </select>
-        </div>}
+          {lists.length>0
+            ?<select style={{...inp,cursor:"pointer"}} value={listId} onChange={e=>setListId(e.target.value)}>
+              {lists.map(l=><option key={l.id} value={l.id}>{l.name}</option>)}
+            </select>
+            :<input style={inp} placeholder="ID da lista (ex: 5f4e3d2c1b0b)" value={listId} onChange={e=>setListId(e.target.value)}/>
+          }
+        </div>
         <div style={{display:"flex",gap:"10px"}}>
           <button style={btn("trello")} onClick={save} disabled={!listId}>💾 Salvar</button>
           <button style={btn("s")} onClick={()=>setStep(1)}>← Voltar</button>
