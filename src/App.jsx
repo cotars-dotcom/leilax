@@ -54,7 +54,8 @@ const K = {
   trello:"#0052CC"
 }
 
-const scoreColor = s => s >= 7.5 ? C.emerald : s >= 6 ? C.emerald : s >= 4.5 ? C.mustard : "#E5484D"
+const RED = "#E5484D"
+const scoreColor = s => s >= 7.5 ? C.emerald : s >= 6 ? C.emerald : s >= 4.5 ? C.mustard : RED
 const scoreLabel = s => s >= 7.5 ? "FORTE" : s >= 6 ? "BOM" : s >= 4.5 ? "MÉDIO" : "FRACO"
 const recColor = r => ({ COMPRAR: C.emerald, AGUARDAR: C.mustard, EVITAR: "#E5484D" })[r] || C.hint
 
@@ -1444,9 +1445,336 @@ function AbaJuridica({ imovel, onReclassificado }) {
   )
 }
 
+// ── ESTRATEGIA CONFIG ─────────────────────────────────────────────────────────
+const ESTRATEGIA_CONFIG = {
+  flip_rapido:    { emoji:'🔄', label:'Flip Rápido',    color:C.emerald },
+  renda_passiva:  { emoji:'🏠', label:'Renda Passiva',  color:C.navy   },
+  airbnb:         { emoji:'🌟', label:'Airbnb/Temporada',color:C.mustard},
+  reforma_revenda:{ emoji:'🏗️', label:'Reforma + Venda',color:C.emerald},
+  locacao_longa:  { emoji:'📋', label:'Locação Longa',  color:C.navy   },
+}
+
+// ── CALCULADORA ROI ──────────────────────────────────────────────────────────
+function CalculadoraROI({ imovel }) {
+  const [entrada, setEntrada] = useState(30)
+  const [prazoVenda, setPrazoVenda] = useState(12)
+  const [taxaJuros, setTaxaJuros] = useState(10.5)
+  const [tabela, setTabela] = useState('price')
+  const [estrategia, setEstrategia] = useState('flip')
+  const lance       = imovel.valor_minimo || 0
+  const comissao    = lance * 0.05
+  const itbi        = lance * ((imovel.itbi_pct || 2) / 100)
+  const doc         = lance * 0.005
+  const reforma     = imovel.custo_reforma_calculado || imovel.custo_reforma_previsto || 0
+  const custoTotal  = lance + comissao + itbi + doc + reforma
+  const vmercado = imovel.valor_mercado_estimado || imovel.valor_pos_reforma_estimado
+    || (imovel.preco_m2_mercado * (imovel.area_privativa_m2 || imovel.area_m2 || 0))
+    || lance * 1.4
+  const lucroFlip    = vmercado - custoTotal
+  const roiFlip      = custoTotal > 0 ? (lucroFlip / custoTotal) * 100 : 0
+  const aluguelMensal = imovel.aluguel_mensal_estimado
+    || (vmercado * (imovel.yield_bruto_pct || 6) / 100 / 12)
+  const rendaAnual   = aluguelMensal * 12
+  const yieldLiquido = custoTotal > 0 ? (rendaAnual / custoTotal) * 100 : 0
+  const valorFinanciado = custoTotal * (1 - entrada / 100)
+  const entradaValor    = custoTotal * (entrada / 100)
+  const taxaMensal      = taxaJuros / 100 / 12
+  const prazoMeses      = 360
+  const parcela         = tabela === 'price' && taxaMensal > 0
+    ? valorFinanciado * (taxaMensal * Math.pow(1 + taxaMensal, prazoMeses))
+        / (Math.pow(1 + taxaMensal, prazoMeses) - 1)
+    : valorFinanciado / prazoMeses + valorFinanciado * taxaMensal
+  const saldoDevedor = taxaMensal > 0
+    ? valorFinanciado * Math.pow(1 + taxaMensal, prazoVenda)
+      - parcela * (Math.pow(1 + taxaMensal, prazoVenda) - 1) / taxaMensal
+    : valorFinanciado - parcela * prazoVenda
+  const lucroFinanciado = vmercado - saldoDevedor - entradaValor - reforma - comissao - itbi - doc
+  const fmt = n => n ? `R$ ${Math.round(n).toLocaleString('pt-BR')}` : '—'
+  const pct = n => n ? `${n.toFixed(1)}%` : '—'
+  return (
+    <div style={{ marginTop: 20 }}>
+      <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
+        <span style={{ fontSize:16 }}>💰</span>
+        <h4 style={{ margin:0, fontSize:14, fontWeight:700, color:C.navy }}>
+          Calculadora de Retorno
+        </h4>
+      </div>
+      <div style={{ background:C.surface, borderRadius:10, padding:'12px 14px', marginBottom:12 }}>
+        <p style={{ margin:'0 0 8px', fontSize:11, fontWeight:600, color:C.muted,
+          textTransform:'uppercase', letterSpacing:'0.5px' }}>Custo Total de Aquisição</p>
+        {[
+          ['Lance mínimo',    fmt(lance)],
+          ['Comissão leiloeiro (5%)', fmt(comissao)],
+          [`ITBI (${imovel.itbi_pct || 2}%)`, fmt(itbi)],
+          ['Documentação (0,5%)', fmt(doc)],
+          reforma > 0 ? ['Reforma estimada', fmt(reforma)] : null,
+        ].filter(Boolean).map(([k,v]) => (
+          <div key={k} style={{ display:'flex', justifyContent:'space-between',
+            padding:'4px 0', borderBottom:`1px solid ${C.borderW}`, fontSize:12 }}>
+            <span style={{ color:C.muted }}>{k}</span>
+            <span style={{ color:C.navy, fontWeight:500 }}>{v}</span>
+          </div>
+        ))}
+        <div style={{ display:'flex', justifyContent:'space-between',
+          padding:'6px 0 0', fontSize:13 }}>
+          <span style={{ fontWeight:700, color:C.navy }}>Total</span>
+          <span style={{ fontWeight:800, color:C.navy }}>{fmt(custoTotal)}</span>
+        </div>
+      </div>
+      <div style={{ display:'flex', gap:4, marginBottom:12 }}>
+        {[['flip','🔄 Flip'],['locacao','🏠 Locação'],['financiado','🏦 Financiado']].map(([k,l]) => (
+          <button key={k} onClick={() => setEstrategia(k)} style={{
+            flex:1, padding:'7px 4px', borderRadius:7, fontSize:11.5, fontWeight:500,
+            border:`1px solid ${estrategia===k ? C.emerald : C.borderW}`,
+            background: estrategia===k ? C.emeraldL : C.white,
+            color: estrategia===k ? C.emerald : C.muted, cursor:'pointer',
+          }}>{l}</button>
+        ))}
+      </div>
+      {estrategia === 'flip' && (
+        <div style={{ background:roiFlip > 20 ? C.emeraldL : C.surface,
+          borderRadius:10, padding:'14px 16px' }}>
+          <div style={{ display:'flex', justifyContent:'space-between', marginBottom:8 }}>
+            <div>
+              <p style={{ margin:0, fontSize:11, color:C.muted }}>Valor de mercado est.</p>
+              <p style={{ margin:0, fontSize:16, fontWeight:800, color:C.navy }}>{fmt(vmercado)}</p>
+            </div>
+            <div style={{ textAlign:'right' }}>
+              <p style={{ margin:0, fontSize:11, color:C.muted }}>Lucro estimado</p>
+              <p style={{ margin:0, fontSize:16, fontWeight:800,
+                color: lucroFlip > 0 ? C.emerald : RED }}>{fmt(lucroFlip)}</p>
+            </div>
+          </div>
+          <div style={{ background:C.white, borderRadius:8, padding:'8px 12px',
+            display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+            <span style={{ fontSize:12, color:C.muted }}>ROI estimado</span>
+            <span style={{ fontSize:18, fontWeight:800,
+              color: roiFlip > 30 ? C.emerald : roiFlip > 15 ? C.mustard : RED }}>
+              {pct(roiFlip)}
+            </span>
+          </div>
+        </div>
+      )}
+      {estrategia === 'locacao' && (
+        <div style={{ background:C.surface, borderRadius:10, padding:'14px 16px' }}>
+          {[
+            ['Aluguel mensal estimado', fmt(aluguelMensal)],
+            ['Renda bruta anual', fmt(rendaAnual)],
+            ['Yield bruto a.a.', pct(yieldLiquido)],
+          ].map(([k,v]) => (
+            <div key={k} style={{ display:'flex', justifyContent:'space-between',
+              padding:'5px 0', borderBottom:`1px solid ${C.borderW}`, fontSize:12 }}>
+              <span style={{ color:C.muted }}>{k}</span>
+              <span style={{ color:C.navy, fontWeight:600 }}>{v}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {estrategia === 'financiado' && (
+        <div style={{ background:C.surface, borderRadius:10, padding:'14px 16px' }}>
+          <div style={{ display:'flex', gap:8, marginBottom:10 }}>
+            <div style={{ flex:1 }}>
+              <p style={{ margin:'0 0 4px', fontSize:10, color:C.muted }}>Entrada (%)</p>
+              <input type="range" min="10" max="90" value={entrada}
+                onChange={e => setEntrada(+e.target.value)}
+                style={{ width:'100%', accentColor: C.emerald }} />
+              <p style={{ margin:0, fontSize:11, fontWeight:600, color:C.navy,
+                textAlign:'center' }}>{entrada}% = {fmt(entradaValor)}</p>
+            </div>
+            <div style={{ flex:1 }}>
+              <p style={{ margin:'0 0 4px', fontSize:10, color:C.muted }}>Vender em (meses)</p>
+              <input type="range" min="6" max="60" step="6" value={prazoVenda}
+                onChange={e => setPrazoVenda(+e.target.value)}
+                style={{ width:'100%', accentColor: C.emerald }} />
+              <p style={{ margin:0, fontSize:11, fontWeight:600, color:C.navy,
+                textAlign:'center' }}>{prazoVenda} meses</p>
+            </div>
+          </div>
+          {[
+            ['1ª parcela estimada', fmt(parcela)],
+            ['Saldo devedor na venda', fmt(Math.max(0, saldoDevedor))],
+            ['Lucro líquido estimado', fmt(lucroFinanciado)],
+          ].map(([k,v]) => (
+            <div key={k} style={{ display:'flex', justifyContent:'space-between',
+              padding:'5px 0', borderBottom:`1px solid ${C.borderW}`, fontSize:12 }}>
+              <span style={{ color:C.muted }}>{k}</span>
+              <span style={{ color: k.includes('Lucro') && lucroFinanciado > 0
+                ? C.emerald : C.navy, fontWeight:600 }}>{v}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── MODO AO VIVO ─────────────────────────────────────────────────────────────
+function ModoAoVivo({ imovel, onClose }) {
+  const s = imovel
+  const rec = s.recomendacao
+  const recClr = rec === 'COMPRAR' ? C.emerald : rec === 'AGUARDAR' ? C.mustard : RED
+  return (
+    <div style={{
+      position:'fixed', inset:0, zIndex:2000,
+      background:'#0A1628', color:'#fff',
+      display:'flex', flexDirection:'column',
+      padding:'24px',
+    }}>
+      <div style={{ display:'flex', justifyContent:'space-between', marginBottom:20 }}>
+        <div>
+          <p style={{ margin:0, fontSize:10, color:'rgba(255,255,255,0.5)',
+            textTransform:'uppercase', letterSpacing:'1px' }}>Modo Ao Vivo — AXIS</p>
+          <p style={{ margin:'2px 0 0', fontSize:14, fontWeight:600, color:'#fff' }}>
+            {s.titulo || s.endereco}
+          </p>
+        </div>
+        <button onClick={onClose} style={{ background:'none', border:'none',
+          color:'rgba(255,255,255,0.6)', fontSize:24, cursor:'pointer' }}>×</button>
+      </div>
+      <div style={{ textAlign:'center', padding:'20px 0' }}>
+        <p style={{ margin:0, fontSize:72, fontWeight:900, color:recClr,
+          lineHeight:1 }}>
+          {s.score_total?.toFixed(1) || '—'}
+        </p>
+        <p style={{ margin:'4px 0 0', fontSize:18, fontWeight:700, color:recClr }}>
+          {rec || 'AGUARDAR'}
+        </p>
+      </div>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, flex:1 }}>
+        {[
+          ['💰 Lance mínimo', s.valor_minimo
+            ? `R$ ${Number(s.valor_minimo).toLocaleString('pt-BR')}` : '—'],
+          ['💸 Desconto', s.desconto_percentual ? `${s.desconto_percentual}%` : '—'],
+          ['⚖️ Jurídico', `${s.score_juridico?.toFixed(1) || '—'}/10`],
+          ['🏠 Ocupação', s.ocupacao || 'Verificar'],
+          ['📍 Localização', `${s.score_localizacao?.toFixed(1) || '—'}/10`],
+          ['💡 Custo total', s.valor_minimo
+            ? `R$ ${Math.round(s.valor_minimo * 1.075 / 1000)}k est.` : '—'],
+        ].map(([label, val]) => (
+          <div key={label} style={{ background:'rgba(255,255,255,0.08)',
+            borderRadius:10, padding:'12px 14px' }}>
+            <p style={{ margin:'0 0 2px', fontSize:11,
+              color:'rgba(255,255,255,0.5)' }}>{label}</p>
+            <p style={{ margin:0, fontSize:16, fontWeight:700, color:'#fff' }}>{val}</p>
+          </div>
+        ))}
+      </div>
+      {s.alertas?.length > 0 && (
+        <div style={{ marginTop:12, padding:'10px 14px',
+          background:'rgba(229,72,77,0.15)', borderRadius:8,
+          borderLeft:'3px solid #E5484D' }}>
+          <p style={{ margin:'0 0 4px', fontSize:10, color:'#E5484D',
+            fontWeight:700, textTransform:'uppercase' }}>⚠️ Alertas</p>
+          {s.alertas.slice(0,2).map((a,i) => (
+            <p key={i} style={{ margin:'2px 0', fontSize:11,
+              color:'rgba(255,255,255,0.8)' }}>• {a}</p>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── PAINEL PORTFÓLIO ─────────────────────────────────────────────────────────
+function PainelPortfolio({ props: imoveis }) {
+  const STATUS = {
+    analisado:   { label:'Em análise',  color:C.mustard, emoji:'🔍' },
+    aprovado:    { label:'Aprovado',    color:C.emerald, emoji:'✅' },
+    arrematado:  { label:'Arrematado',  color:C.navy,    emoji:'🏆' },
+    em_reforma:  { label:'Em reforma',  color:C.mustard, emoji:'🏗️' },
+    a_venda:     { label:'À venda',     color:C.emerald, emoji:'🏷️' },
+    vendido:     { label:'Vendido',     color:'#6B7C90', emoji:'💰' },
+    arquivado:   { label:'Arquivado',   color:'#9EAAB8', emoji:'📦' },
+  }
+  const grupos = Object.entries(STATUS).map(([key, cfg]) => ({
+    ...cfg, key,
+    items: imoveis.filter(i =>
+      (i.status || 'analisado') === key ||
+      (key === 'aprovado' && i.recomendacao === 'COMPRAR' && !i.status) ||
+      (key === 'analisado' && i.recomendacao === 'AGUARDAR' && !i.status)
+    )
+  })).filter(g => g.items.length > 0)
+  const totalInvestido  = imoveis.reduce((s,i) => s + (i.valor_minimo || 0), 0)
+  const scoresMedio     = imoveis.filter(i=>i.score_total)
+  const scoreMedio      = scoresMedio.length
+    ? scoresMedio.reduce((s,i) => s + i.score_total, 0) / scoresMedio.length : 0
+  const aprovados       = imoveis.filter(i => i.recomendacao === 'COMPRAR').length
+  const arrematados     = imoveis.filter(i => i.status === 'arrematado').length
+  return (
+    <div style={{ padding:'24px 32px' }}>
+      <h2 style={{ margin:'0 0 6px', fontSize:20, fontWeight:700, color:C.navy }}>
+        📊 Portfólio AXIS
+      </h2>
+      <p style={{ margin:'0 0 24px', fontSize:13, color:C.muted }}>
+        Visão consolidada do grupo — {imoveis.length} ativos rastreados
+      </p>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12, marginBottom:24 }}>
+        {[
+          ['Total rastreado', imoveis.length, 'imóveis', C.navy],
+          ['Aprovados (COMPRAR)', aprovados, 'imóveis', C.emerald],
+          ['Score médio', scoreMedio.toFixed(1), '/10', C.emerald],
+          ['Arrematados', arrematados, 'imóveis', C.navy],
+        ].map(([label, val, unit, color]) => (
+          <div key={label} style={{ background:C.white, borderRadius:12,
+            padding:'14px 16px', border:`1px solid ${C.borderW}` }}>
+            <p style={{ margin:'0 0 4px', fontSize:11, color:C.muted }}>{label}</p>
+            <p style={{ margin:0, fontSize:22, fontWeight:800, color }}>
+              {val}<span style={{ fontSize:12, fontWeight:400, color:C.muted }}> {unit}</span>
+            </p>
+          </div>
+        ))}
+      </div>
+      <div style={{ display:'flex', gap:12, overflowX:'auto', paddingBottom:8 }}>
+        {grupos.map(grupo => (
+          <div key={grupo.key} style={{ minWidth:240, flex:'0 0 auto' }}>
+            <div style={{ display:'flex', alignItems:'center', gap:6,
+              padding:'6px 10px', borderRadius:'8px 8px 0 0',
+              background:`${grupo.color}15`, borderBottom:`2px solid ${grupo.color}` }}>
+              <span>{grupo.emoji}</span>
+              <span style={{ fontSize:12, fontWeight:700, color:grupo.color }}>
+                {grupo.label}
+              </span>
+              <span style={{ fontSize:11, color:grupo.color, marginLeft:'auto',
+                background:`${grupo.color}20`, borderRadius:10, padding:'1px 7px' }}>
+                {grupo.items.length}
+              </span>
+            </div>
+            {grupo.items.map(item => (
+              <div key={item.id} style={{ background:C.white, border:`1px solid ${C.borderW}`,
+                borderTop:'none', padding:'10px 12px', fontSize:12 }}>
+                <p style={{ margin:'0 0 2px', fontWeight:600, color:C.navy,
+                  overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                  {item.titulo || item.endereco || 'Imóvel'}
+                </p>
+                <p style={{ margin:'0 0 4px', fontSize:10.5, color:C.muted }}>
+                  {item.cidade}/{item.estado}
+                </p>
+                <div style={{ display:'flex', justifyContent:'space-between' }}>
+                  <span style={{ fontSize:11, color:C.navy, fontWeight:600 }}>
+                    {item.valor_minimo
+                      ? `R$ ${Math.round(item.valor_minimo/1000)}k`
+                      : '—'}
+                  </span>
+                  <span style={{ fontSize:11, fontWeight:700,
+                    color: !item.score_total ? C.hint
+                      : item.score_total >= 7.5 ? C.emerald
+                      : item.score_total >= 6 ? C.mustard : RED }}>
+                    {item.score_total?.toFixed(1) || '—'}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ── DETAIL ────────────────────────────────────────────────────────────────────
 function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze,isAdmin,onArchive}) {
   const [sending,setSending]=useState(false)
+  const [modoAoVivo, setModoAoVivo]=useState(false)
   const [msg,setMsg]=useState("")
   const [abaDetalhe,setAbaDetalhe]=useState('resumo')
   const [reanalyzing,setReanalyzing]=useState(false)
@@ -1496,6 +1824,17 @@ function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze,isAdmin,onArch
         {p.fonte_url&&<a href={p.fonte_url} target="_blank" rel="noopener noreferrer" style={{...btn("s"),textDecoration:"none",display:"inline-block"}}>🔗 Anúncio</a>}
         {isAdmin&&<button style={{...btn("s"),background:`${K.amb}15`,color:K.amb,border:`1px solid ${K.amb}30`}} onClick={handleReanalyze} disabled={reanalyzing}>{reanalyzing?"⏳ Reanalisando...":"🔄 Reanalisar"}</button>}
         {isAdmin&&<button style={btn("trello")} onClick={sendTrello} disabled={sending}>{sending?"Enviando...":"🔷 Trello"}</button>}
+        <button onClick={() => setModoAoVivo(true)} style={{
+          padding:'5px 12px', borderRadius:8,
+          background:'#E5484D', color:'#fff',
+          border:'none', fontSize:11.5, fontWeight:700,
+          cursor:'pointer', display:'flex', alignItems:'center', gap:5,
+        }}>
+          <span style={{ width:7, height:7, borderRadius:'50%',
+            background:'#fff', display:'inline-block',
+            animation:'pulse 1s infinite' }} />
+          Ao Vivo
+        </button>
         {isAdmin&&onArchive&&<button style={{...btn("s"),background:`${C.mustardL}`,color:C.mustard,border:`1px solid ${C.mustard}40`}} onClick={()=>onArchive(p.id)}>📦 Arquivar</button>}
         {isAdmin&&<button style={{...btn("d"),padding:"5px 12px",fontSize:"12px"}} onClick={()=>{if(confirm("Excluir?"))onDelete(p.id)}}>🗑</button>}
       </>}/>
@@ -1560,6 +1899,41 @@ function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze,isAdmin,onArch
         <div style={{fontSize:"11px",color:K.red,fontWeight:"700",textTransform:"uppercase",letterSpacing:"1px",marginBottom:"8px"}}>🚨 Alertas Críticos</div>
         {p.alertas.map((a,i)=><div key={i} style={{fontSize:"12.5px",color:K.tx,marginBottom:"4px"}}>• {a}</div>)}
       </div>}
+      {/* Estratégia recomendada badge */}
+      {p.estrategia_recomendada_detalhe?.tipo && (() => {
+        const cfg = ESTRATEGIA_CONFIG[p.estrategia_recomendada_detalhe.tipo]
+        return cfg ? (
+          <div style={{ display:'inline-flex', alignItems:'center', gap:6,
+            padding:'5px 12px', borderRadius:20, marginBottom:14,
+            background:`${cfg.color}15`, border:`1px solid ${cfg.color}30`,
+            fontSize:12, fontWeight:600, color:cfg.color }}>
+            {cfg.emoji} {cfg.label}
+            {p.estrategia_recomendada_detalhe.prazo_estimado_meses && (
+              <span style={{ fontWeight:400, opacity:0.8 }}>
+                · {p.estrategia_recomendada_detalhe.prazo_estimado_meses} meses
+              </span>
+            )}
+          </div>
+        ) : null
+      })()}
+      {/* Síntese executiva */}
+      {p.sintese_executiva && (
+        <div style={{
+          background: C.navyAlfa || '#F0F4FF',
+          border: `1px solid ${C.navy}20`,
+          borderLeft: `3px solid ${C.navy}`,
+          borderRadius: '0 10px 10px 0',
+          padding: '12px 16px', marginBottom: 16,
+        }}>
+          <p style={{ margin:'0 0 4px', fontSize:10, fontWeight:700, color:C.navy,
+            textTransform:'uppercase', letterSpacing:'0.5px' }}>
+            Síntese da análise
+          </p>
+          <p style={{ margin:0, fontSize:13, color:C.text, lineHeight:1.6 }}>
+            {p.sintese_executiva}
+          </p>
+        </div>
+      )}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"14px",marginBottom:"14px"}}>
         <div style={card()}>
           <div style={{fontWeight:"600",color:K.wh,marginBottom:"12px",fontSize:"13px"}}>💰 Valores</div>
@@ -1599,6 +1973,10 @@ function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze,isAdmin,onArch
             </div>
           ))}
         </div>
+      </div>
+      {/* Calculadora ROI */}
+      <div style={{...card(),marginBottom:"14px"}}>
+        <CalculadoraROI imovel={p} />
       </div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"14px",marginBottom:"14px"}}>
         <div style={card()}>
@@ -1688,6 +2066,7 @@ function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze,isAdmin,onArch
       {p.endereco&&<div style={{...card(),marginBottom:"14px"}}><div style={{fontWeight:"600",color:K.wh,marginBottom:"6px",fontSize:"13px"}}>📍 Localização</div><div style={{fontSize:"13px",color:K.t2}}>{p.endereco}</div></div>}
       </>}
     </div>
+    {modoAoVivo && <ModoAoVivo imovel={p} onClose={() => setModoAoVivo(false)} />}
   </div>
 }
 
@@ -2102,6 +2481,7 @@ useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("param
     {icon:Scale,l:'Comparar',v:'comparar'},
     {icon:CheckSquare,l:'Tarefas',v:'tarefas'},
     {icon:FileText,l:'Arquivados',v:'arquivados'},
+    ...(isAdmin?[{icon:TrendingUp,l:'Portfólio',v:'portfolio'}]:[]),
     ...(isAdmin?[{icon:ShieldCheck,l:'Admin',v:'admin'}]:[]),
   ]
   // Keep emoji-based navItems for MobileNav compatibility
@@ -2114,6 +2494,7 @@ useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("param
     {i:'⚖️',l:'Comparar',v:'comparar'},
     {i:'✅',l:'Tarefas',v:'tarefas'},
     {i:'🏦',l:'Arquivados',v:'arquivados'},
+    ...(isAdmin?[{i:'📊',l:'Portfólio',v:'portfolio'}]:[]),
     ...(isAdmin?[{i:'🛡️',l:'Admin',v:'admin'}]:[]),
   ]
   const isAct=v=>view===v||(v==="imoveis"&&view==="detail")
@@ -2209,6 +2590,7 @@ useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("param
     {view==="graficos"&&<div><div style={{padding:"22px 28px 16px",borderBottom:`1px solid ${C.borderW}`,background:C.white}}><div style={{fontWeight:700,fontSize:19,color:C.text}}>Gráficos</div></div><div style={{padding:"20px 28px"}}><Charts properties={props}/></div></div>}
     {view==="tarefas"&&<Tarefas/>}
     {view==="arquivados"&&<BancoArquivados session={session} isAdmin={isAdmin}/>}
+    {view==="portfolio"&&isAdmin&&<PainelPortfolio props={props}/>}
     {view==="admin"&&isAdmin&&<AdminPanel/>}
     </div>
 
