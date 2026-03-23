@@ -1,0 +1,12 @@
+{
+  "name": "AXIS — Inteligência Patrimonial",
+  "short_name": "AXIS",
+  "description": "Visão de Oportunidade. Base de Confiança.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#002B80",
+  "theme_color": "#002B80",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}
