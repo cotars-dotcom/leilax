@@ -1,4 +1,4 @@
--- LEILAX — Documentos jurídicos anexados por imóvel
+-- AXIS — Documentos jurídicos anexados por imóvel
 -- Executar no Supabase SQL Editor
 
 CREATE TABLE IF NOT EXISTS public.documentos_juridicos (
