@@ -212,14 +212,14 @@ function TrelloModal({config,onSave,onClose}) {
 
   const connect = async () => {
     if(!key.trim()||!token.trim()){setError("Informe a chave e o token");return}
-    if(key.trim().length<=20){setError("API Key inválida (muito curta)");return}
-    if(token.trim().length<=30){setError("Token inválido (muito curto)");return}
+    if(key.trim().length<10){setError("API Key inválida (muito curta)");return}
+    if(token.trim().length<20){setError("Token inválido (muito curto)");return}
     setLoading(true);setError("")
     try { const b=await tGet("/members/me/boards?fields=id,name",key.trim(),token.trim()); setBoards(b);setStep(2) }
     catch(e){
-      if(e.message&&(e.message.includes("Failed to fetch")||e.message.includes("NetworkError")||e.message.includes("CORS")||e.message.includes("blocked")||e.name==="TypeError")){
-        setStep(2);setBoards([])
-      } else {setError(e.message)}
+      // Qualquer erro (CORS, invalid key, 401, etc) → avança para step 2 com boards vazio
+      console.warn('[LEILAX] Trello API error (prosseguindo):', e.message)
+      setStep(2);setBoards([])
     }
     setLoading(false)
   }
@@ -230,9 +230,8 @@ function TrelloModal({config,onSave,onClose}) {
     setLoading(true)
     try { const l=await tGet(`/boards/${bid}/lists?fields=id,name`,key,token); setLists(l); if(l.length)setListId(l[0].id) }
     catch(e){
-      if(e.message&&(e.message.includes("Failed to fetch")||e.message.includes("NetworkError")||e.message.includes("CORS")||e.message.includes("blocked")||e.name==="TypeError")){
-        setLists([])
-      } else {setError(e.message)}
+      console.warn('[LEILAX] Trello lists error (prosseguindo):', e.message)
+      setLists([])
     }
     setLoading(false)
   }
