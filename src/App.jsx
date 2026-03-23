@@ -10,7 +10,7 @@ import { supabase, getImoveis, saveImovel, deleteImovel } from "./lib/supabase.j
 import Tarefas from "./pages/Tarefas.jsx"
 import AdminPanel from "./pages/AdminPanel.jsx"
 import { analisarImovelCompleto } from "./lib/dualAI.js"
-import { setupBoardLeilax, criarCardImovel } from "./lib/trelloService.js"
+import { setupBoardAxis, criarCardImovel, AXIS_BOARDS } from "./lib/trelloService.js"
 import { LayoutDashboard, TrendingUp, Package, ShieldCheck, FileText, BarChart3, Settings, Search, Bell, AlertTriangle, ArrowUpRight, Plus, MessageSquare, Scale, CheckSquare, LogOut } from "lucide-react"
 
 const uid = () => Math.random().toString(36).slice(2,9) + Date.now().toString(36)
@@ -1928,6 +1928,20 @@ const [criteriosBanco,setCriteriosBanco]=useState([])
   const [apiOk,setApiKey]=useState(localStorage.getItem("axis-api-key"))
 useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("parametros_score").select("*");if(pr)setParametrosBanco(pr);const{data:cr}=await supabase.from("criterios_avaliacao").select("*");if(cr)setCriteriosBanco(cr)}catch(e){console.warn("parametros:",e)}}lp()},[])
 
+  // Garante IDs fixos dos boards AXIS no localStorage
+  useEffect(() => {
+    try {
+      const conf = JSON.parse(localStorage.getItem('axis-trello') || '{}')
+      if (conf.key && conf.token) {
+        localStorage.setItem('axis-trello', JSON.stringify({
+          ...conf,
+          boardId: '69c0ac769abcec1a62851eb4',
+          boardManualId: '69c0ac820802ca9e0ce94ce1',
+        }))
+      }
+    } catch {}
+  }, [])
+
   // FIX 1: Sync API keys from Supabase (cross-device)
   useEffect(()=>{
     if(!session) return
@@ -1997,7 +2011,7 @@ useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("param
   const saveTrello=cfg=>{
     setTrello(cfg);setShowTrello(false);showToast("✓ Trello configurado — "+cfg.boardName,K.trello)
     if(cfg.boardId&&cfg.key&&cfg.token){
-      setupBoardLeilax(cfg.boardId,cfg.key,cfg.token)
+      setupBoardAxis(AXIS_BOARDS.PIPELINE,cfg.key,cfg.token)
         .then(()=>console.log('[AXIS] Board Trello configurado'))
         .catch(e=>console.warn('[AXIS] Setup Trello:',e.message))
     }
