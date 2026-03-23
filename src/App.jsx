@@ -11,40 +11,83 @@ import Tarefas from "./pages/Tarefas.jsx"
 import AdminPanel from "./pages/AdminPanel.jsx"
 import { analisarImovelCompleto } from "./lib/dualAI.js"
 import { setupBoardLeilax, criarCardImovel } from "./lib/trelloService.js"
-    
+import { LayoutDashboard, TrendingUp, Package, ShieldCheck, FileText, BarChart3, Settings, Search, Bell, AlertTriangle, ArrowUpRight, Plus, MessageSquare, Scale, CheckSquare, LogOut } from "lucide-react"
+
 const uid = () => Math.random().toString(36).slice(2,9) + Date.now().toString(36)
 const fmtD = d => d ? new Date(d).toLocaleDateString("pt-BR") : "—"
 const fmtC = v => v ? `R$ ${Number(v).toLocaleString("pt-BR", {minimumFractionDigits:0})}` : "—"
 
+// AXIS Design Tokens
+const C = {
+  navy:     "#002180",
+  navy2:    "#001666",
+  navy3:    "#00194D",
+  navyAlfa: "#00218014",
+  offwhite: "#F8F5EA",
+  white:    "#FFFFFF",
+  emerald:  "#2DB06C",
+  emeraldL: "#E8F7EF",
+  emeraldM: "#1A9955",
+  mustard:  "#C68A00",
+  mustardL: "#FEF3D0",
+  silver:   "#8A9BB0",
+  border:   "#E8E4D9",
+  borderW:  "#EDEBEE",
+  text:     "#0A1628",
+  muted:    "#6B7C90",
+  hint:     "#9EAAB8",
+}
+
+// Backward-compat aliases (used by existing components)
 const K = {
-  bg:"#080B10", bg2:"#0C1018", s1:"#111620", s2:"#171E2C",
-  bd:"#1C2438", bd2:"#232D42", teal:"#00E5BB", amb:"#F5A623",
-  red:"#FF4757", blue:"#4A9EFF", pur:"#A78BFA", grn:"#2ECC71",
-  gold:"#FFD700", tx:"#DDE4F0", t2:"#7A8BA8", t3:"#3D4E6A", wh:"#FFFFFF",
+  bg:C.offwhite, bg2:C.white, s1:C.white, s2:"#F2F0E6",
+  bd:C.border, bd2:C.borderW, teal:C.emerald, amb:C.mustard,
+  red:"#E5484D", blue:"#4A9EFF", pur:"#A78BFA", grn:C.emerald,
+  gold:"#C68A00", tx:C.text, t2:C.muted, t3:C.hint, wh:C.navy,
   trello:"#0052CC"
 }
 
-const scoreColor = s => s >= 7.5 ? K.grn : s >= 6 ? K.teal : s >= 4.5 ? K.amb : K.red
+const scoreColor = s => s >= 7.5 ? C.emerald : s >= 6 ? C.emerald : s >= 4.5 ? C.mustard : "#E5484D"
 const scoreLabel = s => s >= 7.5 ? "FORTE" : s >= 6 ? "BOM" : s >= 4.5 ? "MÉDIO" : "FRACO"
-const recColor = r => ({ COMPRAR: K.grn, AGUARDAR: K.amb, EVITAR: K.red })[r] || K.t3
+const recColor = r => ({ COMPRAR: C.emerald, AGUARDAR: C.mustard, EVITAR: "#E5484D" })[r] || C.hint
 
 const btn = (v="p") => ({
-  background: v==="p"?K.teal:v==="d"?`${K.red}18`:v==="trello"?K.trello:K.s2,
-  color: v==="p"?"#000":v==="d"?K.red:v==="trello"?"#fff":K.t2,
-  border: v==="d"?`1px solid ${K.red}40`:"none",
-  borderRadius:"6px", padding: v==="s"?"5px 12px":"9px 20px",
+  background: v==="p"?C.navy:v==="d"?`#E5484D12`:v==="trello"?K.trello:C.white,
+  color: v==="p"?C.white:v==="d"?"#E5484D":v==="trello"?"#fff":C.muted,
+  border: v==="p"?`1px solid ${C.navy}`:v==="d"?`1px solid #E5484D40`:`1px solid ${C.borderW}`,
+  borderRadius:"8px", padding: v==="s"?"5px 12px":"9px 20px",
   fontSize: v==="s"?"11.5px":"13px", fontWeight:"600", cursor:"pointer", flexShrink:0
 })
-const inp = { background:K.s1, border:`1px solid ${K.bd}`, borderRadius:"6px", padding:"10px 14px", color:K.tx, fontSize:"13px", width:"100%", outline:"none" }
-const card = (ac) => ({ background:K.s1, border:`1px solid ${ac||K.bd}`, borderRadius:"8px", padding:"18px" })
-const Bdg = ({c,ch}) => <span style={{display:"inline-block",fontSize:"10px",fontWeight:"700",padding:"2px 8px",borderRadius:"4px",textTransform:"uppercase",letterSpacing:".5px",background:`${c}20`,color:c,border:`1px solid ${c}40`}}>{ch}</span>
+const inp = { background:C.offwhite, border:`1px solid ${C.border}`, borderRadius:"8px", padding:"10px 14px", color:C.text, fontSize:"13px", width:"100%", outline:"none" }
+const card = (ac) => ({ background:C.white, border:`1px solid ${ac||C.borderW}`, borderRadius:"12px", padding:"18px" })
+const Bdg = ({c,ch}) => <span style={{display:"inline-block",fontSize:"10px",fontWeight:"700",padding:"2px 8px",borderRadius:"5px",textTransform:"uppercase",letterSpacing:".5px",background:`${c}12`,color:c}}>{ch}</span>
+
+function AxisLogo({ size = "md", light = false }) {
+  const textColor = light ? "#FFFFFF" : C.navy
+  const arrowColor = C.emerald
+  const s = size === "sm" ? 0.7 : size === "lg" ? 1.4 : 1
+  return (
+    <svg
+      width={Math.round(80 * s)}
+      height={Math.round(28 * s)}
+      viewBox="0 0 80 28"
+      fill="none"
+    >
+      <text x="0" y="22" fontFamily="'Inter', system-ui, sans-serif" fontWeight="800" fontSize="26" letterSpacing="-1" fill={textColor}>A</text>
+      <text x="19" y="22" fontFamily="'Inter', system-ui, sans-serif" fontWeight="800" fontSize="26" letterSpacing="-1" fill={textColor}>X</text>
+      <line x1="24" y1="14" x2="35" y2="4" stroke={arrowColor} strokeWidth="2.5" strokeLinecap="round"/>
+      <polyline points="30,4 35,4 35,9" fill="none" stroke={arrowColor} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+      <text x="39" y="22" fontFamily="'Inter', system-ui, sans-serif" fontWeight="800" fontSize="26" letterSpacing="-1" fill={textColor}>IS</text>
+    </svg>
+  )
+}
 
 function Hdr({title,sub,actions}) {
-  return <div style={{padding:"22px 28px 16px",borderBottom:`1px solid ${K.bd}`,flexShrink:0}}>
+  return <div style={{padding:"22px 28px 16px",borderBottom:`1px solid ${C.borderW}`,flexShrink:0,background:C.white}}>
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:"10px",flexWrap:"wrap"}}>
       <div>
-        <div style={{fontWeight:"700",fontSize:"19px",color:K.wh,letterSpacing:"-0.3px"}}>{title}</div>
-        {sub&&<div style={{fontSize:"11px",color:K.t3,marginTop:"3px"}}>{sub}</div>}
+        <div style={{fontWeight:"700",fontSize:"19px",color:C.text,letterSpacing:"-0.3px"}}>{title}</div>
+        {sub&&<div style={{fontSize:"11px",color:C.hint,marginTop:"3px"}}>{sub}</div>}
       </div>
       {actions&&<div style={{display:"flex",gap:"8px",flexWrap:"wrap"}}>{actions}</div>}
     </div>
@@ -52,19 +95,20 @@ function Hdr({title,sub,actions}) {
 }
 
 function ScoreRing({score,size=80}) {
-  const c = scoreColor(score||0)
+  const maxVal = size > 60 ? 10 : 100
+  const c = maxVal === 10 ? scoreColor(score||0) : ((score||0)>=70?C.emerald:(score||0)>=50?C.mustard:"#E5484D")
   const r = (size-10)/2
   const circ = 2*Math.PI*r
-  const dash = ((score||0)/10)*circ
+  const dash = ((score||0)/maxVal)*circ
   return <div style={{position:"relative",width:size,height:size,flexShrink:0}}>
     <svg width={size} height={size} style={{transform:"rotate(-90deg)"}}>
-      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={K.s2} strokeWidth="8"/>
-      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={c} strokeWidth="8"
+      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={`${c}20`} strokeWidth={size>60?8:4}/>
+      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={c} strokeWidth={size>60?8:4}
         strokeDasharray={`${dash} ${circ}`} strokeLinecap="round"/>
     </svg>
     <div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",textAlign:"center"}}>
       <div style={{fontSize:size>70?"18px":"13px",fontWeight:"800",color:c,lineHeight:1}}>{(score||0).toFixed(1)}</div>
-      <div style={{fontSize:"8px",color:K.t3,textTransform:"uppercase",letterSpacing:".5px"}}>{scoreLabel(score||0)}</div>
+      <div style={{fontSize:"8px",color:C.hint,textTransform:"uppercase",letterSpacing:".5px"}}>{scoreLabel(score||0)}</div>
     </div>
   </div>
 }
@@ -464,32 +508,101 @@ function PropCard({p,onNav}) {
   </div>
 }
 
+// ── AXIS HEADER ──────────────────────────────────────────────────────────────
+function AxisHeader() {
+  return (
+    <header style={{
+      display:"flex",alignItems:"center",justifyContent:"space-between",
+      padding:"20px 40px",background:C.white,borderBottom:`1px solid ${C.borderW}`,
+    }}>
+      <div>
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:2}}>
+          <AxisLogo size="sm" />
+          <span style={{width:1,height:20,background:C.borderW,display:"inline-block"}} />
+          <h1 style={{margin:0,fontSize:18,fontWeight:700,color:C.text,letterSpacing:"-0.5px"}}>Executive Dashboard</h1>
+        </div>
+        <p style={{margin:0,fontSize:12.5,color:C.muted,paddingLeft:2}}>
+          Visão consolidada da operação patrimonial · atualizado agora
+        </p>
+      </div>
+      <div style={{display:"flex",alignItems:"center",gap:16}}>
+        <div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 14px",borderRadius:8,border:`1px solid ${C.borderW}`,background:C.offwhite}}>
+          <Search size={14} color={C.hint} />
+          <input placeholder="Buscar ativo..." style={{border:"none",background:"transparent",outline:"none",fontSize:13,color:C.text,width:160}} />
+        </div>
+        <div style={{position:"relative",cursor:"pointer",padding:4}}>
+          <Bell size={17} color={C.muted} />
+          <span style={{position:"absolute",top:2,right:2,width:7,height:7,borderRadius:"50%",background:"#E5484D",border:`2px solid ${C.white}`}} />
+        </div>
+        <button style={{display:"flex",alignItems:"center",gap:8,padding:"7px 14px",borderRadius:8,border:`1px solid ${C.navy}`,background:C.navy,color:C.white,fontSize:12.5,fontWeight:500,cursor:"pointer"}}>
+          Exportar Relatório
+        </button>
+      </div>
+    </header>
+  )
+}
+
+// ── METRIC CARD ──────────────────────────────────────────────────────────────
+function MetricCard({ titulo, valor, aux, badge, badgeColor, badgeBg, icon: Icon, iconColor, trend }) {
+  return (
+    <div style={{
+      background:C.white,border:`1px solid ${C.borderW}`,borderRadius:14,padding:"24px 26px",
+      display:"flex",flexDirection:"column",gap:6,
+      boxShadow:"0 2px 12px rgba(0,33,128,0.06)",transition:"box-shadow 0.2s, transform 0.2s",cursor:"default",
+    }}
+    onMouseEnter={e=>{e.currentTarget.style.boxShadow="0 6px 24px rgba(0,33,128,0.10)";e.currentTarget.style.transform="translateY(-1px)"}}
+    onMouseLeave={e=>{e.currentTarget.style.boxShadow="0 2px 12px rgba(0,33,128,0.06)";e.currentTarget.style.transform="none"}}
+    >
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+        <span style={{fontSize:11,fontWeight:600,color:C.muted,textTransform:"uppercase",letterSpacing:"0.8px"}}>{titulo}</span>
+        <div style={{width:34,height:34,borderRadius:9,background:`${iconColor}12`,display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <Icon size={16} color={iconColor} strokeWidth={1.8} />
+        </div>
+      </div>
+      <div style={{display:"flex",alignItems:"baseline",gap:8,marginTop:4}}>
+        <span style={{fontSize:34,fontWeight:700,color:C.text,letterSpacing:"-1.5px",lineHeight:1}}>{valor}</span>
+        {trend&&<div style={{display:"flex",alignItems:"center",gap:3}}>
+          <ArrowUpRight size={14} color={C.emerald} strokeWidth={2.5} />
+          <span style={{fontSize:13,color:C.emerald,fontWeight:600}}>{trend}</span>
+        </div>}
+      </div>
+      <div style={{display:"flex",alignItems:"center",gap:8,marginTop:2}}>
+        <span style={{fontSize:12.5,color:C.muted}}>{aux}</span>
+        {badge&&<span style={{fontSize:10.5,fontWeight:600,padding:"2px 9px",borderRadius:5,background:badgeBg||`${badgeColor}12`,color:badgeColor}}>{badge}</span>}
+      </div>
+    </div>
+  )
+}
+
 // ── DASHBOARD ─────────────────────────────────────────────────────────────────
 function Dashboard({props,onNav}) {
   const total=props.length, comprar=props.filter(p=>p.recomendacao==="COMPRAR").length
   const forte=props.filter(p=>(p.score_total||0)>=7.5).length
   const avg=total?(props.reduce((s,p)=>s+(p.score_total||0),0)/total).toFixed(1):"—"
   const recentes=[...props].sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt)).slice(0,6)
+
+  const METRICS = [
+    { titulo:"Patrimônio sob Gestão", valor:`${total} ativos`, aux:"Carteira monitorada", badge:"Atualizado", badgeColor:C.emerald, badgeBg:C.emeraldL, icon:BarChart3, iconColor:C.navy },
+    { titulo:"Score Médio", valor:avg, aux:"Média da carteira ativa", badge:"Viável", badgeColor:C.navy, badgeBg:C.navyAlfa, icon:ShieldCheck, iconColor:C.navy },
+    { titulo:"Para Comprar", valor:String(comprar), aux:"Recomendação positiva", badge:"Oportunidade", badgeColor:C.emerald, badgeBg:C.emeraldL, icon:TrendingUp, iconColor:C.emerald, trend:comprar>0?"ativas":undefined },
+    { titulo:"Score Forte", valor:String(forte), aux:`Score ≥ 7.5 de ${total}`, badge:forte>0?"Destaque":"—", badgeColor:C.mustard, badgeBg:C.mustardL, icon:AlertTriangle, iconColor:C.mustard },
+  ]
+
   return <div>
-    <Hdr title="Dashboard LEILAX" sub={`${total} imóvel(is) analisado(s)`} actions={<button style={btn()} onClick={()=>onNav("novo")}>+ Analisar Imóvel</button>}/>
-    <div style={{padding:"20px 28px"}}>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:"12px",marginBottom:"20px"}}>
-        {[{l:"Analisados",v:total,c:K.blue},{l:"Score Médio",v:avg,c:K.teal},{l:"Comprar",v:comprar,c:K.grn},{l:"Score Forte",v:forte,c:K.gold}].map(k=>(
-          <div key={k.l} style={{background:`${k.c}12`,border:`1px solid ${k.c}30`,borderRadius:"8px",padding:"16px"}}>
-            <div style={{fontSize:"10px",color:K.t3,textTransform:"uppercase",letterSpacing:"1px",marginBottom:"8px"}}>{k.l}</div>
-            <div style={{fontFamily:"monospace",fontSize:"30px",fontWeight:"800",color:k.c}}>{k.v}</div>
-          </div>
-        ))}
+    <AxisHeader />
+    <div style={{padding:"28px 36px"}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:"20px",marginBottom:"28px"}}>
+        {METRICS.map(m=><MetricCard key={m.titulo} {...m} />)}
       </div>
       {total===0
-        ?<div style={{textAlign:"center",padding:"60px 20px",color:K.t3}}>
-          <div style={{fontSize:"48px",marginBottom:"16px"}}>🏠</div>
-          <div style={{fontSize:"15px",marginBottom:"8px",color:K.t2}}>Nenhum imóvel analisado ainda</div>
-          <div style={{fontSize:"12px",marginBottom:"24px"}}>Cole o link de um leilão para começar</div>
+        ?<div style={{textAlign:"center",padding:"60px 20px",color:C.hint}}>
+          <div style={{fontSize:"48px",marginBottom:"16px",opacity:0.5}}>📊</div>
+          <div style={{fontSize:"15px",marginBottom:"8px",color:C.muted}}>Nenhum imóvel analisado ainda</div>
+          <div style={{fontSize:"12px",marginBottom:"24px",color:C.hint}}>Cole o link de um leilão para começar</div>
           <button style={btn()} onClick={()=>onNav("novo")}>Analisar Primeiro Imóvel</button>
         </div>
-        :<><div style={{fontWeight:"600",color:K.wh,marginBottom:"12px",fontSize:"13px"}}>Análises Recentes</div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:"12px"}}>
+        :<><div style={{fontWeight:"600",color:C.text,marginBottom:"14px",fontSize:"14px"}}>Análises Recentes</div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:"16px"}}>
           {recentes.map(p=><PropCard key={p.id} p={p} onNav={onNav}/>)}
         </div></>}
     </div>
@@ -686,9 +799,9 @@ function Comparativo({props}) {
 // ── APP ROOT ──────────────────────────────────────────────────────────────────
 export default function App() {
   const { session, profile, loading: authLoading, isAdmin } = useAuth()
-  if (authLoading) return <div style={{display:'flex',flexDirection:'column',height:'100vh',background:'#080B10',justifyContent:'center',alignItems:'center',color:'#00E5BB',fontFamily:'system-ui',fontSize:'16px',fontWeight:'700'}}>⏳ Carregando...</div>
+  if (authLoading) return <div style={{display:'flex',flexDirection:'column',height:'100vh',background:C.offwhite,justifyContent:'center',alignItems:'center',color:C.navy,fontFamily:"'Inter',system-ui,sans-serif",fontSize:'16px',fontWeight:'700'}}>Carregando...</div>
   if (!session) return <Login />
-  if (profile && !profile.ativo) return <div style={{display:'flex',height:'100vh',background:'#080B10',justifyContent:'center',alignItems:'center',color:'#FF4757',fontFamily:'system-ui',flexDirection:'column',gap:'12px'}}><div>🚫</div><div style={{fontSize:'16px',fontWeight:'700'}}>Acesso desativado</div><div style={{fontSize:'13px',color:'#3D4E6A'}}>Contate o administrador</div></div>
+  if (profile && !profile.ativo) return <div style={{display:'flex',height:'100vh',background:C.offwhite,justifyContent:'center',alignItems:'center',color:'#E5484D',fontFamily:"'Inter',system-ui,sans-serif",flexDirection:'column',gap:'12px'}}><div style={{fontSize:'16px',fontWeight:'700'}}>Acesso desativado</div><div style={{fontSize:'13px',color:C.muted}}>Contate o administrador</div></div>
   const [view,setView]=useState("dashboard")
   const [vp,setVp]=useState({})
   const [props,setProps]=useState([])
@@ -758,6 +871,17 @@ useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("param
     }
   }
 
+  const NAV_ITEMS_DEF=[
+    {icon:LayoutDashboard,l:'Dashboard',v:'dashboard'},
+    {icon:Plus,l:'Analisar',v:'novo'},
+    {icon:MessageSquare,l:'Busca GPT',v:'busca'},
+    {icon:Package,l:'Imóveis',v:'imoveis'},
+    {icon:BarChart3,l:'Gráficos',v:'graficos'},
+    {icon:Scale,l:'Comparar',v:'comparar'},
+    {icon:CheckSquare,l:'Tarefas',v:'tarefas'},
+    ...(isAdmin?[{icon:ShieldCheck,l:'Admin',v:'admin'}]:[]),
+  ]
+  // Keep emoji-based navItems for MobileNav compatibility
   const navItems=[
     {i:'🏠',l:'Dashboard',v:'dashboard'},
     {i:'🔍',l:'Analisar',v:'novo'},
@@ -771,87 +895,82 @@ useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("param
   const isAct=v=>view===v||(v==="imoveis"&&view==="detail")
   const selP=vp.id?props.find(p=>p.id===vp.id):null
 
-  if(!loaded) return <div style={{display:"flex",height:"100vh",background:K.bg,justifyContent:"center",alignItems:"center",flexDirection:"column",gap:"12px",fontFamily:"system-ui"}}>
-    <div style={{fontSize:"32px"}}>🏠</div>
-    <div style={{color:K.teal,fontWeight:"700",fontSize:"16px"}}>Carregando LEILAX...</div>
+  if(!loaded) return <div style={{display:"flex",height:"100vh",background:C.offwhite,justifyContent:"center",alignItems:"center",flexDirection:"column",gap:"12px",fontFamily:"'Inter',system-ui,sans-serif"}}>
+    <AxisLogo size="lg" />
+    <div style={{color:C.muted,fontWeight:"500",fontSize:"14px",marginTop:8}}>Carregando...</div>
   </div>
 
-  return <div style={{display:"flex",height:"100vh",background:K.bg,color:K.tx,fontFamily:"'DM Sans',system-ui,sans-serif",fontSize:"14px",overflow:"hidden"}}>
-    <style>{`*{box-sizing:border-box;}::-webkit-scrollbar{width:4px;}::-webkit-scrollbar-track{background:${K.bg};}::-webkit-scrollbar-thumb{background:${K.bd2};border-radius:2px;}select option{background:${K.s1};}@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}a:hover{opacity:.8;}`}</style>
+  return <div style={{display:"flex",minHeight:"100vh",background:C.offwhite,color:C.text,fontFamily:"'Inter',system-ui,sans-serif",fontSize:"14px",overflow:"hidden"}}>
+    <style>{`*{box-sizing:border-box;}::-webkit-scrollbar{width:4px;}::-webkit-scrollbar-track{background:${C.offwhite};}::-webkit-scrollbar-thumb{background:${C.border};border-radius:2px;}select option{background:${C.white};}@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}a:hover{opacity:.8;}`}</style>
 
     {showTrello&&<TrelloModal config={trello} onSave={saveTrello} onClose={()=>setShowTrello(false)}/>}
     {showApiKey&&<ApiKeyModal onClose={()=>setShowApiKey(false)}/>}
 
-{/* SIDEBAR */}
-<div style={{width:220,minWidth:220,maxWidth:220,height:'100vh',background:'#0F1420',borderRight:'1px solid rgba(0,229,187,0.12)',display:'flex',flexDirection:'column',overflow:'hidden',flexShrink:0}}>
-{/* LOGO */}
-<div style={{padding:'18px 16px 10px',flexShrink:0}}>
-<div style={{fontWeight:800,fontSize:22,color:'#fff',letterSpacing:'-0.5px'}}>LEI<span style={{color:'#00E5BB'}}>LAX</span></div>
-<div style={{fontSize:9,color:'#3D4E6A',letterSpacing:'2px',textTransform:'uppercase',marginTop:2}}>Análise de Leilões · IA</div>
-</div>
-{/* NAV ITEMS */}
-<div style={{flex:1,overflowY:'auto',padding:'4px 8px',display:'flex',flexDirection:'column',gap:2}}>
-{navItems.map(item=>(
-<div key={item.v} onClick={()=>nav(item.v)} style={{display:'flex',alignItems:'center',gap:10,padding:'9px 12px',borderRadius:8,cursor:'pointer',background:isAct(item.v)?'rgba(0,229,187,0.12)':'transparent',color:isAct(item.v)?'#00E5BB':'rgba(221,228,240,0.72)',fontSize:13,fontWeight:isAct(item.v)?700:400,border:isAct(item.v)?'1px solid rgba(0,229,187,0.2)':'1px solid transparent',transition:'all 0.15s'}}>
-<span style={{fontSize:16,flexShrink:0}}>{item.i}</span>
-<span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{item.l}</span>
-</div>
-))}
-</div>
-{/* RODAPE DA SIDEBAR */}
-<div style={{flexShrink:0,padding:'8px',borderTop:'1px solid rgba(0,229,187,0.10)',display:'flex',flexDirection:'column',gap:'6px'}}>
-{/* Trello */}
-<div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'7px 10px',borderRadius:'7px',background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.07)',cursor:'pointer'}} onClick={()=>setShowTrello(true)}>
-<div style={{display:'flex',alignItems:'center',gap:'7px'}}>
-<span style={{fontSize:'13px'}}>🔷</span>
-<div>
-<div style={{fontSize:'11px',color:'#DDE4F0',fontWeight:600,lineHeight:1.2}}>Trello</div>
-<div style={{fontSize:'9px',color:'#3D4E6A'}}>{trello?'Configurado':'Clique para configurar'}</div>
-</div>
-</div>
-<span style={{fontSize:'9px',fontWeight:700,padding:'2px 6px',borderRadius:'3px',background:trello?'rgba(0,229,187,0.15)':'rgba(255,71,87,0.15)',color:trello?'#00E5BB':'#FF4757',border:trello?'1px solid rgba(0,229,187,0.3)':'1px solid rgba(255,71,87,0.3)'}}>{trello?'ON':'OFF'}</span>
-</div>
-{/* API Key */}
-<div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'7px 10px',borderRadius:'7px',background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.07)',cursor:'pointer'}} onClick={()=>setShowApiKey(true)}>
-<div style={{display:'flex',alignItems:'center',gap:'7px'}}>
-<span style={{fontSize:'13px'}}>⚙️</span>
-<div style={{fontSize:'11px',color:'#DDE4F0',fontWeight:600}}>API Key</div>
-</div>
-<span style={{fontSize:'9px',fontWeight:700,padding:'2px 6px',borderRadius:'3px',background:apiOk?'rgba(0,229,187,0.15)':'rgba(255,71,87,0.15)',color:apiOk?'#00E5BB':'#FF4757',border:apiOk?'1px solid rgba(0,229,187,0.3)':'1px solid rgba(255,71,87,0.3)'}}>{apiOk?'OK':'FALTA'}</span>
-</div>
-{/* Perfil + Sair */}
-<div style={{display:'flex',alignItems:'center',gap:'8px',padding:'7px 10px',borderRadius:'7px',background:'rgba(255,71,87,0.06)',border:'1px solid rgba(255,71,87,0.15)'}}>
-<div style={{width:26,height:26,borderRadius:'50%',background:'rgba(0,229,187,0.2)',border:'1px solid rgba(0,229,187,0.4)',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:700,color:'#00E5BB',fontSize:'11px',flexShrink:0}}>{(profile?.nome||'U')[0].toUpperCase()}</div>
-<div style={{flex:1,minWidth:0}}>
-<div style={{fontSize:'11px',fontWeight:600,color:'#DDE4F0',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{profile?.nome||'Usuário'}</div>
-<div style={{fontSize:'9px',color:'#3D4E6A'}}>{isAdmin?'🛡️ Admin':'👤 Membro'}</div>
-</div>
-<div title="Sair" style={{fontSize:'16px',cursor:'pointer',color:'#FF4757',flexShrink:0,padding:'2px'}} onClick={async()=>{const{signOut}=await import('./lib/supabase.js');await signOut()}}>↩</div>
-</div>
-{/* Stats */}
-<div style={{padding:'4px 10px',fontSize:'10px',color:'#3D4E6A',display:'flex',flexDirection:'column',gap:'2px'}}>
-<div>🏠 {props.filter(p=>p.status==='analisado').length} analisados</div>
-<div>✅ {props.filter(p=>p.recomendacao==='COMPRAR').length} para comprar</div>
-<div>⭐ {props.filter(p=>(p.score_total||0)>=7).length} score forte</div>
-</div>
-</div>
-</div>
+{/* SIDEBAR — AXIS thin 64px */}
+<aside style={{
+  width:64,minWidth:64,height:'100vh',position:'sticky',top:0,
+  background:C.navy,display:'flex',flexDirection:'column',alignItems:'center',
+  borderRight:`1px solid ${C.navy2}`,paddingTop:0,flexShrink:0,
+}}>
+  {/* Logo compacto */}
+  <div style={{width:'100%',height:64,display:'flex',alignItems:'center',justifyContent:'center',borderBottom:'1px solid rgba(255,255,255,0.08)'}}>
+    <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+      <rect width="32" height="32" rx="8" fill="rgba(255,255,255,0.1)"/>
+      <text x="5" y="22" fontFamily="'Inter',sans-serif" fontWeight="800" fontSize="16" fill="white">A</text>
+      <line x1="17" y1="12" x2="24" y2="6" stroke={C.emerald} strokeWidth="2" strokeLinecap="round"/>
+      <polyline points="21,6 24,6 24,9" fill="none" stroke={C.emerald} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  </div>
+  {/* Nav icons */}
+  <nav style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',padding:'12px 0',gap:4}}>
+    {NAV_ITEMS_DEF.map(item=>{
+      const active=isAct(item.v)
+      return <button key={item.v} onClick={()=>nav(item.v)} title={item.l}
+        style={{
+          width:44,height:44,display:'flex',alignItems:'center',justifyContent:'center',
+          borderRadius:10,border:'none',cursor:'pointer',
+          background:active?'rgba(45,176,108,0.15)':'transparent',
+          color:active?C.emerald:'rgba(255,255,255,0.45)',
+          transition:'all 0.15s',position:'relative',
+        }}
+        onMouseEnter={e=>{if(!active)e.currentTarget.style.background='rgba(255,255,255,0.07)'}}
+        onMouseLeave={e=>{if(!active)e.currentTarget.style.background='transparent'}}
+      >
+        {active&&<span style={{position:'absolute',left:-1,top:'20%',bottom:'20%',width:3,borderRadius:'0 3px 3px 0',background:C.emerald}} />}
+        <item.icon size={18} strokeWidth={active?2:1.5} />
+      </button>
+    })}
+  </nav>
+  {/* Sidebar footer: config buttons + avatar */}
+  <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:6,paddingBottom:12,borderTop:'1px solid rgba(255,255,255,0.08)',paddingTop:8,width:'100%'}}>
+    <button title="Trello" onClick={()=>setShowTrello(true)} style={{width:36,height:36,borderRadius:8,border:'none',cursor:'pointer',background:trello?'rgba(45,176,108,0.12)':'rgba(255,255,255,0.05)',color:trello?C.emerald:'rgba(255,255,255,0.35)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:14}}>
+      🔷
+    </button>
+    <button title="API Key" onClick={()=>setShowApiKey(true)} style={{width:36,height:36,borderRadius:8,border:'none',cursor:'pointer',background:'rgba(255,255,255,0.05)',color:'rgba(255,255,255,0.35)',display:'flex',alignItems:'center',justifyContent:'center'}}>
+      <Settings size={15} />
+    </button>
+    <div title={profile?.nome||'Usuário'} style={{width:36,height:36,borderRadius:'50%',background:`${C.emerald}25`,border:`1px solid ${C.emerald}50`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:700,color:C.emerald,cursor:'pointer'}}
+      onClick={async()=>{if(confirm('Sair?')){const{signOut}=await import('./lib/supabase.js');await signOut()}}}>
+      {(profile?.nome||'U')[0].toUpperCase()}
+    </div>
+  </div>
+</aside>
 {/* FIM SIDEBAR */}
 
     {/* CONTENT */}
-    <div style={{flex:1,overflowY:"auto",background:K.bg,display:"flex",flexDirection:"column",minWidth:0}}>
+    <div style={{flex:1,overflowY:"auto",background:C.offwhite,display:"flex",flexDirection:"column",minWidth:0}}>
       {view==="dashboard"&&<Dashboard props={props} onNav={nav}/>}
   {view==="novo"&&<NovoImovel onSave={addProp} onCancel={()=>nav("imoveis")} trello={trello} parametrosBanco={parametrosBanco} criteriosBanco={criteriosBanco}/>}
       {view==="imoveis"&&<Lista props={props} onNav={nav} onDelete={delProp}/>}
       {view==="detail"&&<Detail p={selP} onDelete={delProp} onNav={nav} trello={trello}/>}
       {view==="comparar"&&<Comparativo props={props}/>}
     {view==="busca"&&<BuscaGPT onAnalisar={(link)=>{nav("novo");setTimeout(()=>{},100)}}/>}
-    {view==="graficos"&&<div><div style={{padding:"22px 28px 16px",borderBottom:`1px solid ${K.bd}`}}><div style={{fontWeight:700,fontSize:19,color:K.wh}}>📊 Gráficos</div></div><div style={{padding:"20px 28px"}}><Charts properties={props}/></div></div>}
+    {view==="graficos"&&<div><div style={{padding:"22px 28px 16px",borderBottom:`1px solid ${C.borderW}`,background:C.white}}><div style={{fontWeight:700,fontSize:19,color:C.text}}>Gráficos</div></div><div style={{padding:"20px 28px"}}><Charts properties={props}/></div></div>}
     {view==="tarefas"&&<Tarefas/>}
     {view==="admin"&&isAdmin&&<AdminPanel/>}
     </div>
 
-    {toast&&<div style={{position:"fixed",bottom:"16px",right:"16px",background:toast.c===K.trello?K.trello:toast.c,color:toast.c===K.teal||toast.c===K.trello?"#000":"#fff",padding:"12px 20px",borderRadius:"8px",fontSize:"13px",fontWeight:"600",zIndex:9999,boxShadow:"0 8px 32px rgba(0,0,0,.6)",maxWidth:"340px"}}>{toast.msg}</div>}
+    {toast&&<div style={{position:"fixed",bottom:"16px",right:"16px",background:C.white,color:C.text,padding:"12px 20px",borderRadius:"10px",fontSize:"13px",fontWeight:"600",zIndex:9999,boxShadow:"0 8px 32px rgba(0,33,128,0.15)",maxWidth:"340px",border:`1px solid ${C.borderW}`}}>{toast.msg}</div>}
     <MobileNav items={navItems} activeKey={view} onNavigate={(v)=>nav(v)}/>
   </div>
 }

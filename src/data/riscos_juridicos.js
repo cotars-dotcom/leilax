@@ -1,0 +1,356 @@
+export const RISCOS_JURIDICOS = [
+  {
+    risco_id: "ocupacao_fiduciaria",
+    categoria: "ocupacao",
+    subcategoria: "ex_mutuario",
+    label: "Imóvel ocupado pelo ex-mutuário (leilão fiduciário)",
+    modalidade_leilao: "extrajudicial_fiduciario",
+    base_legal: "Lei 9.514/97 art.30 + STJ 2024 — reintegração com liminar em 60 dias após consolidação",
+    rota_processual: "reintegracao_posse",
+    prazo_legal_dias: 60,
+    prazo_pratico_meses_min: 4,
+    prazo_pratico_meses_max: 24,
+    custo_processual_mg_min: 514.38,
+    custo_processual_mg_max: 5818.61,
+    custo_diligencias_mg: { imissao_reintegracao: 141.70, endereco_urbano: 35.40, arrombamento: 177.10 },
+    custo_operacional_extra_min: 5000,
+    custo_operacional_extra_max: 30000,
+    bloqueia_uso: true,
+    bloqueia_reforma: true,
+    bloqueia_revenda: true,
+    bloqueia_nova_locacao: true,
+    risco_nota: 9,
+    score_penalizacao: -35,
+    exige_leitura_edital: true,
+    exige_advogado: true,
+    observacoes: "Risco mais comum em leilão fiduciário CAIXA. Prazo real de 4–24 meses. Menores/idosos podem complicar. Acordo amigável R$5–30k pode ser mais rápido que ação judicial."
+  },
+  {
+    risco_id: "inquilino_regular",
+    categoria: "locacao",
+    subcategoria: "inquilino_regular",
+    label: "Imóvel locado com inquilino regular",
+    modalidade_leilao: "judicial",
+    base_legal: "STJ — comprador deve usar ação de despejo, não imissão. Lei 8.245/91 (Lei do Inquilinato)",
+    rota_processual: "despejo",
+    prazo_legal_dias: 15,
+    prazo_pratico_meses_min: 2,
+    prazo_pratico_meses_max: 18,
+    custo_processual_mg_min: 779.98,
+    custo_processual_mg_max: 1405.09,
+    custo_diligencias_mg: { base_aluguel_2500: 779.98, base_aluguel_5000: 1227.99, com_arrombamento_extra: 177.10 },
+    custo_operacional_extra_min: 0,
+    custo_operacional_extra_max: 3000,
+    bloqueia_uso: true,
+    bloqueia_reforma: true,
+    bloqueia_revenda: true,
+    bloqueia_nova_locacao: false,
+    risco_nota: 7,
+    score_penalizacao: -22,
+    exige_leitura_edital: true,
+    exige_advogado: true,
+    observacoes: "Pode haver renda de aluguel em curso. Liminar em 15 dias apenas em hipóteses específicas da lei. Prazo real 6–18 meses sem liminar."
+  },
+  {
+    risco_id: "iptu_previo_judicial",
+    categoria: "tributario",
+    subcategoria: "iptu_previo",
+    label: "Débito IPTU anterior — Leilão judicial",
+    modalidade_leilao: "judicial",
+    base_legal: "STJ repetitivo — edital não pode transferir tributos ao arrematante em hasta pública. CTN art.130 §único.",
+    rota_processual: "nenhuma",
+    prazo_legal_dias: 0,
+    prazo_pratico_meses_min: 0,
+    prazo_pratico_meses_max: 3,
+    custo_processual_mg_min: 0,
+    custo_processual_mg_max: 0,
+    custo_operacional_extra_min: 0,
+    custo_operacional_extra_max: 0,
+    bloqueia_uso: false,
+    bloqueia_reforma: false,
+    bloqueia_revenda: false,
+    bloqueia_nova_locacao: false,
+    risco_nota: 3,
+    score_penalizacao: -5,
+    exige_leitura_edital: true,
+    exige_advogado: false,
+    observacoes: "Em leilão judicial, STJ protege arrematante. Mas atenção: verificar data do edital e modulação da decisão. Risco documental médio, risco financeiro baixo."
+  },
+  {
+    risco_id: "iptu_previo_caixa",
+    categoria: "tributario",
+    subcategoria: "iptu_previo",
+    label: "Débito IPTU anterior — Imóvel CAIXA / Extrajudicial",
+    modalidade_leilao: "caixa_leilao",
+    base_legal: "FAQ CAIXA oficial: IPTU fica a cargo do comprador em imóveis adquiridos em leilão.",
+    rota_processual: "nenhuma",
+    prazo_legal_dias: 0,
+    prazo_pratico_meses_min: 0,
+    prazo_pratico_meses_max: 6,
+    custo_processual_mg_min: 0,
+    custo_processual_mg_max: 0,
+    custo_operacional_extra_min: 500,
+    custo_operacional_extra_max: 30000,
+    bloqueia_uso: false,
+    bloqueia_reforma: false,
+    bloqueia_revenda: false,
+    bloqueia_nova_locacao: false,
+    risco_nota: 7,
+    score_penalizacao: -15,
+    exige_leitura_edital: true,
+    exige_advogado: false,
+    observacoes: "CRÍTICO para imóveis CAIXA: IPTU atrasado é custo real do comprador. Sempre solicitar certidão antes do lance. Pode inviabilizar o desconto aparente do leilão."
+  },
+  {
+    risco_id: "condominio_previo_judicial",
+    categoria: "condominio",
+    subcategoria: "condominio_previo",
+    label: "Débito condominial anterior — Leilão judicial CPC/2015",
+    modalidade_leilao: "judicial",
+    base_legal: "CPC/2015 — créditos propter rem se sub-rogam sobre o preço da arrematação. STJ distingue CPC/73 vs CPC/2015.",
+    rota_processual: "nenhuma",
+    prazo_legal_dias: 0,
+    prazo_pratico_meses_min: 0,
+    prazo_pratico_meses_max: 3,
+    custo_processual_mg_min: 0,
+    custo_processual_mg_max: 0,
+    custo_operacional_extra_min: 0,
+    custo_operacional_extra_max: 5000,
+    bloqueia_uso: false,
+    bloqueia_reforma: false,
+    bloqueia_revenda: false,
+    bloqueia_nova_locacao: false,
+    risco_nota: 4,
+    score_penalizacao: -8,
+    exige_leitura_edital: true,
+    exige_advogado: false,
+    observacoes: "Sob CPC/2015, tendência de sub-rogação no preço (não no arrematante). Mas editais mal redigidos e processos antigos têm risco maior. Sempre verificar."
+  },
+  {
+    risco_id: "condominio_previo_caixa",
+    categoria: "condominio",
+    subcategoria: "condominio_previo",
+    label: "Débito condominial anterior — Imóvel CAIXA",
+    modalidade_leilao: "caixa_leilao",
+    base_legal: "FAQ CAIXA: condomínio atrasado fica a cargo do comprador. Comissão leiloeiro 5%.",
+    rota_processual: "nenhuma",
+    prazo_legal_dias: 0,
+    prazo_pratico_meses_min: 0,
+    prazo_pratico_meses_max: 3,
+    custo_processual_mg_min: 0,
+    custo_processual_mg_max: 0,
+    custo_operacional_extra_min: 1000,
+    custo_operacional_extra_max: 50000,
+    bloqueia_uso: false,
+    bloqueia_reforma: false,
+    bloqueia_revenda: false,
+    bloqueia_nova_locacao: false,
+    risco_nota: 8,
+    score_penalizacao: -20,
+    exige_leitura_edital: true,
+    exige_advogado: false,
+    observacoes: "Débito condominial em CAIXA pode ser muito alto (anos acumulados). Solicitar certidão do síndico ANTES do lance. Pode inviabilizar completamente o negócio."
+  },
+  {
+    risco_id: "edital_matricula_divergente",
+    categoria: "edital",
+    subcategoria: "descricao_errada",
+    label: "Divergência entre edital, matrícula e imóvel real",
+    modalidade_leilao: "qualquer",
+    base_legal: "STJ 2025 — anulou arrematação por edital que descrevia só terreno omitindo construção. Venda por 23% do valor real. CPC admite invalidação por preço vil ou vício.",
+    rota_processual: "acao_autonoma",
+    prazo_legal_dias: 10,
+    prazo_pratico_meses_min: 12,
+    prazo_pratico_meses_max: 24,
+    custo_processual_mg_min: 514.38,
+    custo_processual_mg_max: 5818.61,
+    custo_operacional_extra_min: 0,
+    custo_operacional_extra_max: 0,
+    bloqueia_uso: true,
+    bloqueia_reforma: true,
+    bloqueia_revenda: true,
+    bloqueia_nova_locacao: true,
+    risco_nota: 10,
+    score_penalizacao: -50,
+    exige_leitura_edital: true,
+    exige_advogado: true,
+    observacoes: "RISCO IMPEDITIVO. Divergência entre metragem, construção, zoneamento ou benfeitorias no edital vs matrícula vs realidade = risco de anulação. Sempre checar matrícula atualizada + vistoria presencial ou fotos detalhadas."
+  },
+  {
+    risco_id: "remicao_embargos_pos_arrematacao",
+    categoria: "procedimental",
+    subcategoria: "remicao",
+    label: "Remição / Embargos pós-arrematação",
+    modalidade_leilao: "judicial",
+    base_legal: "CPC — contestação em 10 dias. STJ: remição possível até auto de arrematação ter todas assinaturas.",
+    rota_processual: "embargos",
+    prazo_legal_dias: 10,
+    prazo_pratico_meses_min: 1,
+    prazo_pratico_meses_max: 6,
+    custo_processual_mg_min: 221.24,
+    custo_processual_mg_max: 884.96,
+    custo_operacional_extra_min: 0,
+    custo_operacional_extra_max: 0,
+    bloqueia_uso: true,
+    bloqueia_reforma: true,
+    bloqueia_revenda: true,
+    bloqueia_nova_locacao: true,
+    risco_nota: 6,
+    score_penalizacao: -15,
+    exige_leitura_edital: false,
+    exige_advogado: true,
+    observacoes: "Janela de instabilidade: não iniciar reforma pesada, não captar locatário, não vender antes da carta de arrematação + registro + situação possessória segura. Risco temporário mas bloqueante."
+  },
+  {
+    risco_id: "retencao_benfeitorias",
+    categoria: "benfeitorias",
+    subcategoria: "retencao_benfeitorias",
+    label: "Retenção por benfeitorias pelo ocupante",
+    modalidade_leilao: "qualquer",
+    base_legal: "STJ 2023 — Judiciário deve analisar pedido de retenção por benfeitorias na contestação da imissão na posse.",
+    rota_processual: "imissao_posse",
+    prazo_legal_dias: 0,
+    prazo_pratico_meses_min: 3,
+    prazo_pratico_meses_max: 12,
+    custo_processual_mg_min: 0,
+    custo_processual_mg_max: 0,
+    custo_operacional_extra_min: 0,
+    custo_operacional_extra_max: 15000,
+    bloqueia_uso: false,
+    bloqueia_reforma: false,
+    bloqueia_revenda: false,
+    bloqueia_nova_locacao: false,
+    risco_nota: 5,
+    score_penalizacao: -12,
+    exige_leitura_edital: false,
+    exige_advogado: true,
+    observacoes: "Pode atrasar +3–12 meses e gerar pagamento ao ocupante por benfeitorias realizadas. Avaliar se há prova de obras feitas no imóvel."
+  },
+  {
+    risco_id: "custo_desocupacao_operacional",
+    categoria: "operacional",
+    subcategoria: "arrombamento",
+    label: "Custo operacional de desocupação física",
+    modalidade_leilao: "qualquer",
+    base_legal: "TJMG tabela 2025: R$141,70 imissão/reintegração + R$35,40/endereço + R$177,10 arrombamento/remoção.",
+    rota_processual: "nenhuma",
+    prazo_legal_dias: 0,
+    prazo_pratico_meses_min: 0,
+    prazo_pratico_meses_max: 1,
+    custo_processual_mg_min: 141.70,
+    custo_processual_mg_max: 354.20,
+    custo_operacional_extra_min: 500,
+    custo_operacional_extra_max: 5000,
+    bloqueia_uso: false,
+    bloqueia_reforma: false,
+    bloqueia_revenda: false,
+    bloqueia_nova_locacao: false,
+    risco_nota: 2,
+    score_penalizacao: -3,
+    exige_leitura_edital: false,
+    exige_advogado: false,
+    observacoes: "Custos de chaveiro, mudança, transporte, depósito de bens. Não confundir com custas judiciais. Acordo amigável R$5–30k pode ser mais eficiente."
+  },
+  {
+    risco_id: "agravo_instrumento_tjmg",
+    categoria: "procedimental",
+    subcategoria: "remicao",
+    label: "Agravo de instrumento (contestação de liminar) — TJMG",
+    modalidade_leilao: "qualquer",
+    base_legal: "TJMG tabela 2025: R$331,86 por agravo de instrumento.",
+    rota_processual: "embargos",
+    prazo_legal_dias: 0,
+    prazo_pratico_meses_min: 2,
+    prazo_pratico_meses_max: 8,
+    custo_processual_mg_min: 331.86,
+    custo_processual_mg_max: 663.72,
+    custo_operacional_extra_min: 0,
+    custo_operacional_extra_max: 0,
+    bloqueia_uso: false,
+    bloqueia_reforma: true,
+    bloqueia_revenda: false,
+    bloqueia_nova_locacao: false,
+    risco_nota: 4,
+    score_penalizacao: -8,
+    exige_leitura_edital: false,
+    exige_advogado: true,
+    observacoes: "Relevante quando há contestação de liminar de desocupação. Atrasa +2–8 meses. Somar ao custo total do processo."
+  }
+]
+
+// Regras por modalidade — diferenciação CRÍTICA
+export const REGRAS_MODALIDADE = {
+  judicial: {
+    label: "Leilão Judicial",
+    iptu_responsabilidade: "sub_roga_no_preco",
+    condominio_responsabilidade: "sub_roga_no_preco_cpc2015",
+    comissao_leiloeiro_pct: 5,
+    protecao_stj_tributos: true,
+    observacao: "STJ protege arrematante de tributos anteriores em hasta pública. CPC/2015 sub-roga propter rem no preço."
+  },
+  extrajudicial_fiduciario: {
+    label: "Leilão Extrajudicial (Alienação Fiduciária)",
+    iptu_responsabilidade: "verificar_edital",
+    condominio_responsabilidade: "verificar_edital",
+    comissao_leiloeiro_pct: 5,
+    protecao_stj_tributos: false,
+    observacao: "Sem a mesma proteção do judicial. Edital define quem paga. LEITURA DO EDITAL OBRIGATÓRIA."
+  },
+  caixa_leilao: {
+    label: "Imóvel CAIXA — Leilão",
+    iptu_responsabilidade: "comprador",
+    condominio_responsabilidade: "comprador",
+    comissao_leiloeiro_pct: 5,
+    protecao_stj_tributos: false,
+    observacao: "FAQ CAIXA oficial: IPTU e condomínio ficam com o comprador. Comissão 5% do leiloeiro. Calcular tudo no custo total."
+  },
+  caixa_venda_direta: {
+    label: "Imóvel CAIXA — Venda Direta / Licitação",
+    iptu_responsabilidade: "verificar_edital",
+    condominio_responsabilidade: "verificar_edital",
+    comissao_leiloeiro_pct: 0,
+    protecao_stj_tributos: false,
+    observacao: "Sem comissão de leiloeiro. Ler o edital para definir responsabilidades de débitos."
+  }
+}
+
+// Calcular custo total jurídico estimado para um imóvel
+export function calcularCustoJuridico(riscos_presentes, aluguel_atual = 0) {
+  let custo_min = 0
+  let custo_max = 0
+  let prazo_min = 0
+  let prazo_max = 0
+  let score_reducao = 0
+  let bloqueios = { uso: false, reforma: false, revenda: false, locacao: false }
+
+  for (const risco_id of riscos_presentes) {
+    const risco = RISCOS_JURIDICOS.find(r => r.risco_id === risco_id)
+    if (!risco) continue
+
+    custo_min += risco.custo_processual_mg_min + risco.custo_operacional_extra_min
+    custo_max += risco.custo_processual_mg_max + risco.custo_operacional_extra_max
+    prazo_max = Math.max(prazo_max, risco.prazo_pratico_meses_max)
+    prazo_min = Math.max(prazo_min, risco.prazo_pratico_meses_min)
+    score_reducao += risco.score_penalizacao
+
+    if (risco.bloqueia_uso) bloqueios.uso = true
+    if (risco.bloqueia_reforma) bloqueios.reforma = true
+    if (risco.bloqueia_revenda) bloqueios.revenda = true
+    if (risco.bloqueia_nova_locacao) bloqueios.locacao = true
+  }
+
+  // Adicionar custo de oportunidade do prazo (aluguel perdido)
+  const custo_oportunidade = aluguel_atual > 0 ? aluguel_atual * prazo_max : 0
+
+  return {
+    custo_juridico_min: custo_min,
+    custo_juridico_max: custo_max,
+    custo_oportunidade_estimado: custo_oportunidade,
+    custo_total_min: custo_min,
+    custo_total_max: custo_max + custo_oportunidade,
+    prazo_liberacao_meses_min: prazo_min,
+    prazo_liberacao_meses_max: prazo_max,
+    score_penalizacao_total: score_reducao,
+    bloqueios
+  }
+}
