@@ -303,3 +303,29 @@ export async function updateMercadoRegional(regiaoKey, updates) {
     .eq('regiao_key', regiaoKey)
   if (error) throw error
 }
+
+// == RISCOS JURÍDICOS ==
+export async function getRiscosJuridicos() {
+  const { data, error } = await supabase
+    .from('riscos_juridicos').select('*').order('risco_nota', { ascending: false })
+  if (error) throw error
+  return data || []
+}
+
+export async function getRiscosImovel(imovelId) {
+  const { data, error } = await supabase
+    .from('riscos_imovel')
+    .select('*, risco:riscos_juridicos(*)')
+    .eq('imovel_id', imovelId)
+  if (error) throw error
+  return data || []
+}
+
+export async function addRiscoImovel(imovelId, riscoId, dados) {
+  const { data, error } = await supabase
+    .from('riscos_imovel')
+    .upsert({ imovel_id: imovelId, risco_id: riscoId, ...dados })
+    .select().single()
+  if (error) throw error
+  return data
+}

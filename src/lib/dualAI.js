@@ -10,6 +10,35 @@ import { detectarRegiao, getMercado } from '../data/mercado_regional.js'
 const CLAUDE_MODEL = 'claude-sonnet-4-20250514'
 const GPT_MODEL = 'gpt-4o'
 
+const REGRAS_MODALIDADE_TEXTO = `
+REGRAS CRÍTICAS POR MODALIDADE (APLIQUE SEMPRE):
+LEILÃO JUDICIAL:
+- IPTU anterior: STJ protege arrematante (sub-roga no preço) — risco baixo
+- Condomínio anterior: CPC/2015 sub-roga no preço — risco médio
+- Imóvel ocupado: ação de imissão na posse (prazo 4–24 meses, custo R$514–5.818)
+
+LEILÃO EXTRAJUDICIAL / ALIENAÇÃO FIDUCIÁRIA:
+- IPTU e condomínio: verificar edital — pode ser do comprador
+- Imóvel ocupado: reintegração de posse (Lei 9.514 + STJ 2024, 60 dias legal, 4–24 meses real)
+
+IMÓVEL CAIXA (leilão ou venda direta):
+- IPTU: FICA COM O COMPRADOR (FAQ CAIXA oficial)
+- Condomínio: FICA COM O COMPRADOR (FAQ CAIXA oficial)
+- Comissão leiloeiro: 5% sobre o valor arrematado
+- SEMPRE calcular esses custos no custo total da operação
+
+BLOQUEIOS AUTOMÁTICOS:
+- Divergência edital vs matrícula: score máximo 35, recomendação EVITAR
+- Imóvel ocupado: score × 0.85
+- Risco nota ≥ 9: penalizar -35 pontos no score
+
+Para qualquer campo jurídico identificado, informe:
+- modalidade_leilao detectada
+- riscos presentes (lista de risco_id)
+- custo_juridico_estimado total
+- prazo_liberacao_estimado_meses
+`
+
 // ââ FASE 1: ChatGPT pesquisa mercado e contexto do imÃ³vel ââââââââ
 
 export async function pesquisarMercadoGPT(url, cidade, tipo, openaiKey) {
@@ -109,6 +138,7 @@ Acesse e analise este imÃ³vel: ${url}
 
 ${contextoGPT}
 ${contextoMercadoRegional || ''}
+${REGRAS_MODALIDADE_TEXTO}
 
 PESOS DE SCORE DEFINIDOS PELO GRUPO PARA ESTE APP (USE ESTES PESOS EXATOS):
 ${pesosInfo || '  - LocalizaÃ§Ã£o: 20%, Desconto: 18%, JurÃ­dico: 18%, OcupaÃ§Ã£o: 15%, Liquidez: 15%, Mercado: 14%'}
@@ -172,7 +202,11 @@ RETORNE APENAS JSON VÃLIDO (sem markdown, sem texto fora do JSON):
   "mercado_tendencia": "Alta|EstÃ¡vel|Queda",
   "mercado_demanda": "Alta|MÃ©dia|Baixa",
   "mercado_tempo_venda_meses": 0,
-  "mercado_obs": "string"
+  "mercado_obs": "string",
+  "modalidade_leilao": "judicial|extrajudicial_fiduciario|caixa_leilao|caixa_venda_direta",
+  "riscos_presentes": ["risco_id1","risco_id2"],
+  "custo_juridico_estimado": 0,
+  "prazo_liberacao_estimado_meses": 0
 }`
 
   const res = await fetch('https://api.anthropic.com/v1/messages', {
