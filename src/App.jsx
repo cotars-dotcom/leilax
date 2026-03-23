@@ -730,7 +730,33 @@ function PropCard({p,onNav}) {
 }
 
 // ── AXIS HEADER ──────────────────────────────────────────────────────────────
-function AxisHeader({profile:prof}) {
+function AxisHeader({profile:prof, imoveis=[], onNav}) {
+  const [notifOpen, setNotifOpen] = useState(false)
+  const notifRef = useRef(null)
+
+  // Gerar notificações dinâmicas a partir dos imóveis
+  const notifs = []
+  const comprar = imoveis.filter(p => p.recomendacao === "COMPRAR")
+  const forte = imoveis.filter(p => (p.score_total||0) >= 7.5)
+  const alertas = imoveis.filter(p => (p.score_juridico||10) < 4)
+  const recentes = [...imoveis].sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0,3)
+
+  if (comprar.length > 0) notifs.push({ tipo: "comprar", cor: C.emerald, icon: "arrow", texto: `${comprar.length} imóvel(is) com recomendação COMPRAR`, sub: comprar[0]?.titulo || "Ver oportunidades" })
+  if (forte.length > 0) notifs.push({ tipo: "forte", cor: C.emerald, icon: "star", texto: `${forte.length} imóvel(is) com score forte (≥ 7.5)`, sub: "Melhores oportunidades da carteira" })
+  if (alertas.length > 0) notifs.push({ tipo: "alerta", cor: C.mustard, icon: "alert", texto: `${alertas.length} imóvel(is) com risco jurídico alto`, sub: "Score jurídico < 4 — atenção redobrada" })
+  for (const r of recentes) {
+    const ago = Math.round((Date.now() - new Date(r.createdAt)) / 86400000)
+    notifs.push({ tipo: "recente", cor: C.navy, icon: "new", texto: r.titulo || "Imóvel analisado", sub: ago <= 0 ? "Hoje" : `Há ${ago} dia(s)`, id: r.id })
+  }
+
+  // Fechar dropdown ao clicar fora
+  useEffect(() => {
+    if (!notifOpen) return
+    const handler = (e) => { if (notifRef.current && !notifRef.current.contains(e.target)) setNotifOpen(false) }
+    document.addEventListener("mousedown", handler)
+    return () => document.removeEventListener("mousedown", handler)
+  }, [notifOpen])
+
   return (
     <header style={{
       display:"flex",alignItems:"center",justifyContent:"space-between",
@@ -755,10 +781,95 @@ function AxisHeader({profile:prof}) {
           </svg>
           Exportar
         </button>
-        <div style={{position:"relative",cursor:"pointer",padding:4}}>
-          <Bell size={18} color={C.muted} />
-          <span style={{position:"absolute",top:2,right:2,width:7,height:7,borderRadius:"50%",background:"#E5484D",border:`2px solid ${C.white}`}} />
+        {/* Sininho com dropdown */}
+        <div ref={notifRef} style={{position:"relative"}}>
+          <div
+            onClick={() => setNotifOpen(o => !o)}
+            style={{position:"relative",cursor:"pointer",padding:4}}
+          >
+            <Bell size={18} color={notifOpen ? C.navy : C.muted} />
+            {notifs.length > 0 && (
+              <span style={{
+                position:"absolute",top:1,right:1,
+                minWidth:16,height:16,borderRadius:8,
+                background:"#E5484D",border:`2px solid ${C.white}`,
+                display:"flex",alignItems:"center",justifyContent:"center",
+                fontSize:9,fontWeight:700,color:"#fff",padding:"0 3px",
+              }}>
+                {notifs.length}
+              </span>
+            )}
+          </div>
+          {/* Dropdown */}
+          {notifOpen && (
+            <div style={{
+              position:"absolute",top:"calc(100% + 8px)",right:0,
+              width:340,background:C.white,
+              border:`1px solid ${C.borderW}`,borderRadius:12,
+              boxShadow:"0 12px 40px rgba(0,43,128,0.15)",
+              zIndex:100,overflow:"hidden",
+            }}>
+              <div style={{padding:"14px 16px 10px",borderBottom:`1px solid ${C.borderW}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <p style={{margin:0,fontSize:14,fontWeight:700,color:C.navy}}>Notificações</p>
+                <span style={{fontSize:11,color:C.muted}}>{notifs.length} alerta{notifs.length !== 1 ? "s" : ""}</span>
+              </div>
+              <div style={{maxHeight:320,overflowY:"auto"}}>
+                {notifs.length === 0 ? (
+                  <div style={{padding:"28px 16px",textAlign:"center"}}>
+                    <Bell size={28} color={C.hint} strokeWidth={1.2} />
+                    <p style={{margin:"10px 0 0",fontSize:13,color:C.muted}}>Nenhuma notificação</p>
+                    <p style={{margin:"2px 0",fontSize:11.5,color:C.hint}}>Analise imóveis para receber alertas</p>
+                  </div>
+                ) : notifs.map((n, i) => (
+                  <div
+                    key={i}
+                    onClick={() => { if (n.id && onNav) { onNav("detail", {id: n.id}); setNotifOpen(false) } }}
+                    style={{
+                      padding:"12px 16px",
+                      borderBottom: i < notifs.length - 1 ? `1px solid ${C.borderW}` : "none",
+                      cursor: n.id ? "pointer" : "default",
+                      transition:"background 0.1s",
+                    }}
+                    onMouseEnter={e => { if(n.id) e.currentTarget.style.background = C.surface }}
+                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                  >
+                    <div style={{display:"flex",gap:10,alignItems:"flex-start"}}>
+                      <div style={{
+                        width:32,height:32,borderRadius:8,flexShrink:0,
+                        background:`${n.cor}14`,
+                        display:"flex",alignItems:"center",justifyContent:"center",
+                      }}>
+                        {n.icon === "arrow" && <ArrowUpRight size={15} color={n.cor} />}
+                        {n.icon === "star" && <TrendingUp size={15} color={n.cor} />}
+                        {n.icon === "alert" && <AlertTriangle size={15} color={n.cor} />}
+                        {n.icon === "new" && <Package size={15} color={n.cor} />}
+                      </div>
+                      <div style={{flex:1,minWidth:0}}>
+                        <p style={{margin:0,fontSize:12.5,fontWeight:600,color:C.navy}}>{n.texto}</p>
+                        <p style={{margin:"2px 0 0",fontSize:11,color:C.muted}}>{n.sub}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {imoveis.length > 0 && (
+                <div style={{padding:"10px 16px",borderTop:`1px solid ${C.borderW}`,textAlign:"center"}}>
+                  <button
+                    onClick={() => { if(onNav) onNav("imoveis"); setNotifOpen(false) }}
+                    style={{
+                      border:"none",background:"none",
+                      fontSize:12.5,fontWeight:600,color:C.emerald,
+                      cursor:"pointer",
+                    }}
+                  >
+                    Ver todos os imóveis
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
+        {/* Avatar */}
         <div style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer"}}>
           <div style={{
             width:36,height:36,borderRadius:"50%",background:C.emeraldL,
@@ -821,7 +932,7 @@ function Dashboard({props,onNav,profile:prof}) {
   const fmtM=v=>{if(v>=1e6)return`R$ ${(v/1e6).toFixed(1)}M`;if(v>=1e3)return`R$ ${(v/1e3).toFixed(0)}K`;return`R$ ${v}`}
 
   return <div style={{background:C.bg,minHeight:"100%"}}>
-    <AxisHeader profile={prof} />
+    <AxisHeader profile={prof} imoveis={props} onNav={onNav} />
     <div style={{padding:"28px 32px",display:"flex",flexDirection:"column",gap:20}}>
       {/* Linha 1: 3 colunas — Patrimônio | Valorização | Alertas */}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:18}}>
