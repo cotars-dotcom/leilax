@@ -1,4 +1,4 @@
--- LEILAX — Adicionar colunas de fotos à tabela imoveis
+-- AXIS — Adicionar colunas de fotos à tabela imoveis
 -- Executar no Supabase SQL Editor
 
 ALTER TABLE public.imoveis
