@@ -6,7 +6,7 @@ import MobileNav from "./components/MobileNav.jsx"
 import BuscaGPT from "./components/BuscaGPT.jsx"
 import { useAuth } from "./lib/AuthContext.jsx"
 import Login from "./pages/Login.jsx"
-import { getImoveis, saveImovel, deleteImovel } from "./lib/supabase.js"
+import { supabase, getImoveis, saveImovel, deleteImovel } from "./lib/supabase.js"
 import Tarefas from "./pages/Tarefas.jsx"
 import AdminPanel from "./pages/AdminPanel.jsx"
 import { analisarImovelCompleto } from "./lib/dualAI.js"
@@ -957,10 +957,35 @@ function AbaJuridica({ imovel, onReclassificado }) {
 }
 
 // ── DETAIL ────────────────────────────────────────────────────────────────────
-function Detail({p,onDelete,onNav,trello,onUpdateProp}) {
+function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze}) {
   const [sending,setSending]=useState(false)
   const [msg,setMsg]=useState("")
   const [abaDetalhe,setAbaDetalhe]=useState('resumo')
+  const [reanalyzing,setReanalyzing]=useState(false)
+  const [reStep,setReStep]=useState("")
+
+  const handleReanalyze=async()=>{
+    if(!p?.fonte_url){setMsg("⚠️ Imóvel sem URL de origem para reanalisar");return}
+    const claudeKey=localStorage.getItem("leilax-api-key")||""
+    if(!claudeKey){setMsg("⚠️ Configure a API Key do Claude em Admin → API Keys");return}
+    if(!confirm("Reanalisar este imóvel com a IA? Os dados serão atualizados.")) return
+    setReanalyzing(true);setMsg("")
+    try {
+      const openaiKey=localStorage.getItem("leilax-openai-key")||""
+      const {data:par}=await supabase.from("parametros_score").select("*")
+      const {data:cri}=await supabase.from("criterios_avaliacao").select("*")
+      const novaAnalise=await analisarImovelCompleto(p.fonte_url,claudeKey,openaiKey,par||[],cri||[],setReStep,[])
+      const merged={...p,...novaAnalise,id:p.id,createdAt:p.createdAt,criado_por:p.criado_por}
+      if(onUpdateProp) onUpdateProp(p.id,merged)
+      // Salvar no Supabase
+      import('./lib/supabase.js').then(({saveImovel})=>{
+        const session=JSON.parse(localStorage.getItem('sb-session')||'null')
+        saveImovel(merged,session?.user?.id).catch(()=>{})
+      }).catch(()=>{})
+      setMsg("✅ Imóvel reanalisado com sucesso!")
+    } catch(e) { setMsg(`⚠️ Erro ao reanalisar: ${e.message}`) }
+    setReanalyzing(false);setReStep("")
+  }
   if(!p) return <div style={{padding:"40px",textAlign:"center",color:K.t3}}>Não encontrado</div>
   const sc=p.score_total||0, rc=recColor(p.recomendacao)
   const scores=[
@@ -981,6 +1006,7 @@ function Detail({p,onDelete,onNav,trello,onUpdateProp}) {
     <Hdr title={p.titulo||"Imóvel"} sub={`${p.cidade}/${p.estado} · ${fmtD(p.createdAt)}`}
       actions={<>
         {p.fonte_url&&<a href={p.fonte_url} target="_blank" rel="noopener noreferrer" style={{...btn("s"),textDecoration:"none",display:"inline-block"}}>🔗 Anúncio</a>}
+        <button style={{...btn("s"),background:`${K.amb}15`,color:K.amb,border:`1px solid ${K.amb}30`}} onClick={handleReanalyze} disabled={reanalyzing}>{reanalyzing?"⏳ Reanalisando...":"🔄 Reanalisar"}</button>
         <button style={btn("trello")} onClick={sendTrello} disabled={sending}>{sending?"Enviando...":"🔷 Trello"}</button>
         <button style={{...btn("d"),padding:"5px 12px",fontSize:"12px"}} onClick={()=>{if(confirm("Excluir?"))onDelete(p.id)}}>🗑</button>
       </>}/>
@@ -997,6 +1023,10 @@ function Detail({p,onDelete,onNav,trello,onUpdateProp}) {
     </div>
     <div style={{padding:"20px 28px"}}>
       {msg&&<div style={{background:`${K.teal}10`,border:`1px solid ${K.teal}30`,borderRadius:"6px",padding:"10px",marginBottom:"14px",fontSize:"12px",color:K.teal}}>{msg}</div>}
+      {reanalyzing&&reStep&&<div style={{background:`${K.amb}10`,border:`1px solid ${K.amb}30`,borderRadius:"7px",padding:"12px 16px",marginBottom:"14px",display:"flex",alignItems:"center",gap:"10px"}}>
+        <div style={{width:8,height:8,borderRadius:"50%",background:K.amb,animation:"pulse 1s infinite",flexShrink:0}}/>
+        <span style={{fontSize:"13px",color:K.amb,fontWeight:600}}>{reStep}</span>
+      </div>}
 
       {abaDetalhe==='juridico'&&<AbaJuridica imovel={p} onReclassificado={(novaAnalise)=>{
         if(onUpdateProp) onUpdateProp(p.id, {
@@ -1091,6 +1121,8 @@ function Detail({p,onDelete,onNav,trello,onUpdateProp}) {
             </div>
           ))}
           {p.obs_juridicas&&<div style={{marginTop:"10px",fontSize:"11.5px",color:K.t2,lineHeight:"1.6",background:K.s2,borderRadius:"5px",padding:"8px"}}>{p.obs_juridicas}</div>}
+          <button onClick={()=>setAbaDetalhe('juridico')} style={{marginTop:10,background:`${K.teal}12`,border:`1px solid ${K.teal}30`,borderRadius:6,padding:"6px 14px",fontSize:12,color:K.teal,fontWeight:600,cursor:"pointer",width:"100%"}}>📎 Anexar documentos jurídicos</button>
+          {p.reclassificado_por_doc&&<div style={{marginTop:6,fontSize:10.5,color:K.amb,fontWeight:600}}>🔄 Reclassificado por documento</div>}
         </div>
         <div style={card()}>
           <div style={{fontWeight:"600",color:K.wh,marginBottom:"12px",fontSize:"13px"}}>📈 Retorno e Custos</div>
@@ -1118,15 +1150,39 @@ function Detail({p,onDelete,onNav,trello,onUpdateProp}) {
 }
 
 // ── LISTA ─────────────────────────────────────────────────────────────────────
-function Lista({props,onNav,onDelete}) {
+function Lista({props,onNav,onDelete,trello,onUpdateProp}) {
   const [q,setQ]=useState(""), [filter,setFilter]=useState("todos"), [sort,setSort]=useState("score")
+  const [syncingTrello,setSyncingTrello]=useState(false)
+  const [syncMsg,setSyncMsg]=useState("")
   let list=[...props]
   if(q) list=list.filter(p=>`${p.titulo} ${p.cidade} ${p.tipo}`.toLowerCase().includes(q.toLowerCase()))
   if(filter!=="todos") list=list.filter(p=>p.recomendacao===filter.toUpperCase())
   list.sort((a,b)=>sort==="score"?(b.score_total||0)-(a.score_total||0):sort==="desconto"?(b.desconto_percentual||0)-(a.desconto_percentual||0):sort==="valor"?(a.valor_minimo||0)-(b.valor_minimo||0):new Date(b.createdAt)-new Date(a.createdAt))
+
+  const syncTrello=async()=>{
+    if(!trello?.listId||!trello?.boardId){setSyncMsg("⚠️ Configure o Trello primeiro (ícone ⚙️)");setTimeout(()=>setSyncMsg(""),4000);return}
+    if(!confirm(`Enviar/atualizar ${list.length} imóvel(is) no Trello?`)) return
+    setSyncingTrello(true);setSyncMsg(`🔄 Enviando ${list.length} imóveis para o Trello...`)
+    let ok=0,fail=0
+    for(const p of list){
+      try{
+        await criarCardImovel(p,trello.listId,trello.boardId,trello.key,trello.token)
+        ok++
+        setSyncMsg(`🔄 Enviando... ${ok}/${list.length}`)
+      }catch{fail++}
+    }
+    setSyncMsg(`✅ ${ok} enviado(s) ao Trello${fail?` · ${fail} erro(s)`:""}`)
+    setSyncingTrello(false)
+    setTimeout(()=>setSyncMsg(""),5000)
+  }
+
   return <div>
-    <Hdr title="Imóveis" sub={`${props.length} total · ${list.length} filtrado(s)`} actions={<button style={btn()} onClick={()=>onNav("novo")}>+ Novo</button>}/>
+    <Hdr title="Imóveis" sub={`${props.length} total · ${list.length} filtrado(s)`} actions={<>
+      <button style={{...btn("s"),background:`${K.trello||"#0079BF"}15`,color:K.trello||"#0079BF",border:`1px solid ${K.trello||"#0079BF"}30`}} onClick={syncTrello} disabled={syncingTrello}>{syncingTrello?"⏳ Sincronizando...":"🔷 Atualizar Trello"}</button>
+      <button style={btn()} onClick={()=>onNav("novo")}>+ Novo</button>
+    </>}/>
     <div style={{padding:"20px 28px"}}>
+      {syncMsg&&<div style={{background:`${K.teal}10`,border:`1px solid ${K.teal}30`,borderRadius:"6px",padding:"10px",marginBottom:"14px",fontSize:"12px",color:K.teal}}>{syncMsg}</div>}
       <div style={{display:"flex",gap:"10px",marginBottom:"16px",flexWrap:"wrap"}}>
         <input style={{...inp,maxWidth:"260px"}} placeholder="🔍 Buscar..." value={q} onChange={e=>setQ(e.target.value)}/>
         <select style={{...inp,width:"auto",cursor:"pointer"}} value={filter} onChange={e=>setFilter(e.target.value)}>
@@ -1345,7 +1401,7 @@ useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("param
     <div style={{flex:1,overflowY:"auto",background:C.offwhite,display:"flex",flexDirection:"column",minWidth:0}}>
       {view==="dashboard"&&<Dashboard props={props} onNav={nav}/>}
   {view==="novo"&&<NovoImovel onSave={addProp} onCancel={()=>nav("imoveis")} trello={trello} parametrosBanco={parametrosBanco} criteriosBanco={criteriosBanco}/>}
-      {view==="imoveis"&&<Lista props={props} onNav={nav} onDelete={delProp}/>}
+      {view==="imoveis"&&<Lista props={props} onNav={nav} onDelete={delProp} trello={trello} onUpdateProp={(id,updates)=>setProps(ps=>ps.map(p=>p.id===id?{...p,...updates}:p))}/>}
       {view==="detail"&&<Detail p={selP} onDelete={delProp} onNav={nav} trello={trello} onUpdateProp={(id,updates)=>setProps(ps=>ps.map(p=>p.id===id?{...p,...updates}:p))}/>}
       {view==="comparar"&&<Comparativo props={props}/>}
     {view==="busca"&&<BuscaGPT onAnalisar={(link)=>{nav("novo");setTimeout(()=>{},100)}}/>}
