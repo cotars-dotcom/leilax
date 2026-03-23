@@ -428,18 +428,46 @@ function ModalAuditoriaTrello({ config, imoveis, onClose }) {
       if (rec === 'EVITAR')  return listIds['🚫 Descartados']
       return listIds['🔍 Em Análise']
     }
-    setLoading(true); setMsg('Sincronizando imóveis...')
-    let ok = 0, err = 0
-    const { criarCardImovel: criar } = await import('./lib/trelloService.js')
+    setLoading(true); setMsg('Sincronizando imóveis (com deduplicação)...')
+    let ok = 0, atualizado = 0, err = 0
+    const { criarOuAtualizarCardImovel } = await import('./lib/trelloService.js')
     for (const imovel of (imoveis || [])) {
       try {
         const lid = getListId(imovel.recomendacao) || Object.values(listIds)[0]
         if (!lid) continue
-        await criar(imovel, lid, boardId, key, token)
-        ok++
+        const res = await criarOuAtualizarCardImovel(imovel, lid, boardId, key, token)
+        if (res?.atualizado) atualizado++; else ok++
+        setMsg(`Sincronizando... ${ok + atualizado}/${(imoveis||[]).length}`)
       } catch { err++ }
     }
-    setMsg(`${ok} card(s) criado(s)${err ? ` · ${err} erro(s)` : ''}`)
+    setMsg(`${ok} criado(s), ${atualizado} atualizado(s)${err ? ` · ${err} erro(s)` : ''}`)
+    setLoading(false)
+  }
+
+  async function verificarDuplicatas() {
+    if (!boardId) { setMsg('Configure o Board ID primeiro.'); return }
+    setLoading(true); setMsg('Verificando duplicatas...')
+    try {
+      const { default: _unused, ...ts } = await import('./lib/trelloService.js').catch(() => ({}))
+      const cardsBoard = await fetch(`https://api.trello.com/1/boards/${boardId}/cards?fields=id,name,closed&limit=1000&key=${key}&token=${token}`).then(r => r.json())
+      const por_codigo = {}
+      for (const card of cardsBoard.filter(c => !c.closed)) {
+        const match = card.name.match(/\[AXIS-\d{4}\]/)
+        if (match) {
+          const codigo = match[0].replace(/[\[\]]/g, '')
+          if (!por_codigo[codigo]) por_codigo[codigo] = []
+          por_codigo[codigo].push(card)
+        }
+      }
+      const duplicatas = Object.entries(por_codigo).filter(([, cards]) => cards.length > 1)
+      if (duplicatas.length === 0) {
+        setMsg('Nenhuma duplicata encontrada!')
+      } else {
+        setMsg(`${duplicatas.length} código(s) com duplicata: ${duplicatas.map(([c]) => c).join(', ')}`)
+      }
+    } catch(e) {
+      setMsg(`Erro: ${e.message}`)
+    }
     setLoading(false)
   }
 
@@ -475,6 +503,10 @@ function ModalAuditoriaTrello({ config, imoveis, onClose }) {
           <button onClick={syncTodosImoveis} disabled={loading||!boardId}
             style={{padding:'11px 0',borderRadius:9,border:'none',background:C.emerald,color:'#fff',fontSize:13.5,fontWeight:600,cursor:(loading||!boardId)?'not-allowed':'pointer'}}>
             Sincronizar {imoveis?.length||0} imóvel(is)
+          </button>
+          <button onClick={verificarDuplicatas} disabled={loading||!boardId}
+            style={{padding:'11px 0',borderRadius:9,border:`1px solid ${C.mustard}`,background:C.mustardL,color:C.mustard,fontSize:13.5,fontWeight:600,cursor:(loading||!boardId)?'not-allowed':'pointer'}}>
+            Verificar Duplicatas
           </button>
         </div>
         {msg && (
@@ -705,7 +737,10 @@ function PropCard({p,onNav}) {
     )}
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:"10px"}}>
       <div style={{flex:1,minWidth:0}}>
-        <div style={{fontWeight:"600",fontSize:"13px",color:K.wh,marginBottom:"4px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.titulo||"Imóvel sem título"}</div>
+        <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:"4px"}}>
+          <div style={{fontWeight:"600",fontSize:"13px",color:K.wh,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1}}>{p.titulo||"Imóvel sem título"}</div>
+          {p.codigo_axis&&<span style={{fontSize:"9.5px",fontWeight:700,padding:"1px 6px",borderRadius:3,background:"#002B8010",color:"#002B80",fontFamily:"monospace",flexShrink:0}}>{p.codigo_axis}</span>}
+        </div>
         <div style={{fontSize:"10.5px",color:K.t3,marginBottom:"8px"}}>📍 {p.cidade}/{p.estado} · {p.tipo} · {p.area_m2?`${p.area_m2}m²`:"—"}</div>
         <div style={{display:"flex",gap:"5px",flexWrap:"wrap",marginBottom:"10px"}}>
           <Bdg c={rc} ch={p.recomendacao||"—"}/>
@@ -1373,7 +1408,7 @@ function AbaJuridica({ imovel, onReclassificado }) {
 }
 
 // ── DETAIL ────────────────────────────────────────────────────────────────────
-function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze}) {
+function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze,isAdmin,onArchive}) {
   const [sending,setSending]=useState(false)
   const [msg,setMsg]=useState("")
   const [abaDetalhe,setAbaDetalhe]=useState('resumo')
@@ -1413,18 +1448,19 @@ function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze}) {
     if(!trello?.listId){setMsg("Trello não configurado");return}
     setSending(true);setMsg("")
     try {
-      if(trello.boardId) { await criarCardImovel(p,trello.listId,trello.boardId,trello.key,trello.token); setMsg("✓ Card enviado ao Trello com etiquetas!") }
+      if(trello.boardId) { const res=await criarCardImovel(p,trello.listId,trello.boardId,trello.key,trello.token); setMsg(res?.atualizado?"✓ Card atualizado no Trello!":"✓ Card enviado ao Trello com etiquetas!") }
       else { const cd=buildTrelloCard(p); await tPost("/cards",trello.key,trello.token,{idList:trello.listId,name:cd.name,desc:cd.desc}); setMsg("✓ Card enviado ao Trello!") }
     } catch(e){setMsg(`Erro: ${e.message}`)}
     setSending(false)
   }
   return <div>
-    <Hdr title={p.titulo||"Imóvel"} sub={`${p.cidade}/${p.estado} · ${fmtD(p.createdAt)}`}
+    <Hdr title={<>{p.titulo||"Imóvel"}{p.codigo_axis&&<span style={{fontSize:"10.5px",fontWeight:700,padding:"2px 8px",borderRadius:4,background:"#002B8010",color:"#002B80",border:"1px solid #002B8020",fontFamily:"monospace",letterSpacing:"0.5px",marginLeft:10,verticalAlign:"middle"}}>{p.codigo_axis}</span>}{p.trello_card_url&&<a href={p.trello_card_url} target="_blank" rel="noreferrer" style={{fontSize:11,color:"#0052CC",marginLeft:8,verticalAlign:"middle",textDecoration:"none"}}>Trello</a>}</>} sub={`${p.cidade}/${p.estado} · ${fmtD(p.createdAt)}`}
       actions={<>
         {p.fonte_url&&<a href={p.fonte_url} target="_blank" rel="noopener noreferrer" style={{...btn("s"),textDecoration:"none",display:"inline-block"}}>🔗 Anúncio</a>}
-        <button style={{...btn("s"),background:`${K.amb}15`,color:K.amb,border:`1px solid ${K.amb}30`}} onClick={handleReanalyze} disabled={reanalyzing}>{reanalyzing?"⏳ Reanalisando...":"🔄 Reanalisar"}</button>
-        <button style={btn("trello")} onClick={sendTrello} disabled={sending}>{sending?"Enviando...":"🔷 Trello"}</button>
-        <button style={{...btn("d"),padding:"5px 12px",fontSize:"12px"}} onClick={()=>{if(confirm("Excluir?"))onDelete(p.id)}}>🗑</button>
+        {isAdmin&&<button style={{...btn("s"),background:`${K.amb}15`,color:K.amb,border:`1px solid ${K.amb}30`}} onClick={handleReanalyze} disabled={reanalyzing}>{reanalyzing?"⏳ Reanalisando...":"🔄 Reanalisar"}</button>}
+        {isAdmin&&<button style={btn("trello")} onClick={sendTrello} disabled={sending}>{sending?"Enviando...":"🔷 Trello"}</button>}
+        {isAdmin&&onArchive&&<button style={{...btn("s"),background:`${C.mustardL}`,color:C.mustard,border:`1px solid ${C.mustard}40`}} onClick={()=>onArchive(p.id)}>📦 Arquivar</button>}
+        {isAdmin&&<button style={{...btn("d"),padding:"5px 12px",fontSize:"12px"}} onClick={()=>{if(confirm("Excluir?"))onDelete(p.id)}}>🗑</button>}
       </>}/>
     {/* Tabs */}
     <div style={{display:"flex",gap:0,borderBottom:`1px solid ${K.bd}`,padding:"0 28px",background:K.s1}}>
@@ -1652,9 +1688,229 @@ function Comparativo({props}) {
   </div>
 }
 
+// ── ACESSO NEGADO ────────────────────────────────────────────────────────────
+function AcessoNegado({ mensagem }) {
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column',
+      alignItems: 'center', justifyContent: 'center',
+      height: 320, gap: 16, textAlign: 'center', padding: 32,
+    }}>
+      <div style={{ fontSize: 48 }}>🔒</div>
+      <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: C.navy }}>
+        Acesso Restrito
+      </h3>
+      <p style={{ margin: 0, fontSize: 14, color: C.muted, maxWidth: 360, lineHeight: 1.6 }}>
+        {mensagem || 'Esta funcionalidade é restrita ao administrador.'}
+      </p>
+      <p style={{ margin: 0, fontSize: 12, color: C.hint }}>
+        Contate Gabriel (cotars@hotmail.com) para mais informações.
+      </p>
+    </div>
+  )
+}
+
+// ── BANCO DE ARQUIVADOS ──────────────────────────────────────────────────────
+function BancoArquivados({ session, isAdmin }) {
+  const [arquivados, setArquivados] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [filtro, setFiltro] = useState('')
+  const [recomFiltro, setRecomFiltro] = useState('todos')
+
+  useEffect(() => { carregar() }, [])
+
+  async function carregar() {
+    setLoading(true)
+    try {
+      const { getBancoArquivados } = await import('./lib/supabase.js')
+      const data = await getBancoArquivados()
+      setArquivados(data)
+    } catch {}
+    setLoading(false)
+  }
+
+  async function desarquivar(id) {
+    if (!isAdmin) return
+    try {
+      const { desarquivarImovel } = await import('./lib/supabase.js')
+      await desarquivarImovel(id)
+      setArquivados(prev => prev.filter(p => p.id !== id))
+    } catch(e) { alert('Erro ao desarquivar: ' + e.message) }
+  }
+
+  const filtrados = arquivados.filter(a => {
+    const matchTexto = !filtro ||
+      (a.titulo||'').toLowerCase().includes(filtro.toLowerCase()) ||
+      (a.endereco||'').toLowerCase().includes(filtro.toLowerCase()) ||
+      (a.cidade||'').toLowerCase().includes(filtro.toLowerCase())
+    const matchRecom = recomFiltro === 'todos' || a.recomendacao === recomFiltro
+    return matchTexto && matchRecom
+  })
+
+  const sColor = s => !s ? C.hint : s >= 7.5 ? C.emerald : s >= 6 ? C.mustard : '#E5484D'
+
+  return (
+    <div style={{ padding: '24px 32px' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: C.navy }}>
+            Banco de Arquivados
+          </h2>
+          <p style={{ margin: '4px 0 0', fontSize: 13, color: C.muted }}>
+            {arquivados.length} imóvel(is) arquivado(s) — disponíveis para análise futura
+          </p>
+        </div>
+        <button onClick={carregar} style={{
+          padding: '8px 16px', borderRadius: 8,
+          border: `1px solid ${C.borderW}`, background: C.white,
+          color: C.navy, fontSize: 13, cursor: 'pointer', fontWeight: 500,
+        }}>
+          Atualizar
+        </button>
+      </div>
+
+      {/* Filtros */}
+      <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
+        <input
+          placeholder="Buscar por endereço ou cidade..."
+          value={filtro}
+          onChange={e => setFiltro(e.target.value)}
+          style={{
+            flex: 1, minWidth: 200, padding: '9px 14px', borderRadius: 8,
+            border: `1px solid ${C.borderW}`, fontSize: 13,
+            background: C.white, color: C.navy, outline: 'none',
+          }}
+        />
+        {['todos','COMPRAR','AGUARDAR','EVITAR'].map(r => (
+          <button key={r} onClick={() => setRecomFiltro(r)} style={{
+            padding: '8px 14px', borderRadius: 8, fontSize: 12, fontWeight: 500,
+            cursor: 'pointer',
+            border: `1px solid ${recomFiltro===r ? C.emerald : C.borderW}`,
+            background: recomFiltro===r ? C.emeraldL : C.white,
+            color: recomFiltro===r ? C.emerald : C.muted,
+          }}>
+            {r === 'todos' ? 'Todos' : r}
+          </button>
+        ))}
+      </div>
+
+      {/* Lista */}
+      {loading ? (
+        <p style={{ color: C.muted, textAlign: 'center', padding: 40 }}>Carregando...</p>
+      ) : filtrados.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: 48, color: C.hint }}>
+          <div style={{ fontSize: 40, marginBottom: 12 }}>📦</div>
+          <p style={{ fontSize: 14, fontWeight: 500 }}>Nenhum imóvel arquivado</p>
+          <p style={{ fontSize: 12 }}>
+            Imóveis arquivados aparecem aqui para referência futura.
+          </p>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
+          {filtrados.map(imovel => (
+            <div key={imovel.id} style={{
+              background: C.white, border: `1px solid ${C.borderW}`,
+              borderRadius: 12, overflow: 'hidden',
+              boxShadow: '0 2px 8px rgba(0,43,128,0.06)',
+              opacity: 0.92,
+            }}>
+              {imovel.foto_principal && (
+                <img src={imovel.foto_principal} alt=""
+                  style={{ width: '100%', height: 140, objectFit: 'cover' }}
+                  onError={e => { e.target.style.display = 'none' }}
+                />
+              )}
+              <div style={{ padding: '14px 16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <div style={{ flex: 1 }}>
+                    <p style={{ margin: 0, fontSize: 13.5, fontWeight: 600, color: C.navy }}>
+                      {imovel.titulo || imovel.endereco || 'Imóvel'}
+                    </p>
+                    <p style={{ margin: '2px 0 0', fontSize: 11.5, color: C.muted }}>
+                      {imovel.cidade}/{imovel.estado} — {imovel.tipo}
+                    </p>
+                  </div>
+                  <div style={{ textAlign: 'center', flexShrink: 0 }}>
+                    <p style={{ margin: 0, fontSize: 18, fontWeight: 800, color: sColor(imovel.score_total) }}>
+                      {imovel.score_total?.toFixed(1) || '—'}
+                    </p>
+                    <p style={{ margin: 0, fontSize: 9, color: C.hint }}>score</p>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 12, marginBottom: 10 }}>
+                  <div>
+                    <p style={{ margin: 0, fontSize: 10.5, color: C.hint }}>Lance mínimo</p>
+                    <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: C.navy }}>
+                      {imovel.valor_minimo ? `R$ ${Number(imovel.valor_minimo).toLocaleString('pt-BR')}` : '—'}
+                    </p>
+                  </div>
+                  <div>
+                    <p style={{ margin: 0, fontSize: 10.5, color: C.hint }}>Desconto</p>
+                    <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: C.emerald }}>
+                      {imovel.desconto_percentual ? `${imovel.desconto_percentual}%` : '—'}
+                    </p>
+                  </div>
+                  <div>
+                    <p style={{ margin: 0, fontSize: 10.5, color: C.hint }}>Recomendação</p>
+                    <p style={{ margin: 0, fontSize: 12, fontWeight: 700,
+                      color: imovel.recomendacao === 'COMPRAR' ? C.emerald
+                        : imovel.recomendacao === 'EVITAR' ? '#E5484D' : C.mustard }}>
+                      {imovel.recomendacao || '—'}
+                    </p>
+                  </div>
+                </div>
+                {imovel.motivo_arquivamento && (
+                  <div style={{
+                    padding: '6px 10px', borderRadius: 6, marginBottom: 10,
+                    background: '#F5F4F0', fontSize: 11.5, color: C.muted,
+                  }}>
+                    📦 {imovel.motivo_arquivamento}
+                  </div>
+                )}
+                {imovel.arquivado_em && (
+                  <p style={{ margin: '0 0 10px', fontSize: 10.5, color: C.hint }}>
+                    Arquivado em {new Date(imovel.arquivado_em).toLocaleDateString('pt-BR')}
+                  </p>
+                )}
+                {isAdmin && (
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={() => desarquivar(imovel.id)} style={{
+                      flex: 1, padding: '7px 0', borderRadius: 7,
+                      border: `1px solid ${C.emerald}`,
+                      background: C.emeraldL, color: C.emerald,
+                      fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                    }}>
+                      Reativar
+                    </button>
+                    {imovel.fonte_url && (
+                      <a href={imovel.fonte_url} target="_blank" rel="noreferrer" style={{
+                        padding: '7px 12px', borderRadius: 7,
+                        border: `1px solid ${C.borderW}`,
+                        background: C.white, color: C.muted,
+                        fontSize: 12, textDecoration: 'none',
+                        display: 'flex', alignItems: 'center',
+                      }}>
+                        🔗
+                      </a>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── APP ROOT ──────────────────────────────────────────────────────────────────
 export default function App() {
   const { session, profile, loading: authLoading, isAdmin } = useAuth()
+  const isViewer = !isAdmin && profile?.role === 'viewer'
+  const podeEditar = isAdmin
+  const podeSoVer = !isAdmin
   if (authLoading) return <div style={{display:'flex',flexDirection:'column',height:'100vh',background:C.offwhite,justifyContent:'center',alignItems:'center',color:C.navy,fontFamily:"'Inter',system-ui,sans-serif",fontSize:'16px',fontWeight:'700'}}>Carregando...</div>
   if (!session) return <Login />
   if (profile && !profile.ativo) return <div style={{display:'flex',height:'100vh',background:C.offwhite,justifyContent:'center',alignItems:'center',color:'#E5484D',fontFamily:"'Inter',system-ui,sans-serif",flexDirection:'column',gap:'12px'}}><div style={{fontSize:'16px',fontWeight:'700'}}>Acesso desativado</div><div style={{fontSize:'13px',color:C.muted}}>Contate o administrador</div></div>
@@ -1701,7 +1957,7 @@ useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("param
     if(!localStorage.getItem("axis-api-key")) setTimeout(()=>setShowApiKey(true),1000)
     // FIX 2B: Load imóveis from Supabase (shared database)
     if(session) {
-      import('./lib/supabase.js').then(({getImoveis:gi})=>{
+      import('./lib/supabase.js').then(({getImoveisAtivos:gi})=>{
         gi().then(data=>{
           if(data&&data.length>0) setProps(data)
           else if(p) setProps(p)
@@ -1725,6 +1981,19 @@ useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("param
     }
   }
   const delProp=async(id)=>{deleteImovel(id).catch(()=>{});setProps(ps=>ps.filter(p=>p.id!==id));showToast("Excluído",K.red);nav("imoveis")}
+
+  const handleArquivar=async(imovelId)=>{
+    const motivo=prompt('Motivo do arquivamento (opcional):')
+    if(motivo===null) return
+    try {
+      const{arquivarImovel}=await import('./lib/supabase.js')
+      await arquivarImovel(imovelId,motivo||'Arquivado pelo administrador',session?.user?.id)
+      setProps(prev=>prev.filter(p=>p.id!==imovelId))
+      const sel=vp.id===imovelId
+      if(sel){nav('imoveis')}
+      showToast("Imóvel arquivado",C.mustard)
+    } catch(e){alert('Erro ao arquivar: '+e.message)}
+  }
   const saveTrello=cfg=>{
     setTrello(cfg);setShowTrello(false);showToast("✓ Trello configurado — "+cfg.boardName,K.trello)
     if(cfg.boardId&&cfg.key&&cfg.token){
@@ -1736,23 +2005,25 @@ useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("param
 
   const NAV_ITEMS_DEF=[
     {icon:LayoutDashboard,l:'Dashboard',v:'dashboard'},
-    {icon:Plus,l:'Analisar',v:'novo'},
-    {icon:MessageSquare,l:'Busca GPT',v:'busca'},
+    ...(isAdmin?[{icon:Plus,l:'Analisar',v:'novo'}]:[]),
+    ...(isAdmin?[{icon:MessageSquare,l:'Busca GPT',v:'busca'}]:[]),
     {icon:Package,l:'Imóveis',v:'imoveis'},
     {icon:BarChart3,l:'Gráficos',v:'graficos'},
     {icon:Scale,l:'Comparar',v:'comparar'},
     {icon:CheckSquare,l:'Tarefas',v:'tarefas'},
+    {icon:FileText,l:'Arquivados',v:'arquivados'},
     ...(isAdmin?[{icon:ShieldCheck,l:'Admin',v:'admin'}]:[]),
   ]
   // Keep emoji-based navItems for MobileNav compatibility
   const navItems=[
     {i:'🏠',l:'Dashboard',v:'dashboard'},
-    {i:'🔍',l:'Analisar',v:'novo'},
-    {i:'🤖',l:'Busca GPT',v:'busca'},
+    ...(isAdmin?[{i:'🔍',l:'Analisar',v:'novo'}]:[]),
+    ...(isAdmin?[{i:'🤖',l:'Busca GPT',v:'busca'}]:[]),
     {i:'📋',l:'Imóveis',v:'imoveis'},
     {i:'📊',l:'Gráficos',v:'graficos'},
     {i:'⚖️',l:'Comparar',v:'comparar'},
     {i:'✅',l:'Tarefas',v:'tarefas'},
+    {i:'🏦',l:'Arquivados',v:'arquivados'},
     ...(isAdmin?[{i:'🛡️',l:'Admin',v:'admin'}]:[]),
   ]
   const isAct=v=>view===v||(v==="imoveis"&&view==="detail")
@@ -1812,13 +2083,13 @@ useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("param
     }}>
       🔷 Trello
     </button>
-    <button onClick={()=>setShowApiKey(true)} style={{
+    {isAdmin&&<button onClick={()=>setShowApiKey(true)} style={{
       width:'100%',display:'flex',alignItems:'center',gap:10,
       padding:'8px 12px',borderRadius:8,border:'none',cursor:'pointer',
       background:'transparent',color:'rgba(255,255,255,0.45)',fontSize:13,fontWeight:400,textAlign:'left',
     }}>
       <Settings size={15} /> Config
-    </button>
+    </button>}
     <div onClick={async()=>{if(confirm('Sair?')){const{signOut}=await import('./lib/supabase.js');await signOut()}}}
       style={{display:'flex',alignItems:'center',gap:8,padding:'8px 12px',cursor:'pointer',borderRadius:8,marginTop:4}}>
       <div style={{width:30,height:30,borderRadius:'50%',background:`${C.emerald}25`,border:`1px solid ${C.emerald}50`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,fontWeight:700,color:C.emerald}}>
@@ -1840,13 +2111,14 @@ useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("param
     {/* CONTENT */}
     <div style={{flex:1,overflowY:"auto",background:C.offwhite,display:"flex",flexDirection:"column",minWidth:0}}>
       {view==="dashboard"&&<Dashboard props={props} onNav={nav} profile={profile}/>}
-  {view==="novo"&&<NovoImovel onSave={addProp} onCancel={()=>nav("imoveis")} trello={trello} parametrosBanco={parametrosBanco} criteriosBanco={criteriosBanco}/>}
+  {view==="novo"&&(isAdmin?<NovoImovel onSave={addProp} onCancel={()=>nav("imoveis")} trello={trello} parametrosBanco={parametrosBanco} criteriosBanco={criteriosBanco}/>:<AcessoNegado mensagem="Análise de imóveis é restrita ao administrador."/>)}
       {view==="imoveis"&&<Lista props={props} onNav={nav} onDelete={delProp} trello={trello} onUpdateProp={(id,updates)=>setProps(ps=>ps.map(p=>p.id===id?{...p,...updates}:p))}/>}
-      {view==="detail"&&<Detail p={selP} onDelete={delProp} onNav={nav} trello={trello} onUpdateProp={(id,updates)=>setProps(ps=>ps.map(p=>p.id===id?{...p,...updates}:p))}/>}
+      {view==="detail"&&<Detail p={selP} onDelete={delProp} onNav={nav} trello={trello} onUpdateProp={(id,updates)=>setProps(ps=>ps.map(p=>p.id===id?{...p,...updates}:p))} isAdmin={isAdmin} onArchive={handleArquivar}/>}
       {view==="comparar"&&<Comparativo props={props}/>}
-    {view==="busca"&&<BuscaGPT onAnalisar={(link)=>{nav("novo");setTimeout(()=>{},100)}}/>}
+    {view==="busca"&&(isAdmin?<BuscaGPT onAnalisar={(link)=>{nav("novo");setTimeout(()=>{},100)}}/>:<AcessoNegado mensagem="Busca com IA é restrita ao administrador."/>)}
     {view==="graficos"&&<div><div style={{padding:"22px 28px 16px",borderBottom:`1px solid ${C.borderW}`,background:C.white}}><div style={{fontWeight:700,fontSize:19,color:C.text}}>Gráficos</div></div><div style={{padding:"20px 28px"}}><Charts properties={props}/></div></div>}
     {view==="tarefas"&&<Tarefas/>}
+    {view==="arquivados"&&<BancoArquivados session={session} isAdmin={isAdmin}/>}
     {view==="admin"&&isAdmin&&<AdminPanel/>}
     </div>
 

@@ -305,24 +305,83 @@ async function popularBaseJuridica(listId, key, token) {
   }
 }
 
-// ── Criar card do imóvel com fotos e métricas ────────────────────
-export async function criarCardImovel(imovel, listId, boardId, key, token) {
-  // Buscar labels existentes
+// ── Criar ou atualizar card do imóvel (com deduplicação) ─────────
+export async function criarOuAtualizarCardImovel(imovel, listId, boardId, key, token, userId = null) {
+  // ── PASSO 1: Verificar se já existe card para este imóvel ─────
+  // Estratégia 1: card_id salvo no banco
+  if (imovel.trello_card_id) {
+    try {
+      const cardExistente = await trello('GET',
+        `/cards/${imovel.trello_card_id}?fields=id,name,idList,closed`,
+        null, key, token
+      )
+      if (cardExistente && !cardExistente.closed) {
+        console.log(`[AXIS] Card Trello já existe para ${imovel.codigo_axis} — atualizando`)
+        return await atualizarCardCompleto(imovel, cardExistente.id, listId, key, token)
+      }
+    } catch {
+      // Card não encontrado mais — criar novo
+    }
+  }
+
+  // Estratégia 2: buscar pelo código AXIS no nome do card
+  if (imovel.codigo_axis) {
+    try {
+      const cardsBoard = await trello('GET',
+        `/boards/${boardId}/cards?fields=id,name,idList,closed&limit=1000`,
+        null, key, token
+      )
+      const cardExistente = cardsBoard.find(c =>
+        !c.closed && c.name.includes(imovel.codigo_axis)
+      )
+      if (cardExistente) {
+        console.log(`[AXIS] Card encontrado pelo código ${imovel.codigo_axis} — atualizando`)
+        try {
+          const { updateTrelloCardId } = await import('./supabase.js')
+          await updateTrelloCardId(imovel.id, cardExistente.id, null, listId)
+        } catch {}
+        return await atualizarCardCompleto(imovel, cardExistente.id, listId, key, token)
+      }
+    } catch {}
+  }
+
+  // ── PASSO 2: Criar novo card ───────────────────────────────────
+  const card = await criarCardImovelNovo(imovel, listId, boardId, key, token)
+
+  // ── PASSO 3: Salvar referência no banco ───────────────────────
+  try {
+    const { registrarTrelloCard } = await import('./supabase.js')
+    await registrarTrelloCard(imovel.id, card.id, card.url, listId, userId)
+  } catch {}
+
+  return card
+}
+
+// Atualizar card existente com dados novos
+async function atualizarCardCompleto(imovel, cardId, novaListId, key, token) {
+  const rec = imovel.recomendacao === 'COMPRAR' ? '🟢'
+    : imovel.recomendacao === 'AGUARDAR' ? '🟡' : '🔴'
+  await trello('PUT', `/cards/${cardId}`, {
+    name: `${rec} [${imovel.codigo_axis || 'AXIS'}] ${imovel.titulo || imovel.endereco || 'Imóvel'} · ${(imovel.score_total||0).toFixed(1)}`,
+    idList: novaListId,
+  }, key, token).catch(() => {})
+  return { id: cardId, atualizado: true }
+}
+
+// Criar card novo (com código AXIS no nome)
+async function criarCardImovelNovo(imovel, listId, boardId, key, token) {
   let labelIds = []
   try {
     const labels = await trello('GET', `/boards/${boardId}/labels?limit=50`, null, key, token)
-    const mapear = (contém) => labels.find(l => l.name?.includes(contém))?.id
-
+    const mapear = (txt) => labels.find(l => l.name?.includes(txt))?.id
     const rec = imovel.recomendacao
     if (rec === 'COMPRAR')  { const l = mapear('COMPRAR');  if (l) labelIds.push(l) }
     if (rec === 'AGUARDAR') { const l = mapear('AGUARDAR'); if (l) labelIds.push(l) }
     if (rec === 'EVITAR')   { const l = mapear('EVITAR');   if (l) labelIds.push(l) }
-
     const sc = imovel.score_total || 0
-    if (sc >= 7.5) { const l = mapear('Score ≥'); if (l) labelIds.push(l) }
-    else if (sc >= 6) { const l = mapear('Score 6'); if (l) labelIds.push(l) }
-    else { const l = mapear('Score < 6'); if (l) labelIds.push(l) }
-
+    if (sc >= 7.5)     { const l = mapear('Score ≥'); if (l) labelIds.push(l) }
+    else if (sc >= 6)  { const l = mapear('Score 6'); if (l) labelIds.push(l) }
+    else               { const l = mapear('Score <'); if (l) labelIds.push(l) }
     if (imovel.ocupacao === 'Desocupado') { const l = mapear('Desocupado'); if (l) labelIds.push(l) }
     if (imovel.ocupacao === 'Ocupado')    { const l = mapear('Ocupado');    if (l) labelIds.push(l) }
     if (imovel.financiavel)               { const l = mapear('Financiável'); if (l) labelIds.push(l) }
@@ -333,10 +392,10 @@ export async function criarCardImovel(imovel, listId, boardId, key, token) {
   const fmt = n => n ? `R$ ${Number(n).toLocaleString('pt-BR')}` : '—'
   const pct = n => n ? `${Number(n).toFixed(1)}%` : '—'
   const sc  = n => n !== undefined ? `${Number(n).toFixed(1)}/10` : '—'
-  const rec = imovel.recomendacao === 'COMPRAR' ? '🟢'
+  const recIcon = imovel.recomendacao === 'COMPRAR' ? '🟢'
     : imovel.recomendacao === 'AGUARDAR' ? '🟡' : '🔴'
 
-  const desc = `${rec} **${imovel.recomendacao || 'AGUARDAR'}** · Score AXIS: **${(imovel.score_total||0).toFixed(1)}/10**
+  const desc = `${recIcon} **${imovel.recomendacao || 'AGUARDAR'}** · Score: **${(imovel.score_total||0).toFixed(1)}/10** · Código: **${imovel.codigo_axis || '—'}**
 
 ---
 
@@ -396,10 +455,10 @@ ${(imovel.negativos||[]).map(n=>`❌ ${n}`).join('\n') || ''}
 **Justificativa:** ${imovel.justificativa || '—'}
 
 ---
-*Analisado pelo AXIS Intelligence · Motor Duplo IA*
-${imovel.fonte_url ? `🔗 [Ver anúncio](${imovel.fonte_url})` : ''}`
+*AXIS Intelligence · ${imovel.analise_dupla_ia ? 'Claude + ChatGPT' : 'Claude'}*
+${imovel.fonte_url ? `🔗 [Ver anúncio original](${imovel.fonte_url})` : ''}`
 
-  const nomeCard = `${rec} ${imovel.titulo || imovel.endereco || 'Imóvel'} · ${(imovel.score_total||0).toFixed(1)}`
+  const nomeCard = `${recIcon} [${imovel.codigo_axis || 'AXIS'}] ${imovel.titulo || imovel.endereco || 'Imóvel'} · ${(imovel.score_total||0).toFixed(1)}`
 
   const card = await trello('POST', '/cards', {
     idList: listId,
@@ -423,9 +482,9 @@ ${imovel.fonte_url ? `🔗 [Ver anúncio](${imovel.fonte_url})` : ''}`
     } catch {}
   }
 
-  // Fotos extras (até 4)
-  for (const foto of (imovel.fotos||[]).slice(1, 5)) {
-    try { await trello('POST', `/cards/${card.id}/attachments`, { url: foto, name: 'Foto' }, key, token) } catch {}
+  // Fotos extras
+  for (const foto of (imovel.fotos||[]).slice(1, 4)) {
+    try { await trello('POST', `/cards/${card.id}/attachments`, { url: foto }, key, token) } catch {}
   }
 
   // Checklist de due diligence
@@ -443,8 +502,7 @@ ${imovel.fonte_url ? `🔗 [Ver anúncio](${imovel.fonte_url})` : ''}`
       '🏗️ Estimativa de reforma',
       '💰 Capital disponível confirmado',
       '💰 Estrutura de aquisição definida',
-      '💰 Acordo de Copropriedade assinado',
-      '📋 Proposta registrada no prazo',
+      '📋 Lance/proposta registrado',
       '📋 Boleto emitido e pago',
     ]
     for (const item of items) {
@@ -454,6 +512,9 @@ ${imovel.fonte_url ? `🔗 [Ver anúncio](${imovel.fonte_url})` : ''}`
 
   return card
 }
+
+// Manter criarCardImovel como alias para compatibilidade
+export { criarOuAtualizarCardImovel as criarCardImovel }
 
 // ── Auditar board existente ──────────────────────────────────────
 export async function auditarBoard(boardId, key, token) {
@@ -490,7 +551,7 @@ export async function atualizarCardImovel(cardId, imovel, key, token) {
   const rec = imovel.recomendacao === 'COMPRAR' ? '🟢'
     : imovel.recomendacao === 'AGUARDAR' ? '🟡' : '🔴'
   await trello('PUT', `/cards/${cardId}`, {
-    name: `${rec} ${imovel.titulo || imovel.endereco || 'Imóvel'} · ${(imovel.score_total||0).toFixed(1)}`,
+    name: `${rec} [${imovel.codigo_axis || 'AXIS'}] ${imovel.titulo || imovel.endereco || 'Imóvel'} · ${(imovel.score_total||0).toFixed(1)}`,
   }, key, token)
 }
 
