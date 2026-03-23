@@ -142,7 +142,7 @@ function ScoreRing({score,size=80}) {
 const ANTHROPIC_API = "https://api.anthropic.com/v1/messages"
 
 async function analyzeProperty(url) {
-  const sys = `Você é LEILAX, especialista em análise de imóveis em leilão para investimento imobiliário no Brasil. Use web search para buscar informações sobre o imóvel.
+  const sys = `Você é AXIS, especialista em análise de imóveis em leilão para investimento imobiliário no Brasil. Use web search para buscar informações sobre o imóvel.
 
 Retorne SOMENTE JSON válido sem markdown:
 {
@@ -170,7 +170,7 @@ Retorne SOMENTE JSON válido sem markdown:
 Scores 0-10. score_total = média ponderada (loc 20%, desc 18%, jur 18%, ocup 15%, liq 15%, merc 14%).
 Se score_juridico < 4 → score_total *= 0.75. Se ocupado → score_total *= 0.85.`
 
-  const apiKey = localStorage.getItem("leilax-api-key") || ""
+  const apiKey = localStorage.getItem("axis-api-key") || ""
   if (!apiKey) throw new Error("Configure a chave da API Anthropic nas configurações")
 
   const r = await fetch(ANTHROPIC_API, {
@@ -260,7 +260,7 @@ ${(p.alertas||[]).map(x=>`- ${x}`).join("\n")||"Nenhum"}
 ${p.justificativa||"—"}
 
 ---
-*Analisado por LEILAX · ${new Date().toLocaleDateString("pt-BR")}*
+*Analisado pelo AXIS · ${new Date().toLocaleDateString("pt-BR")}*
 ${p.fonte_url?`\n🔗 ${p.fonte_url}`:""}`
 
   return { name:`${emoji} [${score}] ${p.titulo||p.tipo||"Imóvel"} — ${p.cidade||""}`, desc }
@@ -286,7 +286,7 @@ function TrelloModal({config,onSave,onClose}) {
     try { const b=await tGet("/members/me/boards?fields=id,name",key.trim(),token.trim()); setBoards(b);setStep(2) }
     catch(e){
       // Qualquer erro (CORS, invalid key, 401, etc) → avança para step 2 com boards vazio
-      console.warn('[LEILAX] Trello API error (prosseguindo):', e.message)
+      console.warn('[AXIS] Trello API error (prosseguindo):', e.message)
       setStep(2);setBoards([])
     }
     setLoading(false)
@@ -298,7 +298,7 @@ function TrelloModal({config,onSave,onClose}) {
     setLoading(true)
     try { const l=await tGet(`/boards/${bid}/lists?fields=id,name`,key,token); setLists(l); if(l.length)setListId(l[0].id) }
     catch(e){
-      console.warn('[LEILAX] Trello lists error (prosseguindo):', e.message)
+      console.warn('[AXIS] Trello lists error (prosseguindo):', e.message)
       setLists([])
     }
     setLoading(false)
@@ -365,11 +365,150 @@ function TrelloModal({config,onSave,onClose}) {
   </div>
 }
 
+// ── MODAL AUDITORIA TRELLO ────────────────────────────────────────────────────
+function ModalAuditoriaTrello({ config, imoveis, onClose }) {
+  const [loading, setLoading] = useState(false)
+  const [auditoria, setAuditoria] = useState(null)
+  const [boards, setBoards] = useState([])
+  const [msg, setMsg] = useState('')
+  const { key, token, boardId } = config || {}
+
+  useEffect(() => {
+    if (key && token) carregarBoards()
+  }, [])
+
+  async function carregarBoards() {
+    try {
+      const { getBoardsAxis } = await import('./lib/trelloService.js')
+      const data = await getBoardsAxis(key, token)
+      setBoards(data.filter(b => b.name.includes('AXIS')))
+    } catch {}
+  }
+
+  async function criarWorkspace() {
+    setLoading(true); setMsg('Criando workspace AXIS no Trello...')
+    try {
+      const { setupWorkspaceAxis } = await import('./lib/trelloService.js')
+      const res = await setupWorkspaceAxis(key, token)
+      const novoConfig = {
+        ...config,
+        boardId: res.boards.pipeline,
+        boardManualId: res.boards.manual,
+        listIds: res.lists,
+      }
+      localStorage.setItem('axis-trello', JSON.stringify(novoConfig))
+      setMsg(`Workspace criado! ${Object.keys(res.lists).length} listas, ${Object.keys(res.labels).length} etiquetas.`)
+      await carregarBoards()
+    } catch(e) {
+      setMsg(`Erro: ${e.message}`)
+    }
+    setLoading(false)
+  }
+
+  async function rodarAuditoria() {
+    if (!boardId) { setMsg('Crie o workspace primeiro.'); return }
+    setLoading(true); setMsg('Auditando board...')
+    try {
+      const { auditarBoard } = await import('./lib/trelloService.js')
+      const res = await auditarBoard(boardId, key, token)
+      setAuditoria(res)
+      setMsg('')
+    } catch(e) {
+      setMsg(`Erro: ${e.message}`)
+    }
+    setLoading(false)
+  }
+
+  async function syncTodosImoveis() {
+    if (!boardId) { setMsg('Configure o Board ID primeiro.'); return }
+    const trelloConf = JSON.parse(localStorage.getItem('axis-trello') || '{}')
+    const listIds = trelloConf.listIds || {}
+    const getListId = (rec) => {
+      if (rec === 'COMPRAR') return listIds['✅ Aprovados']
+      if (rec === 'EVITAR')  return listIds['🚫 Descartados']
+      return listIds['🔍 Em Análise']
+    }
+    setLoading(true); setMsg('Sincronizando imóveis...')
+    let ok = 0, err = 0
+    const { criarCardImovel: criar } = await import('./lib/trelloService.js')
+    for (const imovel of (imoveis || [])) {
+      try {
+        const lid = getListId(imovel.recomendacao) || Object.values(listIds)[0]
+        if (!lid) continue
+        await criar(imovel, lid, boardId, key, token)
+        ok++
+      } catch { err++ }
+    }
+    setMsg(`${ok} card(s) criado(s)${err ? ` · ${err} erro(s)` : ''}`)
+    setLoading(false)
+  }
+
+  return (
+    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000}}>
+      <div style={{background:'#fff',borderRadius:16,padding:'28px 32px',width:560,maxHeight:'85vh',overflowY:'auto',boxShadow:'0 20px 60px rgba(0,0,0,0.3)'}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:20}}>
+          <div>
+            <h2 style={{margin:0,fontSize:18,fontWeight:700,color:C.navy}}>Trello AXIS — Central de Controle</h2>
+            <p style={{margin:'4px 0 0',fontSize:12.5,color:C.muted}}>Gerencie boards, sincronize imóveis e audite cards</p>
+          </div>
+          <button onClick={onClose} style={{border:'none',background:'none',fontSize:20,cursor:'pointer',color:C.muted}}>x</button>
+        </div>
+        {boards.length > 0 && (
+          <div style={{marginBottom:16,padding:'12px 14px',background:C.emeraldL,borderRadius:10}}>
+            <p style={{margin:'0 0 6px',fontSize:12,fontWeight:600,color:C.emerald}}>{boards.length} board(s) AXIS encontrado(s):</p>
+            {boards.map(b => (
+              <p key={b.id} style={{margin:'2px 0',fontSize:12,color:C.navy}}>
+                {b.name} · <a href={b.url} target="_blank" rel="noreferrer" style={{color:C.emerald}}>abrir</a>
+              </p>
+            ))}
+          </div>
+        )}
+        <div style={{display:'flex',flexDirection:'column',gap:10}}>
+          <button onClick={criarWorkspace} disabled={loading}
+            style={{padding:'11px 0',borderRadius:9,border:'none',background:C.navy,color:'#fff',fontSize:13.5,fontWeight:600,cursor:loading?'wait':'pointer'}}>
+            Criar / Recriar Workspace AXIS
+          </button>
+          <button onClick={rodarAuditoria} disabled={loading||!boardId}
+            style={{padding:'11px 0',borderRadius:9,border:`1px solid ${C.navy}`,background:'#fff',color:C.navy,fontSize:13.5,fontWeight:600,cursor:(loading||!boardId)?'not-allowed':'pointer'}}>
+            Auditar Board Pipeline
+          </button>
+          <button onClick={syncTodosImoveis} disabled={loading||!boardId}
+            style={{padding:'11px 0',borderRadius:9,border:'none',background:C.emerald,color:'#fff',fontSize:13.5,fontWeight:600,cursor:(loading||!boardId)?'not-allowed':'pointer'}}>
+            Sincronizar {imoveis?.length||0} imóvel(is)
+          </button>
+        </div>
+        {msg && (
+          <div style={{marginTop:14,padding:'10px 14px',borderRadius:8,background:msg.includes('Erro')?'#FEE8E8':C.emeraldL,fontSize:13,color:msg.includes('Erro')?'#C0392B':C.emerald}}>
+            {msg}
+          </div>
+        )}
+        {auditoria && (
+          <div style={{marginTop:16,padding:'14px 16px',background:C.surface,borderRadius:10}}>
+            <p style={{margin:'0 0 10px',fontWeight:600,fontSize:14,color:C.navy}}>Resultado da Auditoria</p>
+            <p style={{margin:'3px 0',fontSize:13,color:C.text}}>Board: {auditoria.board?.name}</p>
+            <p style={{margin:'3px 0',fontSize:13,color:C.text}}>Total de cards: {auditoria.cards_total}</p>
+            <p style={{margin:'3px 0',fontSize:13,color:C.text}}>Listas: {auditoria.listas?.map(l=>l.nome).join(', ')}</p>
+            {auditoria.cards_sem_foto?.length>0 && (
+              <p style={{margin:'6px 0 0',fontSize:12.5,color:C.mustard}}>Sem foto: {auditoria.cards_sem_foto.join(', ')}</p>
+            )}
+            {auditoria.cards_sem_checklist?.length>0 && (
+              <p style={{margin:'4px 0',fontSize:12.5,color:C.mustard}}>Sem checklist: {auditoria.cards_sem_checklist.join(', ')}</p>
+            )}
+            {auditoria.erros?.length>0 && (
+              <p style={{margin:'4px 0',fontSize:12.5,color:'#C0392B'}}>Erros: {auditoria.erros.join(', ')}</p>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── API KEY MODAL ─────────────────────────────────────────────────────────────
 function ApiKeyModal({onClose}) {
- const [key,setKey]=useState(localStorage.getItem("leilax-api-key")||"")
- const [oaiKey,setOaiKey]=useState(localStorage.getItem("leilax-openai-key")||"")
- const save=()=>{localStorage.setItem("leilax-api-key",key.trim());if(oaiKey.trim())localStorage.setItem("leilax-openai-key",oaiKey.trim());onClose()}
+ const [key,setKey]=useState(localStorage.getItem("axis-api-key")||"")
+ const [oaiKey,setOaiKey]=useState(localStorage.getItem("axis-openai-key")||"")
+ const save=()=>{localStorage.setItem("axis-api-key",key.trim());if(oaiKey.trim())localStorage.setItem("axis-openai-key",oaiKey.trim());onClose()}
   return <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.75)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:"20px"}}>
     <div style={{background:K.s1,border:`1px solid ${K.bd}`,borderRadius:"10px",padding:"28px",maxWidth:"480px",width:"100%"}}>
       <div style={{display:"flex",justifyContent:"space-between",marginBottom:"20px"}}>
@@ -413,13 +552,13 @@ function NovoImovel({onSave,onCancel,trello,parametrosBanco,criteriosBanco}) {
 
   const analyze = async () => {
     if(!url.trim()){setError("Cole o link do leilão");return}
-    const hasKey = localStorage.getItem("leilax-api-key")
+    const hasKey = localStorage.getItem("axis-api-key")
     if(!hasKey){setError("Configure a chave da API Anthropic nas Configurações (⚙️)");return}
     setLoading(true);setError("");setTrelloMsg("")
     setStep("🔍 Buscando informações do imóvel...")
     try {
       setStep("🧠 IA analisando: score, risco jurídico, mercado...")
-      const openaiKey = localStorage.getItem("leilax-openai-key") || ""
+      const openaiKey = localStorage.getItem("axis-openai-key") || ""
         const data = await analisarImovelCompleto(url.trim(), hasKey, openaiKey, parametrosBanco, criteriosBanco, (msg) => setStep(msg), anexos)
       data.fonte_url = url.trim()
       const property = {...data, id:uid(), createdAt:new Date().toISOString()}
@@ -860,8 +999,8 @@ function AbaJuridica({ imovel, onReclassificado }) {
     setErro('')
     setResultado(null)
 
-    const claudeKey = localStorage.getItem('leilax-api-key') || ''
-    const openaiKey = localStorage.getItem('leilax-openai-key') || ''
+    const claudeKey = localStorage.getItem('axis-api-key') || ''
+    const openaiKey = localStorage.getItem('axis-openai-key') || ''
     if (!claudeKey) {
       setErro('Configure a API Key do Claude no painel Admin → API Keys')
       return
@@ -1132,12 +1271,12 @@ function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze}) {
 
   const handleReanalyze=async()=>{
     if(!p?.fonte_url){setMsg("⚠️ Imóvel sem URL de origem para reanalisar");return}
-    const claudeKey=localStorage.getItem("leilax-api-key")||""
+    const claudeKey=localStorage.getItem("axis-api-key")||""
     if(!claudeKey){setMsg("⚠️ Configure a API Key do Claude em Admin → API Keys");return}
     if(!confirm("Reanalisar este imóvel com a IA? Os dados serão atualizados.")) return
     setReanalyzing(true);setMsg("")
     try {
-      const openaiKey=localStorage.getItem("leilax-openai-key")||""
+      const openaiKey=localStorage.getItem("axis-openai-key")||""
       const {data:par}=await supabase.from("parametros_score").select("*")
       const {data:cri}=await supabase.from("criterios_avaliacao").select("*")
       const novaAnalise=await analisarImovelCompleto(p.fonte_url,claudeKey,openaiKey,par||[],cri||[],setReStep,[])
@@ -1416,9 +1555,10 @@ export default function App() {
   const [trello,setTrello]=useState(null)
   const [showTrello,setShowTrello]=useState(false)
   const [showApiKey,setShowApiKey]=useState(false)
+  const [showTrelloModal,setShowTrelloModal]=useState(false)
 const [parametrosBanco,setParametrosBanco]=useState([])
 const [criteriosBanco,setCriteriosBanco]=useState([])
-  const [apiOk,setApiKey]=useState(localStorage.getItem("leilax-api-key"))
+  const [apiOk,setApiKey]=useState(localStorage.getItem("axis-api-key"))
 useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("parametros_score").select("*");if(pr)setParametrosBanco(pr);const{data:cr}=await supabase.from("criterios_avaliacao").select("*");if(cr)setCriteriosBanco(cr)}catch(e){console.warn("parametros:",e)}}lp()},[])
 
   // FIX 1: Sync API keys from Supabase (cross-device)
@@ -1426,10 +1566,10 @@ useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("param
     if(!session) return
     import('./lib/supabase.js').then(({getAppSetting})=>{
       getAppSetting('anthropic_api_key').then(k=>{
-        if(k&&k.length>10){localStorage.setItem('leilax-api-key',k);setApiKey(k)}
+        if(k&&k.length>10){localStorage.setItem('axis-api-key',k);setApiKey(k)}
       }).catch(()=>{})
       getAppSetting('openai_api_key').then(k=>{
-        if(k&&k.length>10){localStorage.setItem('leilax-openai-key',k)}
+        if(k&&k.length>10){localStorage.setItem('axis-openai-key',k)}
       }).catch(()=>{})
     }).catch(()=>{})
   },[session])
@@ -1438,10 +1578,10 @@ useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("param
   const nav=(v,p={})=>{setView(v);setVp(p)}
 
   useEffect(()=>{(async()=>{
-    const [p,t]=await Promise.all([stLoad("leilax-props"),stLoad("leilax-trello")])
+    const [p,t]=await Promise.all([stLoad("axis-props"),stLoad("axis-trello")])
     if(t)setTrello(t); setL(true)
     // Mostrar modal de API key se não tiver
-    if(!localStorage.getItem("leilax-api-key")) setTimeout(()=>setShowApiKey(true),1000)
+    if(!localStorage.getItem("axis-api-key")) setTimeout(()=>setShowApiKey(true),1000)
     // FIX 2B: Load imóveis from Supabase (shared database)
     if(session) {
       import('./lib/supabase.js').then(({getImoveis:gi})=>{
@@ -1453,8 +1593,8 @@ useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("param
     } else { if(p) setProps(p) }
   })()},[])
 
-  useEffect(()=>{if(loaded)stSave("leilax-props",props)},[props,loaded])
-  useEffect(()=>{if(loaded&&trello)stSave("leilax-trello",trello)},[trello,loaded])
+  useEffect(()=>{if(loaded)stSave("axis-props",props)},[props,loaded])
+  useEffect(()=>{if(loaded&&trello)stSave("axis-trello",trello)},[trello,loaded])
 
   const addProp=p=>{
     setProps(ps=>[p,...ps])
@@ -1472,8 +1612,8 @@ useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("param
     setTrello(cfg);setShowTrello(false);showToast("✓ Trello configurado — "+cfg.boardName,K.trello)
     if(cfg.boardId&&cfg.key&&cfg.token){
       setupBoardLeilax(cfg.boardId,cfg.key,cfg.token)
-        .then(()=>console.log('[LEILAX] Board Trello configurado'))
-        .catch(e=>console.warn('[LEILAX] Setup Trello:',e.message))
+        .then(()=>console.log('[AXIS] Board Trello configurado'))
+        .catch(e=>console.warn('[AXIS] Setup Trello:',e.message))
     }
   }
 
@@ -1511,6 +1651,7 @@ useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("param
 
     {showTrello&&<TrelloModal config={trello} onSave={saveTrello} onClose={()=>setShowTrello(false)}/>}
     {showApiKey&&<ApiKeyModal onClose={()=>setShowApiKey(false)}/>}
+    {showTrelloModal&&<ModalAuditoriaTrello config={trello||JSON.parse(localStorage.getItem('axis-trello')||'{}')} imoveis={props} onClose={()=>setShowTrelloModal(false)}/>}
 
 {/* SIDEBAR — AXIS expandida 200px */}
 <aside style={{
@@ -1546,7 +1687,7 @@ useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("param
   </nav>
   {/* Sidebar footer */}
   <div style={{padding:'10px 10px',borderTop:'1px solid rgba(255,255,255,0.07)',display:'flex',flexDirection:'column',gap:4}}>
-    <button onClick={()=>setShowTrello(true)} style={{
+    <button onClick={()=>trello?setShowTrelloModal(true):setShowTrello(true)} style={{
       width:'100%',display:'flex',alignItems:'center',gap:10,
       padding:'8px 12px',borderRadius:8,border:'none',cursor:'pointer',
       background:trello?'rgba(5,168,109,0.12)':'transparent',

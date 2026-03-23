@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-// LEILAX — Base de Custos de Reforma MG/BH/JF
+// AXIS — Base de Custos de Reforma MG/BH/JF
 // Versão: MG_BH_JF_reforma_pequena_v1 (2026)
 // Escopo: APENAS custo direto de mão de obra + materiais + terceirizados
 // NÃO inclui: projeto, ART/RRT, administração, eletros, marcenaria,

@@ -73,10 +73,10 @@ export default function BuscaGPT({ onAnalisar }) {
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState(null);
   const [error, setError] = useState("");
-  const [openaiKey, setOpenaiKey] = useState(() => localStorage.getItem("leilax-openai-key") || "");
+  const [openaiKey, setOpenaiKey] = useState(() => localStorage.getItem("axis-openai-key") || "");
   const [showKey, setShowKey] = useState(false);
 
-  const saveKey = (k) => { setOpenaiKey(k); localStorage.setItem("leilax-openai-key", k); };
+  const saveKey = (k) => { setOpenaiKey(k); localStorage.setItem("axis-openai-key", k); };
 
   const buscar = async () => {
     if (!cidade.trim()) { setError("Informe a cidade"); return; }

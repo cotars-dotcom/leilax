@@ -1,5 +1,5 @@
 // âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
-// LEILAX â Motor Duplo de IA
+// AXIS â Motor Duplo de IA
 // Fase 1: ChatGPT pesquisa dados de mercado na internet
 // Fase 2: Claude recebe tudo + parÃ¢metros do banco e gera anÃ¡lise
 // Fase 3: Score calculado com os pesos definidos pelo admin
@@ -130,7 +130,7 @@ Retorne APENAS JSON vÃ¡lido (sem markdown):
       .join('') || ''
     return JSON.parse(txt.replace(/```json|```/g, '').trim())
   } catch (e) {
-    console.warn('[LEILAX] ChatGPT indisponÃ­vel:', e.message)
+    console.warn('[AXIS] ChatGPT indisponÃ­vel:', e.message)
     return null
   }
 }
