@@ -275,3 +275,31 @@ export async function logAtividade(userId, acao, entidade, entidadeId, detalhes)
     })
   } catch {}
 }
+
+// == MERCADO REGIONAL ==
+export async function getMercadoRegional() {
+  const { data, error } = await supabase
+    .from('mercado_regional')
+    .select('*')
+    .order('cidade')
+  if (error) throw error
+  return data || []
+}
+
+export async function getMercadoPorRegiao(regiaoKey) {
+  const { data, error } = await supabase
+    .from('mercado_regional')
+    .select('*')
+    .eq('regiao_key', regiaoKey)
+    .single()
+  if (error) return null
+  return data
+}
+
+export async function updateMercadoRegional(regiaoKey, updates) {
+  const { error } = await supabase
+    .from('mercado_regional')
+    .update({ ...updates, atualizado_em: new Date().toISOString() })
+    .eq('regiao_key', regiaoKey)
+  if (error) throw error
+}

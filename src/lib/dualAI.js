@@ -5,6 +5,8 @@
 // Fase 3: Score calculado com os pesos definidos pelo admin
 // âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
+import { detectarRegiao, getMercado } from '../data/mercado_regional.js'
+
 const CLAUDE_MODEL = 'claude-sonnet-4-20250514'
 const GPT_MODEL = 'gpt-4o'
 
@@ -77,7 +79,7 @@ Retorne APENAS JSON vÃ¡lido (sem markdown):
 
 // ââ FASE 2: Claude analisa o link com todos os dados âââââââââââââ
 
-export async function analisarComClaude(url, claudeKey, parametros, criterios, dadosGPT, anexos) {
+export async function analisarComClaude(url, claudeKey, parametros, criterios, dadosGPT, anexos, contextoMercadoRegional) {
   const pesosInfo = (parametros || [])
     .map(p => `  - ${p.nome}: peso ${p.peso}% (dimensao: ${p.dimensao})`)
     .join('\n')
@@ -106,6 +108,7 @@ NOTA: ChatGPT nÃ£o disponÃ­vel no momento. Use seu conhecimento para estimar
 Acesse e analise este imÃ³vel: ${url}
 
 ${contextoGPT}
+${contextoMercadoRegional || ''}
 
 PESOS DE SCORE DEFINIDOS PELO GRUPO PARA ESTE APP (USE ESTES PESOS EXATOS):
 ${pesosInfo || '  - LocalizaÃ§Ã£o: 20%, Desconto: 18%, JurÃ­dico: 18%, OcupaÃ§Ã£o: 15%, Liquidez: 15%, Mercado: 14%'}
@@ -264,13 +267,47 @@ export async function analisarImovelCompleto(url, claudeKey, openaiKey, parametr
   progress('ð ChatGPT pesquisando dados de mercado na internet...')
   const dadosGPT = await pesquisarMercadoGPT(url, cidade, tipo, openaiKey)
 
+  // Enriquecer com dados de mercado regional (se detectou região)
+  if (dadosMercado) {
+    const regiaoFinal = detectarRegiao(analise.cidade || '', analise.endereco || '')
+    const mercadoFinal = regiaoFinal ? getMercado(regiaoFinal) : dadosMercado
+    if (mercadoFinal) {
+      if (!analise.preco_m2_mercado) analise.preco_m2_mercado = mercadoFinal.preco_m2_venda_medio
+      if (!analise.aluguel_mensal_estimado && analise.area_m2)
+        analise.aluguel_mensal_estimado = mercadoFinal.preco_m2_locacao * analise.area_m2
+      if (!analise.mercado_tendencia) analise.mercado_tendencia = mercadoFinal.tendencia
+      if (!analise.mercado_demanda) analise.mercado_demanda = mercadoFinal.demanda
+      if (mercadoFinal.alertas && mercadoFinal.alertas.length)
+        analise.alertas = [...(analise.alertas||[]), ...mercadoFinal.alertas]
+    }
+  }
+
   if (dadosGPT) {
     progress('â ChatGPT encontrou dados de mercado. Claude analisando o imÃ³vel...')
   } else {
     progress('â ï¸ ChatGPT indisponÃ­vel. Claude analisando com dados internos...')
   }
 
-  const analise = await analisarComClaude(url, claudeKey, parametros, criterios, dadosGPT, anexos)
+  // Detectar região e buscar dados de mercado local
+  const regiaoDetectada = detectarRegiao(
+    dadosGPT?.cidade || cidade || '',
+    dadosGPT?.bairro || ''
+  )
+  const dadosMercado = regiaoDetectada ? getMercado(regiaoDetectada) : null
+  const contextoMercadoRegional = dadosMercado ? `
+DADOS DE MERCADO DA REGIÃO (use para calibrar os scores):
+- Região: ${dadosMercado.label}
+- Preço médio m²: R$ ${dadosMercado.preco_m2_venda_medio.toLocaleString('pt-BR')}
+- Aluguel médio m²: R$ ${dadosMercado.preco_m2_locacao}/m²
+- Tempo médio de venda: ${dadosMercado.tempo_venda_dias} dias
+- Tendência 12 meses: ${dadosMercado.tendencia} (${dadosMercado.tendencia_pct_12m}%)
+- Demanda atual: ${dadosMercado.demanda}
+- Vacância regional: ${dadosMercado.vacancia_pct}%
+- Yield bruto típico: ${dadosMercado.yield_bruto_pct}%
+- Imóvel mais líquido: ${JSON.stringify(dadosMercado.imovel_mais_liquido)}
+` : ''
+
+  const analise = await analisarComClaude(url, claudeKey, parametros, criterios, dadosGPT, anexos, contextoMercadoRegional)
 
   progress('ð Calculando score com parÃ¢metros do grupo...')
   const score_total = calcularScore(analise, parametros)
@@ -293,6 +330,8 @@ export async function analisarImovelCompleto(url, claudeKey, openaiKey, parametr
   return {
     ...analise,
     score_total,
+    regiao_mercado: regiaoDetectada || null,
+    dados_mercado_regional: dadosMercado || null,
     id: `${Date.now()}-${Math.random().toString(36).slice(2,7)}`,
     fonte_url: url,
     status: 'analisado',
