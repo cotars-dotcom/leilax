@@ -142,7 +142,7 @@ function ScoreRing({score,size=80}) {
 const ANTHROPIC_API = "https://api.anthropic.com/v1/messages"
 
 async function analyzeProperty(url) {
-  const sys = `Você é LEILAX, especialista em análise de imóveis em leilão para investimento imobiliário no Brasil. Use web search para buscar informações sobre o imóvel.
+  const sys = `Você é AXIS, especialista em análise de imóveis em leilão para investimento imobiliário no Brasil. Use web search para buscar informações sobre o imóvel.
 
 Retorne SOMENTE JSON válido sem markdown:
 {
@@ -170,7 +170,7 @@ Retorne SOMENTE JSON válido sem markdown:
 Scores 0-10. score_total = média ponderada (loc 20%, desc 18%, jur 18%, ocup 15%, liq 15%, merc 14%).
 Se score_juridico < 4 → score_total *= 0.75. Se ocupado → score_total *= 0.85.`
 
-  const apiKey = localStorage.getItem("leilax-api-key") || ""
+  const apiKey = localStorage.getItem("axis-api-key") || ""
   if (!apiKey) throw new Error("Configure a chave da API Anthropic nas configurações")
 
   const r = await fetch(ANTHROPIC_API, {
@@ -260,7 +260,7 @@ ${(p.alertas||[]).map(x=>`- ${x}`).join("\n")||"Nenhum"}
 ${p.justificativa||"—"}
 
 ---
-*Analisado por LEILAX · ${new Date().toLocaleDateString("pt-BR")}*
+*Analisado pelo AXIS · ${new Date().toLocaleDateString("pt-BR")}*
 ${p.fonte_url?`\n🔗 ${p.fonte_url}`:""}`
 
   return { name:`${emoji} [${score}] ${p.titulo||p.tipo||"Imóvel"} — ${p.cidade||""}`, desc }
@@ -286,7 +286,7 @@ function TrelloModal({config,onSave,onClose}) {
     try { const b=await tGet("/members/me/boards?fields=id,name",key.trim(),token.trim()); setBoards(b);setStep(2) }
     catch(e){
       // Qualquer erro (CORS, invalid key, 401, etc) → avança para step 2 com boards vazio
-      console.warn('[LEILAX] Trello API error (prosseguindo):', e.message)
+      console.warn('[AXIS] Trello API error (prosseguindo):', e.message)
       setStep(2);setBoards([])
     }
     setLoading(false)
@@ -298,7 +298,7 @@ function TrelloModal({config,onSave,onClose}) {
     setLoading(true)
     try { const l=await tGet(`/boards/${bid}/lists?fields=id,name`,key,token); setLists(l); if(l.length)setListId(l[0].id) }
     catch(e){
-      console.warn('[LEILAX] Trello lists error (prosseguindo):', e.message)
+      console.warn('[AXIS] Trello lists error (prosseguindo):', e.message)
       setLists([])
     }
     setLoading(false)
@@ -367,9 +367,9 @@ function TrelloModal({config,onSave,onClose}) {
 
 // ── API KEY MODAL ─────────────────────────────────────────────────────────────
 function ApiKeyModal({onClose}) {
- const [key,setKey]=useState(localStorage.getItem("leilax-api-key")||"")
- const [oaiKey,setOaiKey]=useState(localStorage.getItem("leilax-openai-key")||"")
- const save=()=>{localStorage.setItem("leilax-api-key",key.trim());if(oaiKey.trim())localStorage.setItem("leilax-openai-key",oaiKey.trim());onClose()}
+ const [key,setKey]=useState(localStorage.getItem("axis-api-key")||"")
+ const [oaiKey,setOaiKey]=useState(localStorage.getItem("axis-openai-key")||"")
+ const save=()=>{localStorage.setItem("axis-api-key",key.trim());if(oaiKey.trim())localStorage.setItem("axis-openai-key",oaiKey.trim());onClose()}
   return <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.75)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:"20px"}}>
     <div style={{background:K.s1,border:`1px solid ${K.bd}`,borderRadius:"10px",padding:"28px",maxWidth:"480px",width:"100%"}}>
       <div style={{display:"flex",justifyContent:"space-between",marginBottom:"20px"}}>
@@ -413,13 +413,13 @@ function NovoImovel({onSave,onCancel,trello,parametrosBanco,criteriosBanco}) {
 
   const analyze = async () => {
     if(!url.trim()){setError("Cole o link do leilão");return}
-    const hasKey = localStorage.getItem("leilax-api-key")
+    const hasKey = localStorage.getItem("axis-api-key")
     if(!hasKey){setError("Configure a chave da API Anthropic nas Configurações (⚙️)");return}
     setLoading(true);setError("");setTrelloMsg("")
     setStep("🔍 Buscando informações do imóvel...")
     try {
       setStep("🧠 IA analisando: score, risco jurídico, mercado...")
-      const openaiKey = localStorage.getItem("leilax-openai-key") || ""
+      const openaiKey = localStorage.getItem("axis-openai-key") || ""
         const data = await analisarImovelCompleto(url.trim(), hasKey, openaiKey, parametrosBanco, criteriosBanco, (msg) => setStep(msg), anexos)
       data.fonte_url = url.trim()
       const property = {...data, id:uid(), createdAt:new Date().toISOString()}
@@ -860,8 +860,8 @@ function AbaJuridica({ imovel, onReclassificado }) {
     setErro('')
     setResultado(null)
 
-    const claudeKey = localStorage.getItem('leilax-api-key') || ''
-    const openaiKey = localStorage.getItem('leilax-openai-key') || ''
+    const claudeKey = localStorage.getItem('axis-api-key') || ''
+    const openaiKey = localStorage.getItem('axis-openai-key') || ''
     if (!claudeKey) {
       setErro('Configure a API Key do Claude no painel Admin → API Keys')
       return
@@ -1132,12 +1132,12 @@ function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze}) {
 
   const handleReanalyze=async()=>{
     if(!p?.fonte_url){setMsg("⚠️ Imóvel sem URL de origem para reanalisar");return}
-    const claudeKey=localStorage.getItem("leilax-api-key")||""
+    const claudeKey=localStorage.getItem("axis-api-key")||""
     if(!claudeKey){setMsg("⚠️ Configure a API Key do Claude em Admin → API Keys");return}
     if(!confirm("Reanalisar este imóvel com a IA? Os dados serão atualizados.")) return
     setReanalyzing(true);setMsg("")
     try {
-      const openaiKey=localStorage.getItem("leilax-openai-key")||""
+      const openaiKey=localStorage.getItem("axis-openai-key")||""
       const {data:par}=await supabase.from("parametros_score").select("*")
       const {data:cri}=await supabase.from("criterios_avaliacao").select("*")
       const novaAnalise=await analisarImovelCompleto(p.fonte_url,claudeKey,openaiKey,par||[],cri||[],setReStep,[])
@@ -1418,7 +1418,7 @@ export default function App() {
   const [showApiKey,setShowApiKey]=useState(false)
 const [parametrosBanco,setParametrosBanco]=useState([])
 const [criteriosBanco,setCriteriosBanco]=useState([])
-  const [apiOk,setApiKey]=useState(localStorage.getItem("leilax-api-key"))
+  const [apiOk,setApiKey]=useState(localStorage.getItem("axis-api-key"))
 useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("parametros_score").select("*");if(pr)setParametrosBanco(pr);const{data:cr}=await supabase.from("criterios_avaliacao").select("*");if(cr)setCriteriosBanco(cr)}catch(e){console.warn("parametros:",e)}}lp()},[])
 
   // FIX 1: Sync API keys from Supabase (cross-device)
@@ -1426,10 +1426,10 @@ useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("param
     if(!session) return
     import('./lib/supabase.js').then(({getAppSetting})=>{
       getAppSetting('anthropic_api_key').then(k=>{
-        if(k&&k.length>10){localStorage.setItem('leilax-api-key',k);setApiKey(k)}
+        if(k&&k.length>10){localStorage.setItem('axis-api-key',k);setApiKey(k)}
       }).catch(()=>{})
       getAppSetting('openai_api_key').then(k=>{
-        if(k&&k.length>10){localStorage.setItem('leilax-openai-key',k)}
+        if(k&&k.length>10){localStorage.setItem('axis-openai-key',k)}
       }).catch(()=>{})
     }).catch(()=>{})
   },[session])
@@ -1438,10 +1438,10 @@ useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("param
   const nav=(v,p={})=>{setView(v);setVp(p)}
 
   useEffect(()=>{(async()=>{
-    const [p,t]=await Promise.all([stLoad("leilax-props"),stLoad("leilax-trello")])
+    const [p,t]=await Promise.all([stLoad("axis-props"),stLoad("axis-trello")])
     if(t)setTrello(t); setL(true)
     // Mostrar modal de API key se não tiver
-    if(!localStorage.getItem("leilax-api-key")) setTimeout(()=>setShowApiKey(true),1000)
+    if(!localStorage.getItem("axis-api-key")) setTimeout(()=>setShowApiKey(true),1000)
     // FIX 2B: Load imóveis from Supabase (shared database)
     if(session) {
       import('./lib/supabase.js').then(({getImoveis:gi})=>{
@@ -1453,8 +1453,8 @@ useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("param
     } else { if(p) setProps(p) }
   })()},[])
 
-  useEffect(()=>{if(loaded)stSave("leilax-props",props)},[props,loaded])
-  useEffect(()=>{if(loaded&&trello)stSave("leilax-trello",trello)},[trello,loaded])
+  useEffect(()=>{if(loaded)stSave("axis-props",props)},[props,loaded])
+  useEffect(()=>{if(loaded&&trello)stSave("axis-trello",trello)},[trello,loaded])
 
   const addProp=p=>{
     setProps(ps=>[p,...ps])
@@ -1472,8 +1472,8 @@ useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("param
     setTrello(cfg);setShowTrello(false);showToast("✓ Trello configurado — "+cfg.boardName,K.trello)
     if(cfg.boardId&&cfg.key&&cfg.token){
       setupBoardLeilax(cfg.boardId,cfg.key,cfg.token)
-        .then(()=>console.log('[LEILAX] Board Trello configurado'))
-        .catch(e=>console.warn('[LEILAX] Setup Trello:',e.message))
+        .then(()=>console.log('[AXIS] Board Trello configurado'))
+        .catch(e=>console.warn('[AXIS] Setup Trello:',e.message))
     }
   }
 

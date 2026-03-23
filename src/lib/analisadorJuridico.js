@@ -1,4 +1,4 @@
-// LEILAX — Analisador Jurídico com IA Dupla
+// AXIS — Analisador Jurídico com IA Dupla
 // Claude analisa texto (PDF/TXT), ChatGPT analisa imagens, Claude consolida
 
 import { RISCOS_JURIDICOS } from '../data/riscos_juridicos.js'
@@ -88,7 +88,7 @@ Retorne APENAS JSON válido:
     if (!jsonMatch) throw new Error('Claude não retornou JSON')
     return JSON.parse(jsonMatch[0])
   } catch (e) {
-    console.error('[LEILAX] Erro análise jurídica Claude:', e.message)
+    console.error('[AXIS] Erro análise jurídica Claude:', e.message)
     return null
   }
 }
@@ -161,7 +161,7 @@ Retorne APENAS JSON:
     if (!jsonMatch) return null
     return JSON.parse(jsonMatch[0])
   } catch (e) {
-    console.warn('[LEILAX] ChatGPT imagem indisponível:', e.message)
+    console.warn('[AXIS] ChatGPT imagem indisponível:', e.message)
     return null
   }
 }
