@@ -398,3 +398,54 @@ export async function reclassificarImovel(imovelId, novaAnalise, documentoId) {
   if (error) throw error
   return updates
 }
+
+// ── Arquivamento ───────────────────────────────────────────────
+export async function arquivarImovel(imovelId, motivo, userId) {
+  const { error } = await supabase
+    .from('imoveis')
+    .update({
+      status_operacional: 'arquivado',
+      motivo_arquivamento: motivo || 'Arquivado pelo usuário',
+      arquivado_por: userId,
+      arquivado_em: new Date().toISOString(),
+      status: 'arquivado',
+      atualizado_em: new Date().toISOString()
+    })
+    .eq('id', imovelId)
+  if (error) throw error
+}
+
+export async function desarquivarImovel(imovelId) {
+  const { error } = await supabase
+    .from('imoveis')
+    .update({
+      status_operacional: 'ativo',
+      motivo_arquivamento: null,
+      arquivado_por: null,
+      arquivado_em: null,
+      status: 'analisado',
+      atualizado_em: new Date().toISOString()
+    })
+    .eq('id', imovelId)
+  if (error) throw error
+}
+
+export async function getImoveisAtivos() {
+  const { data, error } = await supabase
+    .from('imoveis')
+    .select('*')
+    .or('status_operacional.eq.ativo,status_operacional.is.null')
+    .order('criado_em', { ascending: false })
+  if (error) throw error
+  return data || []
+}
+
+export async function getBancoArquivados() {
+  const { data, error } = await supabase
+    .from('imoveis')
+    .select('*')
+    .eq('status_operacional', 'arquivado')
+    .order('arquivado_em', { ascending: false })
+  if (error) throw error
+  return data || []
+}
