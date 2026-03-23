@@ -39,6 +39,35 @@ Para qualquer campo jurídico identificado, informe:
 - prazo_liberacao_estimado_meses
 `
 
+const REGRAS_REFORMA_TEXTO = `
+PARÂMETROS DE CUSTO DE REFORMA — MG/BH/JF 2026
+(apenas custo direto: mão de obra + materiais + terceirizados)
+NÃO inclui: projeto, ART, administração, móveis, eletrodomésticos
+
+ESCOPOS DISPONÍVEIS:
+- refresh_giro: pintura + reparos + revisão pontual = R$200–520/m² (classe D a A)
+- leve_funcional: refresh + piso + troca funcional = R$360–900/m²
+- leve_reforcada_1_molhado: leve + 1 banheiro ou cozinha = R$620–1.450/m²
+
+PACOTES DE SERVIÇO FIXOS:
+- Pintura geral: R$3.500–9.000
+- Revisão elétrica pontual: R$1.500–5.000
+- Revisão hidráulica pontual: R$1.500–6.000
+- Banheiro refresh: R$7.000–14.000
+- Banheiro leve reforçado: R$14.000–22.000
+- Cozinha refresh: R$10.000–20.000
+- Cozinha leve reforçada: R$20.000–32.000
+
+TETO ECONÔMICO (% do valor de mercado):
+- Classe A (>R$12k/m²): 3% a 7%
+- Classe B (R$8–12k/m²): 3% a 6%
+- Classe C (R$5–8k/m²): 2,5% a 5%
+- Classe D (<R$5k/m²): 2% a 4%
+
+Se a reforma proposta superar o teto, penalizar score_financeiro.
+Retornar no JSON: escopo_reforma, custo_reforma_estimado, alerta_sobrecap
+`
+
 // ââ FASE 1: ChatGPT pesquisa mercado e contexto do imÃ³vel ââââââââ
 
 export async function pesquisarMercadoGPT(url, cidade, tipo, openaiKey) {
@@ -139,6 +168,7 @@ Acesse e analise este imÃ³vel: ${url}
 ${contextoGPT}
 ${contextoMercadoRegional || ''}
 ${REGRAS_MODALIDADE_TEXTO}
+${REGRAS_REFORMA_TEXTO}
 
 PESOS DE SCORE DEFINIDOS PELO GRUPO PARA ESTE APP (USE ESTES PESOS EXATOS):
 ${pesosInfo || '  - LocalizaÃ§Ã£o: 20%, Desconto: 18%, JurÃ­dico: 18%, OcupaÃ§Ã£o: 15%, Liquidez: 15%, Mercado: 14%'}
@@ -206,7 +236,10 @@ RETORNE APENAS JSON VÃLIDO (sem markdown, sem texto fora do JSON):
   "modalidade_leilao": "judicial|extrajudicial_fiduciario|caixa_leilao|caixa_venda_direta",
   "riscos_presentes": ["risco_id1","risco_id2"],
   "custo_juridico_estimado": 0,
-  "prazo_liberacao_estimado_meses": 0
+  "prazo_liberacao_estimado_meses": 0,
+  "escopo_reforma": "refresh_giro|leve_funcional|leve_reforcada_1_molhado",
+  "custo_reforma_estimado": 0,
+  "alerta_sobrecap": "verde|amarelo|vermelho"
 }`
 
   const res = await fetch('https://api.anthropic.com/v1/messages', {

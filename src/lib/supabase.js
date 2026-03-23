@@ -329,3 +329,18 @@ export async function addRiscoImovel(imovelId, riscoId, dados) {
   if (error) throw error
   return data
 }
+
+// == REFORMA ==
+export async function getParametrosReforma() {
+  const { data, error } = await supabase
+    .from('parametros_reforma').select('*').order('faixa_venda_m2_min', { ascending: false })
+  if (error) throw error
+  return data || []
+}
+
+export async function getPacotesReforma() {
+  const { data, error } = await supabase
+    .from('pacotes_reforma').select('*').order('custo_min')
+  if (error) throw error
+  return data || []
+}
