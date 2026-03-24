@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useIsMobile } from '../hooks/useIsMobile'
 import { supabase, signIn } from '../lib/supabase'
 
 const C = {
@@ -49,6 +50,7 @@ function AxisLogo() {
 }
 
 export default function Login() {
+  const isMobileLogin = useIsMobile(768)
   const [modo, setModo] = useState('login')
   const [email, setEmail] = useState('')
   const [senha, setSenha] = useState('')
@@ -105,17 +107,21 @@ export default function Login() {
 
   return (
     <div style={{
-      display:'flex', minHeight:'100vh',
+      display:'flex', flexDirection: isMobileLogin ? 'column' : 'row',
+      minHeight:'100vh',
       fontFamily:"'Inter', system-ui, sans-serif",
       background: C.bg,
     }}>
       {/* ── LADO ESQUERDO: Brand ─────────────────────────── */}
       <div style={{
-        width:'45%', minHeight:'100vh',
+        width: isMobileLogin ? '100%' : '45%',
+        minHeight: isMobileLogin ? 'auto' : '100vh',
         background: C.navy,
         display:'flex', flexDirection:'column',
-        justifyContent:'space-between',
-        padding:'48px 56px',
+        justifyContent: isMobileLogin ? 'center' : 'space-between',
+        alignItems: isMobileLogin ? 'center' : 'flex-start',
+        textAlign: isMobileLogin ? 'center' : 'left',
+        padding: isMobileLogin ? '40px 24px 24px' : '48px 56px',
         position:'relative', overflow:'hidden',
       }}>
         <svg style={{position:'absolute',top:0,left:0,width:'100%',height:'100%',pointerEvents:'none'}}
@@ -189,8 +195,10 @@ export default function Login() {
 
       {/* ── LADO DIREITO: Formulário ─────────────────────── */}
       <div style={{
-        flex:1, display:'flex', alignItems:'center',
-        justifyContent:'center', padding:'48px 64px',
+        flex:1, display:'flex', flexDirection:'column',
+        alignItems:'center', justifyContent:'center',
+        padding: isMobileLogin ? '32px 24px 48px' : '48px 64px',
+        maxWidth: isMobileLogin ? '100%' : 580,
       }}>
         <div style={{ width:'100%', maxWidth:400 }}>
           <div style={{
