@@ -90,6 +90,73 @@ export async function saveImovel(imovel, userId) {
   return data
 }
 
+// Colunas conhecidas da tabela imoveis — tudo fora disso é descartado
+const IMOVEIS_COLS = new Set([
+  'id','titulo','endereco','cidade','estado','bairro','tipo','tipologia',
+  'area_privativa_m2','area_coberta_privativa_m2','area_descoberta_privativa_m2',
+  'area_total_m2','area_real_total_m2','area_usada_calculo_m2','area_usada_label',
+  'area_m2','quartos','suites','vagas','andar','andares_unidade','elevador',
+  'padrao_acabamento','vaga_tipo','condominio_mensal',
+  'modalidade_leilao','processo_numero','leiloeiro','data_leilao','num_leilao',
+  'valor_avaliacao','valor_minimo','valor_lance_atual',
+  'ocupacao','ocupacao_fonte','financiavel','fgts_aceito',
+  'debitos_condominio','debitos_iptu','responsabilidade_debitos','responsabilidade_fonte',
+  'processos_ativos','matricula_status','obs_juridicas',
+  'preco_m2_imovel','preco_m2_mercado','preco_m2_fonte',
+  'valor_mercado_estimado','desconto_percentual','desconto_sobre_mercado_pct',
+  'gap_preco_asking_closing_pct','preco_m2_asking_bairro','preco_m2_closing_bairro','classe_ipead',
+  'itbi_pct','comissao_leiloeiro_pct',
+  'custo_reforma_calculado','custo_reforma_previsto','custo_reforma_estimado',
+  'custo_total_aquisicao','custo_juridico_estimado','custo_regularizacao',
+  'aluguel_mensal_estimado',
+  'escopo_reforma','prazo_reforma_meses','valor_pos_reforma_estimado',
+  'indice_sobrecapitalizacao','alerta_sobrecap','classe_mercado_reforma',
+  'liquidez','prazo_revenda_meses',
+  'mercado_tendencia','mercado_tendencia_pct_12m','mercado_demanda',
+  'mercado_tempo_venda_meses','mercado_obs','yield_bruto_pct',
+  'score_localizacao','score_desconto','score_juridico',
+  'score_ocupacao','score_liquidez','score_mercado','score_total',
+  'modalidade','riscos_presentes','prazo_liberacao_estimado_meses',
+  'reclassificado_por_doc','historico_juridico','score_juridico_manual',
+  'recomendacao','justificativa','positivos','negativos','alertas',
+  'estrategia_recomendada','estrategia_recomendada_detalhe','estrutura_recomendada',
+  'retorno_venda_pct','retorno_locacao_anual_pct',
+  'fotos','foto_principal','fonte_url',
+  'codigo_axis','criado_em','atualizado_em','criado_por',
+  'status','status_operacional',
+  'motivo_arquivamento','arquivado_por','arquivado_em',
+  'trello_card_id','trello_card_url','trello_list_id','trello_sincronizado_em',
+  'analise_dupla_ia','comparaveis','sintese_executiva',
+])
+
+export async function saveImovelCompleto(imovel, userId) {
+  // Filtrar apenas colunas que existem na tabela
+  const payload = {}
+  for (const [k, v] of Object.entries(imovel)) {
+    if (IMOVEIS_COLS.has(k)) payload[k] = v
+  }
+  // Mapear campo legado url → fonte_url
+  if (!payload.fonte_url && imovel.url) payload.fonte_url = imovel.url
+  // Garantir campos obrigatórios
+  if (!payload.id) payload.id = crypto.randomUUID()
+  if (userId) payload.criado_por = userId
+  payload.atualizado_em = new Date().toISOString()
+  if (!payload.status_operacional) payload.status_operacional = 'ativo'
+
+  console.log('[AXIS Supabase] Salvando imóvel:', payload.id, payload.titulo || '(sem título)')
+  const { data, error } = await supabase
+    .from('imoveis')
+    .upsert(payload, { onConflict: 'id' })
+    .select()
+    .single()
+  if (error) {
+    console.error('[AXIS Supabase] ERRO ao salvar:', error.code, error.message, error.details)
+    throw error
+  }
+  console.log('[AXIS Supabase] Salvo com sucesso:', data.id, data.codigo_axis)
+  return data
+}
+
 export async function deleteImovel(id) {
   const { error } = await supabase.from('imoveis').delete().eq('id', id)
   if (error) throw error

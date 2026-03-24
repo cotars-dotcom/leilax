@@ -592,7 +592,7 @@ function ApiKeyModal({onClose}) {
 }
 
 // ── NOVO IMÓVEL ───────────────────────────────────────────────────────────────
-function NovoImovel({onSave,onCancel,onNav,trello,parametrosBanco,criteriosBanco,isPhone}) {
+function NovoImovel({onSave,onCancel,onNav,trello,parametrosBanco,criteriosBanco,isPhone,existingProps=[]}) {
   const [url,setUrl]=useState("")
   const [loading,setLoading]=useState(false)
   const [step,setStep]=useState("")
@@ -606,13 +606,18 @@ function NovoImovel({onSave,onCancel,onNav,trello,parametrosBanco,criteriosBanco
     if(!url.trim()){setError("Cole o link do leilão");return}
     const hasKey = localStorage.getItem("axis-api-key")
     if(!hasKey){setError("Configure a chave da API Anthropic nas Configurações (⚙️)");return}
-    // Verificar duplicata por URL
+    // Verificar duplicata: local primeiro, depois Supabase
     if(!duplicado) {
+      const urlNorm=url.trim()
+      // 1. Verificar no state local (sempre funciona)
+      const localDup=existingProps.find(p=>(p.fonte_url||p.url||'')===urlNorm)
+      if(localDup){setDuplicado(localDup);return}
+      // 2. Verificar no Supabase
       try {
         const{verificarImovelDuplicado}=await import('./lib/supabase.js')
-        const dups=await verificarImovelDuplicado(url.trim())
+        const dups=await verificarImovelDuplicado(urlNorm)
         if(dups?.length>0){setDuplicado(dups[0]);return}
-      } catch{}
+      } catch(e){console.warn('[AXIS] Verificação Supabase falhou, usando local:',e.message)}
     }
     setDuplicado(null)
     setLoading(true);setError("");setTrelloMsg("")
@@ -2753,17 +2758,20 @@ useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("param
     // Carregar imóveis: Supabase como fonte primária, localStorage como fallback
     if(session) {
       try {
-        // Migração única: localStorage → Supabase
+        // Migração única: localStorage → Supabase (usa saveImovelCompleto com payload seguro)
         if(!localStorage.getItem('axis-migracao-concluida')){
           const local=JSON.parse(localStorage.getItem('axis-props')||'[]')
           if(local.length>0){
             console.log(`[AXIS] Migrando ${local.length} imóveis locais para Supabase...`)
-            const{saveImovel:si}=await import('./lib/supabase.js')
+            const{saveImovelCompleto}=await import('./lib/supabase.js')
             let ok=0
-            for(const im of local){try{await si(im,session.user.id);ok++}catch(e){console.warn('[AXIS] Migração:',im.id,e.message)}}
+            for(const im of local){try{await saveImovelCompleto(im,session.user.id);ok++}catch(e){console.warn('[AXIS] Migração falhou:',im.id,e.message,e)}}
             console.log(`[AXIS] Migração: ${ok}/${local.length} imóveis salvos no Supabase`)
+            // Só marcar concluída se pelo menos 1 migrou com sucesso
+            if(ok>0) localStorage.setItem('axis-migracao-concluida','true')
+          } else {
+            localStorage.setItem('axis-migracao-concluida','true')
           }
-          localStorage.setItem('axis-migracao-concluida','true')
         }
         // Carregar do Supabase
         const{getImoveisAtivos:gi}=await import('./lib/supabase.js')
@@ -2791,6 +2799,8 @@ useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("param
   useEffect(()=>{if(loaded&&trello)stSave("axis-trello",trello)},[trello,loaded])
 
   const addProp=async(p)=>{
+    // Garantir ID
+    if(!p.id) p.id=crypto.randomUUID()
     // Gerar código AXIS único
     if(!p.codigo_axis) {
       try {
@@ -2801,24 +2811,26 @@ useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("param
         p.codigo_axis=`MG-${new Date().getFullYear()}-${Date.now().toString().slice(-4)}`
       }
     }
+    // 1. Atualizar state imediatamente (UI responsiva)
+    setProps(ps=>{
+      const existe=ps.find(x=>x.id===p.id)
+      if(existe) return ps.map(x=>x.id===p.id?p:x)
+      return [p,...ps]
+    })
     showToast(`✓ ${p.codigo_axis} · ${p.titulo||"Imóvel"} — Score ${(p.score_total||0).toFixed(1)} · ${p.recomendacao}`)
     nav("detail",{id:p.id})
-    // Salvar no Supabase primeiro, depois atualizar estado
+    // 2. Salvar no Supabase (fonte primária)
     if(session) {
       try {
-        const{saveImovel:si}=await import('./lib/supabase.js')
-        const salvo=await si(p,session.user.id)
-        setProps(ps=>{
-          const existe=ps.find(x=>x.id===salvo.id)
-          if(existe) return ps.map(x=>x.id===salvo.id?salvo:x)
-          return [salvo,...ps]
-        })
+        const{saveImovelCompleto}=await import('./lib/supabase.js')
+        const salvo=await saveImovelCompleto(p,session.user.id)
+        // Atualizar state com dados confirmados pelo Supabase
+        setProps(ps=>ps.map(x=>x.id===salvo.id?salvo:x))
+        console.log('[AXIS] Imóvel salvo no Supabase:',salvo.codigo_axis)
       } catch(e) {
-        console.error('[AXIS] Erro ao salvar no Supabase:',e)
-        setProps(ps=>[p,...ps]) // fallback local
+        console.error('[AXIS] FALHA ao salvar no Supabase:',e.message,e)
+        showToast(`⚠️ Salvo localmente — sync nuvem falhou: ${e.message}`)
       }
-    } else {
-      setProps(ps=>[p,...ps])
     }
   }
   const delProp=async(id)=>{deleteImovel(id).catch(()=>{});setProps(ps=>ps.filter(p=>p.id!==id));showToast("Excluído",K.red);nav("imoveis")}
@@ -2954,7 +2966,7 @@ useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("param
     {/* CONTENT */}
     <div style={{flex:1,overflowY:"auto",background:C.offwhite,display:"flex",flexDirection:"column",minWidth:0}}>
       {view==="dashboard"&&<Dashboard props={props} onNav={nav} profile={profile} isMobile={isMobile} isPhone={isPhone}/>}
-  {view==="novo"&&(isAdmin?<NovoImovel onSave={addProp} onCancel={()=>nav("imoveis")} onNav={nav} trello={trello} parametrosBanco={parametrosBanco} criteriosBanco={criteriosBanco} isPhone={isPhone}/>:<AcessoNegado mensagem="Análise de imóveis é restrita ao administrador."/>)}
+  {view==="novo"&&(isAdmin?<NovoImovel onSave={addProp} onCancel={()=>nav("imoveis")} onNav={nav} trello={trello} parametrosBanco={parametrosBanco} criteriosBanco={criteriosBanco} isPhone={isPhone} existingProps={props}/>:<AcessoNegado mensagem="Análise de imóveis é restrita ao administrador."/>)}
       {view==="imoveis"&&<Lista props={props} onNav={nav} onDelete={delProp} trello={trello} onUpdateProp={(id,updates)=>setProps(ps=>ps.map(p=>p.id===id?{...p,...updates}:p))}/>}
       {view==="detail"&&<Detail p={selP} onDelete={delProp} onNav={nav} trello={trello} onUpdateProp={(id,updates)=>setProps(ps=>ps.map(p=>p.id===id?{...p,...updates}:p))} isAdmin={isAdmin} onArchive={handleArquivar} isMobile={isMobile} isPhone={isPhone}/>}
       {view==="comparar"&&<Comparativo props={props}/>}
