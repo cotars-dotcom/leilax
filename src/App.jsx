@@ -492,7 +492,7 @@ function ModalAuditoriaTrello({ config, imoveis, onClose }) {
 
   return (
     <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000}}>
-      <div style={{background:'#fff',borderRadius:16,padding:'28px 32px',width:560,maxHeight:'85vh',overflowY:'auto',boxShadow:'0 20px 60px rgba(0,0,0,0.3)'}}>
+      <div style={{background:'#fff',borderRadius:16,padding:'28px 32px',width:'90vw',maxWidth:560,maxHeight:'90vh',overflowY:'auto',boxShadow:'0 20px 60px rgba(0,0,0,0.3)'}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:20}}>
           <div>
             <h2 style={{margin:0,fontSize:18,fontWeight:700,color:C.navy}}>Trello AXIS — Central de Controle</h2>
@@ -1171,7 +1171,7 @@ function Dashboard({props,onNav,profile:prof,isMobile,isPhone}) {
         </div>
         :<div>
           <div style={{fontWeight:"600",color:C.text,marginBottom:"14px",fontSize:"14px"}}>Análises Recentes</div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:"16px"}}>
+          <div style={{display:"grid",gridTemplateColumns:isPhone?"1fr":"repeat(auto-fill,minmax(300px,1fr))",gap:"16px"}}>
             {recentes.map(p=><PropCard key={p.id} p={p} onNav={onNav}/>)}
           </div>
         </div>}
@@ -1469,7 +1469,7 @@ function AbaJuridica({ imovel, onReclassificado }) {
 }
 
 // ── PAINEL ADMIN (convites + usuários) ────────────────────────────────────────
-function PainelConvitesAdmin({ session, imoveis: propImoveis }) {
+function PainelConvitesAdmin({ session, imoveis: propImoveis, isPhone }) {
   const [aba, setAba] = useState('convites')
   const [convites, setConvites] = useState([])
   const [usuarios, setUsuarios] = useState([])
@@ -1541,7 +1541,7 @@ function PainelConvitesAdmin({ session, imoveis: propImoveis }) {
   const roleClr = (r) => r === 'admin' ? C.navy : r === 'member' ? C.emerald : C.mustard
 
   return (
-    <div style={{ padding:'24px 32px', maxWidth:900 }}>
+    <div style={{ padding: isPhone ? '16px' : '24px 32px', maxWidth:900 }}>
       <h2 style={{ margin:'0 0 6px', fontSize:20, fontWeight:700, color:C.navy }}>
         🛡️ Painel Admin
       </h2>
@@ -1574,7 +1574,7 @@ function PainelConvitesAdmin({ session, imoveis: propImoveis }) {
             <h4 style={{ margin:'0 0 16px', fontSize:14, fontWeight:700, color:C.navy }}>
               Gerar novo convite
             </h4>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+            <div style={{ display:'grid', gridTemplateColumns: isPhone ? '1fr' : '1fr 1fr', gap:12 }}>
               {[
                 { label:'Nome do convidado*', key:'nome', type:'text', ph:'Ex: Pedro Advogado' },
                 { label:'Email (opcional)', key:'email', type:'email', ph:'pedro@email.com' },
@@ -1787,7 +1787,7 @@ function PainelConvitesAdmin({ session, imoveis: propImoveis }) {
         const media = lista.length ? totalUSD / lista.length : 0
         return (
           <div style={{ paddingTop: 16 }}>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10, marginBottom:20 }}>
+            <div style={{ display:'grid', gridTemplateColumns: isPhone ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap:10, marginBottom:20 }}>
               {[
                 ['Total gasto', `R$ ${(totalUSD*USD).toFixed(2)}`],
                 ['Por análise', `R$ ${(media*USD).toFixed(2)}`],
@@ -2092,7 +2092,7 @@ function PainelPortfolio({ props: imoveis, isMobile, isPhone }) {
   const aprovados       = imoveis.filter(i => i.recomendacao === 'COMPRAR').length
   const arrematados     = imoveis.filter(i => i.status === 'arrematado').length
   return (
-    <div style={{ padding:'24px 32px' }}>
+    <div style={{ padding: isPhone ? '16px' : '24px 32px' }}>
       <h2 style={{ margin:'0 0 6px', fontSize:20, fontWeight:700, color:C.navy }}>
         📊 Portfólio AXIS
       </h2>
@@ -2463,6 +2463,7 @@ function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze,isAdmin,onArch
 
 // ── LISTA ─────────────────────────────────────────────────────────────────────
 function Lista({props,onNav,onDelete,trello,onUpdateProp}) {
+  const isPhoneL = useIsMobile(480)
   const [q,setQ]=useState(""), [filter,setFilter]=useState("todos"), [sort,setSort]=useState("score")
   const [syncingTrello,setSyncingTrello]=useState(false)
   const [syncMsg,setSyncMsg]=useState("")
@@ -2493,10 +2494,10 @@ function Lista({props,onNav,onDelete,trello,onUpdateProp}) {
       <button style={{...btn("s"),background:`${K.trello||"#0079BF"}15`,color:K.trello||"#0079BF",border:`1px solid ${K.trello||"#0079BF"}30`}} onClick={syncTrello} disabled={syncingTrello}>{syncingTrello?"⏳ Sincronizando...":"🔷 Atualizar Trello"}</button>
       <button style={btn()} onClick={()=>onNav("novo")}>+ Novo</button>
     </>}/>
-    <div style={{padding:"20px 28px"}}>
+    <div style={{padding:isPhoneL?"16px":"20px 28px"}}>
       {syncMsg&&<div style={{background:`${K.teal}10`,border:`1px solid ${K.teal}30`,borderRadius:"6px",padding:"10px",marginBottom:"14px",fontSize:"12px",color:K.teal}}>{syncMsg}</div>}
       <div style={{display:"flex",gap:"10px",marginBottom:"16px",flexWrap:"wrap"}}>
-        <input style={{...inp,maxWidth:"260px"}} placeholder="🔍 Buscar..." value={q} onChange={e=>setQ(e.target.value)}/>
+        <input style={{...inp,maxWidth:isPhoneL?"100%":"260px",fontSize:isPhoneL?16:13}} placeholder="🔍 Buscar..." value={q} onChange={e=>setQ(e.target.value)}/>
         <select style={{...inp,width:"auto",cursor:"pointer"}} value={filter} onChange={e=>setFilter(e.target.value)}>
           <option value="todos">Todos</option><option value="comprar">Comprar</option><option value="aguardar">Aguardar</option><option value="evitar">Evitar</option>
         </select>
@@ -2505,7 +2506,7 @@ function Lista({props,onNav,onDelete,trello,onUpdateProp}) {
         </select>
       </div>
       {list.length===0?<div style={{textAlign:"center",padding:"40px",color:K.t3}}><div style={{fontSize:"32px",marginBottom:"10px"}}>🔍</div><div>Nenhum imóvel encontrado</div></div>
-      :<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:"12px"}}>
+      :<div style={{display:"grid",gridTemplateColumns:isPhoneL?"1fr":"repeat(auto-fill,minmax(300px,1fr))",gap:"12px"}}>
         {list.map(p=><PropCard key={p.id} p={p} onNav={onNav}/>)}
       </div>}
     </div>
@@ -2571,7 +2572,7 @@ function AcessoNegado({ mensagem }) {
 }
 
 // ── BANCO DE ARQUIVADOS ──────────────────────────────────────────────────────
-function BancoArquivados({ session, isAdmin }) {
+function BancoArquivados({ session, isAdmin, isPhone }) {
   const [arquivados, setArquivados] = useState([])
   const [loading, setLoading] = useState(true)
   const [filtro, setFiltro] = useState('')
@@ -2610,9 +2611,9 @@ function BancoArquivados({ session, isAdmin }) {
   const sColor = s => !s ? C.hint : s >= 7.5 ? C.emerald : s >= 6 ? C.mustard : '#E5484D'
 
   return (
-    <div style={{ padding: '24px 32px' }}>
+    <div style={{ padding: isPhone ? '16px' : '24px 32px' }}>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, flexWrap:'wrap', gap:12 }}>
         <div>
           <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: C.navy }}>
             Banco de Arquivados
@@ -2667,7 +2668,7 @@ function BancoArquivados({ session, isAdmin }) {
           </p>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isPhone ? '1fr' : 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
           {filtrados.map(imovel => (
             <div key={imovel.id} style={{
               background: C.white, border: `1px solid ${C.borderW}`,
@@ -2959,7 +2960,7 @@ useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("param
     {showTrelloModal&&<ModalAuditoriaTrello config={trello||JSON.parse(localStorage.getItem('axis-trello')||'{}')} imoveis={props} onClose={()=>setShowTrelloModal(false)}/>}
 
 {/* SIDEBAR — AXIS expandida 200px */}
-<aside style={{
+<aside className="axis-sidebar" style={{
   width:200,minWidth:200,height:'100vh',position:'sticky',top:0,
   background:C.navy,display:'flex',flexDirection:'column',
   borderRight:`1px solid ${C.navy2}`,flexShrink:0,
@@ -3026,18 +3027,18 @@ useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("param
 {/* FIM SIDEBAR */}
 
     {/* CONTENT */}
-    <div style={{flex:1,overflowY:"auto",background:C.offwhite,display:"flex",flexDirection:"column",minWidth:0}}>
+    <div className="axis-main" style={{flex:1,overflowY:"auto",background:C.offwhite,display:"flex",flexDirection:"column",minWidth:0}}>
       {view==="dashboard"&&<Dashboard props={props} onNav={nav} profile={profile} isMobile={isMobile} isPhone={isPhone}/>}
   {view==="novo"&&(isAdmin?<NovoImovel onSave={addProp} onCancel={()=>nav("imoveis")} onNav={nav} trello={trello} parametrosBanco={parametrosBanco} criteriosBanco={criteriosBanco} isPhone={isPhone} existingProps={props}/>:<AcessoNegado mensagem="Análise de imóveis é restrita ao administrador."/>)}
       {view==="imoveis"&&<Lista props={props} onNav={nav} onDelete={delProp} trello={trello} onUpdateProp={(id,updates)=>setProps(ps=>ps.map(p=>p.id===id?{...p,...updates}:p))}/>}
       {view==="detail"&&<Detail p={selP} onDelete={delProp} onNav={nav} trello={trello} onUpdateProp={(id,updates)=>setProps(ps=>ps.map(p=>p.id===id?{...p,...updates}:p))} isAdmin={isAdmin} onArchive={handleArquivar} isMobile={isMobile} isPhone={isPhone}/>}
       {view==="comparar"&&<Comparativo props={props}/>}
     {view==="busca"&&(isAdmin?<BuscaGPT onAnalisar={(link)=>{nav("novo");setTimeout(()=>{},100)}}/>:<AcessoNegado mensagem="Busca com IA é restrita ao administrador."/>)}
-    {view==="graficos"&&<div><div style={{padding:"22px 28px 16px",borderBottom:`1px solid ${C.borderW}`,background:C.white}}><div style={{fontWeight:700,fontSize:19,color:C.text}}>Gráficos</div></div><div style={{padding:"20px 28px"}}><Charts properties={props}/></div></div>}
+    {view==="graficos"&&<div><div style={{padding:isPhone?"16px":"22px 28px 16px",borderBottom:`1px solid ${C.borderW}`,background:C.white}}><div style={{fontWeight:700,fontSize:19,color:C.text}}>Gráficos</div></div><div style={{padding:isPhone?"16px":"20px 28px"}}><Charts properties={props}/></div></div>}
     {view==="tarefas"&&<Tarefas/>}
-    {view==="arquivados"&&<BancoArquivados session={session} isAdmin={isAdmin}/>}
+    {view==="arquivados"&&<BancoArquivados session={session} isAdmin={isAdmin} isPhone={isPhone}/>}
     {view==="portfolio"&&isAdmin&&<PainelPortfolio props={props} isMobile={isMobile} isPhone={isPhone}/>}
-    {view==="admin"&&isAdmin&&<PainelConvitesAdmin session={session} imoveis={props}/>}
+    {view==="admin"&&isAdmin&&<PainelConvitesAdmin session={session} imoveis={props} isPhone={isPhone}/>}
     </div>
 
     {toast&&<div style={{position:"fixed",bottom:"16px",right:"16px",background:C.white,color:C.text,padding:"12px 20px",borderRadius:"10px",fontSize:"13px",fontWeight:"600",zIndex:9999,boxShadow:"0 8px 32px rgba(0,33,128,0.15)",maxWidth:"340px",border:`1px solid ${C.borderW}`}}>{toast.msg}</div>}
