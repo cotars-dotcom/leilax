@@ -1,11 +1,28 @@
 // AXIS v2.0 — Supabase Client
 import { createClient } from '@supabase/supabase-js'
 
+// Cache simples em memória para reduzir chamadas redundantes
+const _cache = {}
+const CACHE_TTL = 30000 // 30 segundos
+async function cachedQuery(key, queryFn) {
+  const now = Date.now()
+  if (_cache[key] && (now - _cache[key].ts) < CACHE_TTL) {
+    return _cache[key].data
+  }
+  const data = await queryFn()
+  _cache[key] = { data, ts: now }
+  return data
+}
+export function invalidarCache(key) {
+  if (key) delete _cache[key]
+  else Object.keys(_cache).forEach(k => delete _cache[k])
+}
+
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn('[AXIS] Supabase nÃ£o configurado. Defina VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY.')
+  console.warn('[AXIS] Supabase não configurado. Defina VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY.')
 }
 
 export const supabase = createClient(
@@ -35,10 +52,12 @@ export async function getSession() {
 
 // == PROFILES ==
 export async function getProfile(userId) {
-  const { data, error } = await supabase
-    .from('profiles').select('*').eq('id', userId).single()
-  if (error) throw error
-  return data
+  return cachedQuery(`profile_${userId}`, async () => {
+    const { data, error } = await supabase
+      .from('profiles').select('*').eq('id', userId).single()
+    if (error) throw error
+    return data
+  })
 }
 
 export async function getAllProfiles() {
@@ -51,6 +70,7 @@ export async function getAllProfiles() {
 export async function updateProfile(id, updates) {
   const { error } = await supabase.from('profiles').update(updates).eq('id', id)
   if (error) throw error
+  invalidarCache(`profile_${id}`)
 }
 
 // == IMOVEIS ==
@@ -67,6 +87,73 @@ export async function saveImovel(imovel, userId) {
     .upsert({ ...imovel, criado_por: userId, atualizado_em: new Date().toISOString() })
     .select().single()
   if (error) throw error
+  return data
+}
+
+// Colunas conhecidas da tabela imoveis — tudo fora disso é descartado
+const IMOVEIS_COLS = new Set([
+  'id','titulo','endereco','cidade','estado','bairro','tipo','tipologia',
+  'area_privativa_m2','area_coberta_privativa_m2','area_descoberta_privativa_m2',
+  'area_total_m2','area_real_total_m2','area_usada_calculo_m2','area_usada_label',
+  'area_m2','quartos','suites','vagas','andar','andares_unidade','elevador',
+  'padrao_acabamento','vaga_tipo','condominio_mensal',
+  'modalidade_leilao','processo_numero','leiloeiro','data_leilao','num_leilao',
+  'valor_avaliacao','valor_minimo','valor_lance_atual',
+  'ocupacao','ocupacao_fonte','financiavel','fgts_aceito',
+  'debitos_condominio','debitos_iptu','responsabilidade_debitos','responsabilidade_fonte',
+  'processos_ativos','matricula_status','obs_juridicas',
+  'preco_m2_imovel','preco_m2_mercado','preco_m2_fonte',
+  'valor_mercado_estimado','desconto_percentual','desconto_sobre_mercado_pct',
+  'gap_preco_asking_closing_pct','preco_m2_asking_bairro','preco_m2_closing_bairro','classe_ipead',
+  'itbi_pct','comissao_leiloeiro_pct',
+  'custo_reforma_calculado','custo_reforma_previsto','custo_reforma_estimado',
+  'custo_total_aquisicao','custo_juridico_estimado','custo_regularizacao',
+  'aluguel_mensal_estimado',
+  'escopo_reforma','prazo_reforma_meses','valor_pos_reforma_estimado',
+  'indice_sobrecapitalizacao','alerta_sobrecap','classe_mercado_reforma',
+  'liquidez','prazo_revenda_meses',
+  'mercado_tendencia','mercado_tendencia_pct_12m','mercado_demanda',
+  'mercado_tempo_venda_meses','mercado_obs','yield_bruto_pct',
+  'score_localizacao','score_desconto','score_juridico',
+  'score_ocupacao','score_liquidez','score_mercado','score_total',
+  'modalidade','riscos_presentes','prazo_liberacao_estimado_meses',
+  'reclassificado_por_doc','historico_juridico','score_juridico_manual',
+  'recomendacao','justificativa','positivos','negativos','alertas',
+  'estrategia_recomendada','estrategia_recomendada_detalhe','estrutura_recomendada',
+  'retorno_venda_pct','retorno_locacao_anual_pct',
+  'fotos','foto_principal','fonte_url',
+  'codigo_axis','criado_em','atualizado_em','criado_por',
+  'status','status_operacional',
+  'motivo_arquivamento','arquivado_por','arquivado_em',
+  'trello_card_id','trello_card_url','trello_list_id','trello_sincronizado_em',
+  'analise_dupla_ia','comparaveis','sintese_executiva',
+])
+
+export async function saveImovelCompleto(imovel, userId) {
+  // Filtrar apenas colunas que existem na tabela
+  const payload = {}
+  for (const [k, v] of Object.entries(imovel)) {
+    if (IMOVEIS_COLS.has(k)) payload[k] = v
+  }
+  // Mapear campo legado url → fonte_url
+  if (!payload.fonte_url && imovel.url) payload.fonte_url = imovel.url
+  // Garantir campos obrigatórios
+  if (!payload.id) payload.id = crypto.randomUUID()
+  if (userId) payload.criado_por = userId
+  payload.atualizado_em = new Date().toISOString()
+  if (!payload.status_operacional) payload.status_operacional = 'ativo'
+
+  console.log('[AXIS Supabase] Salvando imóvel:', payload.id, payload.titulo || '(sem título)')
+  const { data, error } = await supabase
+    .from('imoveis')
+    .upsert(payload, { onConflict: 'id' })
+    .select()
+    .single()
+  if (error) {
+    console.error('[AXIS Supabase] ERRO ao salvar:', error.code, error.message, error.details)
+    throw error
+  }
+  console.log('[AXIS Supabase] Salvo com sucesso:', data.id, data.codigo_axis)
   return data
 }
 
@@ -193,21 +280,25 @@ export async function saveObservacao(obs) {
 
 // == APP SETTINGS (API KEYS) ==
 export async function getAppSetting(chave) {
-  try {
-    const { data, error } = await supabase
-      .from('app_settings').select('valor').eq('chave', chave).single()
-    if (error) return null
-    return data?.valor || null
-  } catch { return null }
+  return cachedQuery(`app_setting_${chave}`, async () => {
+    try {
+      const { data, error } = await supabase
+        .from('app_settings').select('valor').eq('chave', chave).single()
+      if (error) return null
+      return data?.valor || null
+    } catch { return null }
+  })
 }
 
 export async function getAppSettings() {
-  try {
-    const { data, error } = await supabase
-      .from('app_settings').select('chave, valor, descricao')
-    if (error) return {}
-    return Object.fromEntries((data || []).map(r => [r.chave, r]))
-  } catch { return {} }
+  return cachedQuery('app_settings', async () => {
+    try {
+      const { data, error } = await supabase
+        .from('app_settings').select('chave, valor, descricao')
+      if (error) return {}
+      return Object.fromEntries((data || []).map(r => [r.chave, r]))
+    } catch { return {} }
+  })
 }
 
 export async function setAppSetting(chave, valor, userId) {
@@ -217,6 +308,8 @@ export async function setAppSetting(chave, valor, userId) {
     atualizado_em: new Date().toISOString()
   })
   if (error) throw error
+  invalidarCache(`app_setting_${chave}`)
+  invalidarCache('app_settings')
 }
 
 // == CONVITES ==
