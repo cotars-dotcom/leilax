@@ -1,11 +1,28 @@
 // AXIS v2.0 — Supabase Client
 import { createClient } from '@supabase/supabase-js'
 
+// Cache simples em memória para reduzir chamadas redundantes
+const _cache = {}
+const CACHE_TTL = 30000 // 30 segundos
+async function cachedQuery(key, queryFn) {
+  const now = Date.now()
+  if (_cache[key] && (now - _cache[key].ts) < CACHE_TTL) {
+    return _cache[key].data
+  }
+  const data = await queryFn()
+  _cache[key] = { data, ts: now }
+  return data
+}
+export function invalidarCache(key) {
+  if (key) delete _cache[key]
+  else Object.keys(_cache).forEach(k => delete _cache[k])
+}
+
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn('[AXIS] Supabase nÃ£o configurado. Defina VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY.')
+  console.warn('[AXIS] Supabase não configurado. Defina VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY.')
 }
 
 export const supabase = createClient(
@@ -35,10 +52,12 @@ export async function getSession() {
 
 // == PROFILES ==
 export async function getProfile(userId) {
-  const { data, error } = await supabase
-    .from('profiles').select('*').eq('id', userId).single()
-  if (error) throw error
-  return data
+  return cachedQuery(`profile_${userId}`, async () => {
+    const { data, error } = await supabase
+      .from('profiles').select('*').eq('id', userId).single()
+    if (error) throw error
+    return data
+  })
 }
 
 export async function getAllProfiles() {
@@ -51,6 +70,7 @@ export async function getAllProfiles() {
 export async function updateProfile(id, updates) {
   const { error } = await supabase.from('profiles').update(updates).eq('id', id)
   if (error) throw error
+  invalidarCache(`profile_${id}`)
 }
 
 // == IMOVEIS ==
@@ -193,21 +213,25 @@ export async function saveObservacao(obs) {
 
 // == APP SETTINGS (API KEYS) ==
 export async function getAppSetting(chave) {
-  try {
-    const { data, error } = await supabase
-      .from('app_settings').select('valor').eq('chave', chave).single()
-    if (error) return null
-    return data?.valor || null
-  } catch { return null }
+  return cachedQuery(`app_setting_${chave}`, async () => {
+    try {
+      const { data, error } = await supabase
+        .from('app_settings').select('valor').eq('chave', chave).single()
+      if (error) return null
+      return data?.valor || null
+    } catch { return null }
+  })
 }
 
 export async function getAppSettings() {
-  try {
-    const { data, error } = await supabase
-      .from('app_settings').select('chave, valor, descricao')
-    if (error) return {}
-    return Object.fromEntries((data || []).map(r => [r.chave, r]))
-  } catch { return {} }
+  return cachedQuery('app_settings', async () => {
+    try {
+      const { data, error } = await supabase
+        .from('app_settings').select('chave, valor, descricao')
+      if (error) return {}
+      return Object.fromEntries((data || []).map(r => [r.chave, r]))
+    } catch { return {} }
+  })
 }
 
 export async function setAppSetting(chave, valor, userId) {
@@ -217,6 +241,8 @@ export async function setAppSetting(chave, valor, userId) {
     atualizado_em: new Date().toISOString()
   })
   if (error) throw error
+  invalidarCache(`app_setting_${chave}`)
+  invalidarCache('app_settings')
 }
 
 // == CONVITES ==

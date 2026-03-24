@@ -9,7 +9,6 @@ import { useAuth } from "./lib/AuthContext.jsx"
 import Login from "./pages/Login.jsx"
 import { supabase, getImoveis, saveImovel, deleteImovel } from "./lib/supabase.js"
 import Tarefas from "./pages/Tarefas.jsx"
-import AdminPanel from "./pages/AdminPanel.jsx"
 import { analisarImovelCompleto } from "./lib/dualAI.js"
 import { setupBoardLeilax, criarCardImovel } from "./lib/trelloService.js"
 import { LayoutDashboard, TrendingUp, Package, ShieldCheck, FileText, BarChart3, Settings, Search, Bell, AlertTriangle, ArrowUpRight, Plus, MessageSquare, Scale, CheckSquare, LogOut } from "lucide-react"
@@ -61,10 +60,11 @@ const RED = "#E5484D"
 function normalizarTextoAlerta(texto) {
   if (!texto) return ''
 
-  // Decodificar double-encoding UTF-8 (latin1 interpretado como UTF-8)
+  // Tentar decodificar double-encoding UTF-8
   let s = texto
   try {
-    s = decodeURIComponent(escape(texto))
+    const decoded = decodeURIComponent(escape(texto))
+    if (decoded !== texto) s = decoded
   } catch {
     s = texto
   }
@@ -76,6 +76,7 @@ function normalizarTextoAlerta(texto) {
     .replace(/Ã°Â\S*/g, '')
     .replace(/ÃÂÂ[^\s]*/g, '')
     .replace(/Ã¢ÂÂ[^\s]*/g, '')
+    .replace(/Ã[ÂĈ][^\s]{2,8}/g, '')
     .replace(/[\uFFFD\uFFFE\uFFFF]/g, '')
     // Tags de texto para emojis
     .replace(/\[CRITICO\]/gi, '🔴')
@@ -708,9 +709,16 @@ function NovoImovel({onSave,onCancel,onNav,trello,parametrosBanco,criteriosBanco
 
 // ── PROPERTY CARD ─────────────────────────────────────────────────────────────
 // ── GALERIA DE FOTOS ──────────────────────────────────────────────────────────
-function GaleriaFotos({ fotos = [], foto_principal = null }) {
+function GaleriaFotos({ fotos = [], foto_principal = null, url = null }) {
   const [fotoAtiva, setFotoAtiva] = useState(foto_principal || fotos[0] || null)
-  if (!fotos.length && !foto_principal) return null
+  if (!fotos.length && !foto_principal) return (
+    <div style={{ textAlign:'center', padding:'40px 24px', color:C.hint }}>
+      <div style={{ fontSize:40, marginBottom:12 }}>📷</div>
+      <p style={{ margin:'0 0 6px', fontSize:14, fontWeight:600, color:C.muted }}>Nenhuma foto disponível</p>
+      <p style={{ margin:0, fontSize:12, color:C.hint }}>As fotos são extraídas automaticamente do anúncio original. Sites com carregamento dinâmico (SPA) podem não ter fotos.</p>
+      {url && <a href={url} target="_blank" rel="noopener noreferrer" style={{ display:'inline-block', marginTop:12, padding:'8px 16px', borderRadius:8, background:C.navy, color:'#fff', fontSize:12, fontWeight:600, textDecoration:'none' }}>Ver anúncio original →</a>}
+    </div>
+  )
   const todasFotos = foto_principal
     ? [foto_principal, ...fotos.filter(f => f !== foto_principal)]
     : fotos
@@ -775,7 +783,9 @@ function PropCard({p,onNav}) {
       <div style={{flex:1,minWidth:0}}>
         <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:"4px"}}>
           <div style={{fontWeight:"600",fontSize:"13px",color:K.wh,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1}}>{p.titulo||"Imóvel sem título"}</div>
-          {p.codigo_axis&&<span style={{fontSize:"9.5px",fontWeight:700,padding:"1px 6px",borderRadius:3,background:"#002B8010",color:"#002B80",fontFamily:"monospace",flexShrink:0}}>{p.codigo_axis}</span>}
+          {p.codigo_axis?<span style={{fontSize:"9.5px",fontWeight:700,padding:"1px 6px",borderRadius:3,background:"#002B8010",color:"#002B80",fontFamily:"monospace",flexShrink:0}}>{p.codigo_axis}</span>:<span style={{fontSize:10,color:C.hint}}>
+            # pendente
+          </span>}
         </div>
         <div style={{fontSize:"10.5px",color:K.t3,marginBottom:"8px"}}>📍 {p.cidade}/{p.estado} · {p.tipo} · {p.area_m2?`${p.area_m2}m²`:"—"}</div>
         <div style={{display:"flex",gap:"5px",flexWrap:"wrap",marginBottom:"10px"}}>
@@ -2179,7 +2189,7 @@ function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze,isAdmin,onArch
         })
       }}/>}
 
-      {abaDetalhe==='fotos'&&<GaleriaFotos fotos={p.fotos||[]} foto_principal={p.foto_principal}/>}
+      {abaDetalhe==='fotos'&&<GaleriaFotos fotos={p.fotos||[]} foto_principal={p.foto_principal} url={p.url}/>}
 
       {abaDetalhe==='mercado'&&<div>
         <div style={card()}>
@@ -2244,7 +2254,7 @@ function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze,isAdmin,onArch
             Síntese da análise
           </p>
           <p style={{ margin:0, fontSize:13, color:C.text, lineHeight:1.6 }}>
-            {p.sintese_executiva}
+            {normalizarTextoAlerta(p.sintese_executiva)}
           </p>
         </div>
       )}
@@ -2304,7 +2314,7 @@ function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze,isAdmin,onArch
               <span style={{fontSize:"12px",fontWeight:"600",color:cs?.[v]||K.t2}}>{v||"—"}</span>
             </div>
           ))}
-          {p.obs_juridicas&&<div style={{marginTop:"10px",fontSize:"11.5px",color:K.t2,lineHeight:"1.6",background:K.s2,borderRadius:"5px",padding:"8px"}}>{p.obs_juridicas}</div>}
+          {p.obs_juridicas&&<div style={{marginTop:"10px",fontSize:"11.5px",color:K.t2,lineHeight:"1.6",background:K.s2,borderRadius:"5px",padding:"8px"}}>{normalizarTextoAlerta(p.obs_juridicas)}</div>}
           <button onClick={()=>setAbaDetalhe('juridico')} style={{marginTop:10,background:`${K.teal}12`,border:`1px solid ${K.teal}30`,borderRadius:6,padding:"6px 14px",fontSize:12,color:K.teal,fontWeight:600,cursor:"pointer",width:"100%"}}>📎 Anexar documentos jurídicos</button>
           {p.reclassificado_por_doc&&<div style={{marginTop:6,fontSize:10.5,color:K.amb,fontWeight:600}}>🔄 Reclassificado por documento</div>}
         </div>
@@ -2953,10 +2963,7 @@ useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("param
     {view==="tarefas"&&<Tarefas/>}
     {view==="arquivados"&&<BancoArquivados session={session} isAdmin={isAdmin}/>}
     {view==="portfolio"&&isAdmin&&<PainelPortfolio props={props} isMobile={isMobile} isPhone={isPhone}/>}
-    {view==="admin"&&isAdmin&&<div>
-      <PainelConvitesAdmin session={session}/>
-      <div style={{borderTop:`1px solid ${C.borderW}`,marginTop:24}}><AdminPanel/></div>
-    </div>}
+    {view==="admin"&&isAdmin&&<PainelConvitesAdmin session={session}/>}
     </div>
 
     {toast&&<div style={{position:"fixed",bottom:"16px",right:"16px",background:C.white,color:C.text,padding:"12px 20px",borderRadius:"10px",fontSize:"13px",fontWeight:"600",zIndex:9999,boxShadow:"0 8px 32px rgba(0,33,128,0.15)",maxWidth:"340px",border:`1px solid ${C.borderW}`}}>{toast.msg}</div>}
