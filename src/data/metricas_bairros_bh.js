@@ -103,6 +103,10 @@ export const BAIRROS_BH = [
   { key:'bh_bairro_venda_nova', label:'Venda Nova', zona:'Norte',
     precoAnuncioM2:4365, precoContratoM2:null, classeIpead:2, classeIpeadLabel:'Médio',
     yieldBruto:6.60, tendencia12m:2.0, rankingQA:null, tipoPreco:'anuncio_fipezap' },
+  { key:'bh_bairro_planalto', label:'Planalto', zona:'Norte',
+    precoAnuncioM2:null, precoContratoM2:null, classeIpead:2, classeIpeadLabel:'Médio',
+    yieldBruto:6.60, tendencia12m:2.0, rankingQA:null, tipoPreco:'proxy_zona',
+    obs:'Classe 2 Médio (5 a 8.5 SM) — dado estimado via zona Norte' },
 ]
 
 // Função principal — buscar dados de bairro por nome

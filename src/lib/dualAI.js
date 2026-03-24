@@ -439,15 +439,15 @@ NUNCA usar area_total_m2 para calcular preco_m2_imovel.
   "aluguel_mensal_estimado": 0,
   "liquidez": "Alta|MÃ©dia|Baixa",
   "prazo_revenda_meses": 0,
-  "score_localizacao": 0,
-  "score_desconto": 0,
-  "score_juridico": 0,
-  "score_ocupacao": 0,
-  "score_liquidez": 0,
-  "score_mercado": 0,
+  "score_localizacao": 0.0,  // ESCALA 0.0 a 10.0 (ex: 7.5, 8.2, 6.0) — NUNCA use 0-100
+  "score_desconto": 0.0,     // Calibração: desconto 40%→7.0, 60%+→9.5, 20%→4.0
+  "score_juridico": 0.0,     // Calibração: sem processos→8.0, risco alto→3.0
+  "score_ocupacao": 0.0,     // Calibração: desocupado confirmado→8.5, ocupado→3.0
+  "score_liquidez": 0.0,     // Calibração: alta demanda bairro nobre→8.5, periferia→4.0
+  "score_mercado": 0.0,      // Calibração: BH classe 4 Luxo→8.5, classe 2 Médio→5.5
   "positivos": ["string1","string2","string3"],
   "negativos": ["string1","string2"],
-  "alertas": ["string acionÃ¡vel em linguagem clara"],
+  "alertas": ["string acionavel em linguagem clara — use prefixos [CRITICO] [ATENCAO] ou [OK] em vez de emojis"],
   "recomendacao": "COMPRAR|AGUARDAR|EVITAR",
   "justificativa": "string detalhada 3-5 linhas explicando a decisÃ£o",
   "estrategia_recomendada": "flip|locacao|temporada",
@@ -554,7 +554,7 @@ export function calcularScore(analise, parametros) {
     (analise.score_mercado     || 0) * p.mercado
 
   if ((analise.score_juridico || 0) < 4) score *= 0.75
-  if (analise.ocupacao === 'Ocupado') score *= 0.85
+  if ((analise.ocupacao || '').toLowerCase() === 'ocupado') score *= 0.85
 
   return Math.min(10, Math.max(0, parseFloat(score.toFixed(2))))
 }
@@ -566,6 +566,16 @@ export function calcularScore(analise, parametros) {
 export function validarECorrigirAnalise(analise) {
   const erros = []
   const avisos = []
+
+  // 0. Normalizar scores que vieram em escala 0-100 para 0-10
+  const camposScore = ['score_localizacao','score_desconto','score_juridico',
+                       'score_ocupacao','score_liquidez','score_mercado']
+  for (const campo of camposScore) {
+    if (typeof analise[campo] === 'number' && analise[campo] > 10) {
+      avisos.push(`NORMALIZADO: ${campo} era ${analise[campo]} (escala 0-100), convertido para ${(analise[campo] / 10).toFixed(1)}`)
+      analise[campo] = parseFloat((analise[campo] / 10).toFixed(1))
+    }
+  }
 
   // 1. Ãrea usada para cÃ¡lculo â corrigir se usou total/real em vez de privativa
   const areaReal = analise.area_real_total_m2 || analise.area_total_m2
@@ -605,9 +615,9 @@ export function validarECorrigirAnalise(analise) {
     analise.alertas = analise.alertas.filter(alerta => {
       const a = (typeof alerta === 'string') ? alerta.toLowerCase() : ''
       if ((a.includes('baixa_liquidez') || a.includes('muito_baixa')) &&
-          (analise.score_liquidez || 0) >= 65) return false
-      if (a.includes('alta_vacancia') && (analise.score_liquidez || 0) >= 65) return false
-      if (a.includes('risco jurÃ­dico alto') && (analise.score_juridico || 0) >= 70) return false
+          (analise.score_liquidez || 0) >= 6.5) return false
+      if (a.includes('alta_vacancia') && (analise.score_liquidez || 0) >= 6.5) return false
+      if (a.includes('risco jur') && (analise.score_juridico || 0) >= 7.0) return false
       return true
     })
     // Substituir alertas internos por linguagem amigÃ¡vel
@@ -634,9 +644,9 @@ export function validarECorrigirAnalise(analise) {
   const ocupLower = (analise.ocupacao || '').toLowerCase()
   if ((ocupLower === 'desocupado' || tituloLower.includes('nunca habitado') ||
        justLower.includes('nunca habitado')) &&
-      (analise.score_ocupacao || 0) < 70) {
+      (analise.score_ocupacao || 0) < 7.0) {
     avisos.push('AJUSTE: imÃ³vel nunca habitado/desocupado â score_ocupacao ajustado')
-    analise.score_ocupacao = Math.max(analise.score_ocupacao || 50, 75)
+    analise.score_ocupacao = Math.max(analise.score_ocupacao || 5.0, 7.5)
   }
 
   // 7. Recalcular score total se houve correÃ§Ãµes
@@ -650,7 +660,7 @@ export function validarECorrigirAnalise(analise) {
       (analise.score_liquidez    || 0) * pesos.liquidez +
       (analise.score_mercado     || 0) * pesos.mercado
     let fator = 1
-    if ((analise.score_juridico || 0) < 40) fator *= 0.75
+    if ((analise.score_juridico || 0) < 4) fator *= 0.75
     if (ocupLower === 'ocupado') fator *= 0.85
     analise.score_total = Math.min(10, Math.round(scoreBase * fator * 10) / 10)
     if (analise.score_total >= 7.5) analise.recomendacao = 'COMPRAR'
@@ -682,27 +692,36 @@ export async function extrairFotosImovel(url, claudeKey) {
         tools: [{ type: 'web_search_20250305', name: 'web_search' }],
         messages: [{
           role: 'user',
-          content: `Acesse esta URL de imovel: ${url}
+          content: `Estou analisando este imovel de leilao: ${url}
 
-O site pode usar JavaScript/React/SPA para carregar imagens dinamicamente.
-Tente as seguintes estrategias para encontrar fotos do imovel:
+IMPORTANTE: Muitos sites de leilao (marcoantonioleiloeiro.com.br, zuk.com.br, sold.com.br)
+usam React/SPA — o HTML inicial NAO contem as imagens. Use web_search para encontra-las.
 
-1. Verificar se a URL contem parametros de ID do lote
-2. Buscar imagens no padrao: /storage/, /images/, /fotos/, /uploads/, /lote/
-3. Para marcoantonioleiloeiro.com.br, imagens costumam seguir o padrao:
-   https://marcoantonioleiloeiro.com.br/storage/lotes/[ID]/[arquivo].jpg
-4. Verificar meta tags og:image
-5. Verificar atributos data-src, data-lazy, data-original, srcset
-6. Procure por tags <img> com src contendo extensoes .jpg, .jpeg, .png, .webp
-7. Priorize fotos grandes (nao icones, nao logos, nao thumbnails)
+ESTRATEGIAS (tente TODAS em ordem):
 
-Retorne APENAS um JSON valido no formato:
+1. META TAG og:image na URL (sempre tem ao menos uma foto principal)
+
+2. PADRAO DE URL POR SITE:
+   - marcoantonioleiloeiro.com.br: /storage/lotes/[ID]/[foto].jpg (ID esta na URL apos "/lote/")
+   - zuk.com.br: /storage/imoveis/[ID]/
+   - sold.com.br: /assets/lotes/[ID]/
+   - leilonavale.com.br: /uploads/lotes/[ID]/
+
+3. WEB SEARCH: busque "site:${new URL(url).hostname} ${url.split('/').pop()} foto" ou
+   o endereco do imovel para encontrar imagens indexadas pelo Google
+
+4. FALLBACK: buscar <img> com src contendo .jpg .jpeg .png .webp
+   Verificar data-src, data-lazy, srcset, data-original
+   Ignorar icones, logos, thumbnails < 200px
+
+Retorne APENAS JSON valido:
 {
   "fotos": ["url1", "url2"],
-  "foto_principal": "url_principal",
-  "estrategia_usada": "qual metodo funcionou"
+  "foto_principal": "url_principal_fachada_ou_melhor_angulo",
+  "fonte_fotos": "como foram encontradas"
 }
-Maximo de 12 fotos. A foto_principal deve ser a fachada ou melhor angulo externo.`
+Maximo 12 fotos. foto_principal = fachada ou melhor angulo externo.
+Se nao encontrar: {"fotos": [], "foto_principal": null, "fonte_fotos": "nenhuma encontrada"}`
         }]
       })
     })
@@ -809,8 +828,8 @@ DADOS DE BAIRRO (parcial):
       if (mercadoFinal.alertas && mercadoFinal.alertas.length) {
         const scoreLiquidez = analise.score_liquidez || 0
         const alertasRegionais = mercadoFinal.alertas.filter(alerta => {
-          if (scoreLiquidez > 70 && alerta.includes('baixa_liquidez')) return false
-          if (scoreLiquidez > 70 && alerta.includes('vacancia')) return false
+          if (scoreLiquidez > 7.0 && alerta.includes('baixa_liquidez')) return false
+          if (scoreLiquidez > 7.0 && alerta.includes('vacancia')) return false
           return true
         })
         const alertasExistentes = new Set(analise.alertas || [])

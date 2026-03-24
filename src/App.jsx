@@ -55,6 +55,19 @@ const K = {
 }
 
 const RED = "#E5484D"
+
+// Normalizar texto de alertas — corrige double-encoding UTF-8 e converte tags para emojis
+function normalizarTextoAlerta(texto) {
+  if (!texto) return ''
+  return texto
+    .replace(/Ã°Â[^\s]*/g, '')
+    .replace(/Ã¢ÂÂ[^\s]*/g, '')
+    .replace(/[\uFFFD]/g, '')
+    .replace(/\[CRITICO\]/gi, '🔴')
+    .replace(/\[ATENCAO\]/gi, '⚠️')
+    .replace(/\[OK\]/gi, '✅')
+    .trim()
+}
 const scoreColor = s => s >= 7.5 ? C.emerald : s >= 6 ? C.emerald : s >= 4.5 ? C.mustard : RED
 const scoreLabel = s => s >= 7.5 ? "FORTE" : s >= 6 ? "BOM" : s >= 4.5 ? "MÉDIO" : "FRACO"
 const recColor = r => ({ COMPRAR: C.emerald, AGUARDAR: C.mustard, EVITAR: "#E5484D" })[r] || C.hint
@@ -1359,7 +1372,7 @@ function AbaJuridica({ imovel, onReclassificado }) {
             <div>
               {resultado.alertas_criticos.map((a, i) => (
                 <p key={i} style={{ margin: '4px 0', fontSize: 12.5, color: K.red }}>
-                  🚨 {a}
+                  🚨 {normalizarTextoAlerta(a)}
                 </p>
               ))}
             </div>
@@ -1983,7 +1996,7 @@ function ModoAoVivo({ imovel, onClose }) {
             fontWeight:700, textTransform:'uppercase' }}>⚠️ Alertas</p>
           {s.alertas.slice(0,2).map((a,i) => (
             <p key={i} style={{ margin:'2px 0', fontSize:11,
-              color:'rgba(255,255,255,0.8)' }}>• {a}</p>
+              color:'rgba(255,255,255,0.8)' }}>• {normalizarTextoAlerta(a)}</p>
           ))}
         </div>
       )}
@@ -2213,7 +2226,7 @@ function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze,isAdmin,onArch
       </div>
       {p.alertas?.length>0&&<div style={{background:`${K.red}10`,border:`1px solid ${K.red}30`,borderRadius:"8px",padding:"14px",marginBottom:"14px"}}>
         <div style={{fontSize:"11px",color:K.red,fontWeight:"700",textTransform:"uppercase",letterSpacing:"1px",marginBottom:"8px"}}>🚨 Alertas Críticos</div>
-        {p.alertas.map((a,i)=><div key={i} style={{fontSize:"12.5px",color:K.tx,marginBottom:"4px"}}>• {a}</div>)}
+        {p.alertas.map((a,i)=><div key={i} style={{fontSize:"12.5px",color:K.tx,marginBottom:"4px"}}>• {normalizarTextoAlerta(a)}</div>)}
       </div>}
       {/* Estratégia recomendada badge */}
       {p.estrategia_recomendada_detalhe?.tipo && (() => {
@@ -2372,11 +2385,11 @@ function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze,isAdmin,onArch
       {(p.positivos?.length>0||p.negativos?.length>0)&&<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"14px",marginBottom:"14px"}}>
         <div style={{...card(),borderTop:`2px solid ${K.grn}`}}>
           <div style={{fontWeight:"600",color:K.grn,marginBottom:"10px",fontSize:"13px"}}>✅ Pontos Positivos</div>
-          {(p.positivos||[]).map((pt,i)=><div key={i} style={{fontSize:"12.5px",color:K.tx,marginBottom:"6px",display:"flex",gap:"8px"}}><span style={{color:K.grn}}>+</span>{pt}</div>)}
+          {(p.positivos||[]).map((pt,i)=><div key={i} style={{fontSize:"12.5px",color:K.tx,marginBottom:"6px",display:"flex",gap:"8px"}}><span style={{color:K.grn}}>+</span>{normalizarTextoAlerta(pt)}</div>)}
         </div>
         <div style={{...card(),borderTop:`2px solid ${K.red}`}}>
           <div style={{fontWeight:"600",color:K.red,marginBottom:"10px",fontSize:"13px"}}>⚠️ Pontos de Atenção</div>
-          {(p.negativos||[]).map((pt,i)=><div key={i} style={{fontSize:"12.5px",color:K.tx,marginBottom:"6px",display:"flex",gap:"8px"}}><span style={{color:K.red}}>−</span>{pt}</div>)}
+          {(p.negativos||[]).map((pt,i)=><div key={i} style={{fontSize:"12.5px",color:K.tx,marginBottom:"6px",display:"flex",gap:"8px"}}><span style={{color:K.red}}>−</span>{normalizarTextoAlerta(pt)}</div>)}
         </div>
       </div>}
       {p.endereco&&<div style={{...card(),marginBottom:"14px"}}><div style={{fontWeight:"600",color:K.wh,marginBottom:"6px",fontSize:"13px"}}>📍 Localização</div><div style={{fontSize:"13px",color:K.t2}}>{p.endereco}</div></div>}
