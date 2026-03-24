@@ -380,9 +380,10 @@ function ModalAuditoriaTrello({ config, imoveis, onClose }) {
 
   async function carregarBoards() {
     try {
-      const { getBoardsAxis } = await import('./lib/trelloService.js')
+      const { getBoardsAxis, AXIS_BOARDS } = await import('./lib/trelloService.js')
       const data = await getBoardsAxis(key, token)
-      setBoards(data.filter(b => b.name.includes('AXIS')))
+      const idsOficiais = [AXIS_BOARDS.PIPELINE, AXIS_BOARDS.MANUAL]
+      setBoards(data.filter(b => idsOficiais.includes(b.id)))
     } catch {}
   }
 
@@ -409,14 +410,8 @@ function ModalAuditoriaTrello({ config, imoveis, onClose }) {
   async function rodarAuditoria() {
     setLoading(true); setMsg('Auditando board...')
     try {
-      const { auditarBoard, getBoardsExistentes } = await import('./lib/trelloService.js')
-      let bid = boardId
-      if (!bid) {
-        const existentes = await getBoardsExistentes(key, token)
-        const b = existentes.find(b => b.name.includes('Pipeline') || b.name.includes('AXIS'))
-        bid = b?.id
-      }
-      if (!bid) { setMsg('Board não encontrado. Crie o workspace primeiro.'); setLoading(false); return }
+      const { auditarBoard, AXIS_BOARDS } = await import('./lib/trelloService.js')
+      const bid = boardId || AXIS_BOARDS.PIPELINE
       const res = await auditarBoard(bid, key, token)
       setAuditoria(res)
       setMsg('')
@@ -433,19 +428,12 @@ function ModalAuditoriaTrello({ config, imoveis, onClose }) {
     }
     setLoading(true); setMsg('Preparando sincronização...')
     try {
-      const { criarOuAtualizarCardImovel, getBoardsExistentes, getListasBoard } = await import('./lib/trelloService.js')
-      // Se não tiver boardId salvo, buscar o board existente
-      let bid = boardId || trelloConf.boardId
+      const { criarOuAtualizarCardImovel, getListasBoard } = await import('./lib/trelloService.js')
+      const { AXIS_BOARDS } = await import('./lib/trelloService.js')
+      let bid = boardId || trelloConf.boardId || AXIS_BOARDS.PIPELINE
       let listIds = trelloConf.listIds || {}
-      if (!bid) {
-        const existentes = await getBoardsExistentes(key, token)
-        const boardPipeline = existentes.find(b => b.name.includes('Pipeline') || b.name.includes('AXIS'))
-        if (!boardPipeline) {
-          setMsg('Board AXIS não encontrado. Clique em "Criar Workspace AXIS" primeiro.')
-          setLoading(false); return
-        }
-        bid = boardPipeline.id
-        // Salvar para próximas vezes
+      if (bid !== AXIS_BOARDS.PIPELINE) {
+        bid = AXIS_BOARDS.PIPELINE
         localStorage.setItem('axis-trello', JSON.stringify({ ...trelloConf, boardId: bid }))
       }
       // Buscar listas do board se não tiver salvas

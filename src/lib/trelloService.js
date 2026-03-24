@@ -54,36 +54,8 @@ export async function getBoardsExistentes(key, token) {
   }
 }
 
-async function getOuCriarBoard(nome, desc, prefs, key, token) {
-  const existentes = await getBoardsExistentes(key, token)
-  const existente = existentes.find(b =>
-    b.name.toLowerCase().trim() === nome.toLowerCase().trim()
-  )
-  if (existente) {
-    console.log(`[AXIS] Board existente reutilizado: ${existente.name} (${existente.id})`)
-    return existente
-  }
-  console.log(`[AXIS] Criando novo board: ${nome}`)
-  return await trello('POST', '/boards', {
-    name: nome,
-    desc,
-    defaultLists: false,
-    ...prefs
-  }, key, token)
-}
-
-async function getOuCriarLista(boardId, nomeLista, pos, key, token) {
-  const listas = await trello('GET', `/boards/${boardId}/lists?filter=open`, null, key, token)
-  const existente = listas?.find(l =>
-    l.name.toLowerCase().trim() === nomeLista.toLowerCase().trim()
-  )
-  if (existente) return existente
-  return await trello('POST', '/lists', {
-    idBoard: boardId,
-    name: nomeLista,
-    pos
-  }, key, token)
-}
+// getOuCriarBoard REMOVIDO — boards AXIS usam IDs fixos (AXIS_BOARDS)
+// Nunca criar boards novos; sempre reutilizar os IDs oficiais.
 
 // Criar (ou reutilizar) estrutura completa do workspace AXIS
 export async function setupWorkspaceAxis(key, token) {
