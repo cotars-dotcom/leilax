@@ -153,16 +153,20 @@ EXTINÃÂÃÂO DE CONDOMÃÂNIO (caso especial):
 
 --- ALERTAS E CONSISTÃÂNCIA ---
 NUNCA gerar alerta que contradiga o score:
-  Se score_liquidez >= 70 Ã¢ÂÂ NÃÂO incluir alerta "baixa_liquidez"
-  Se score_juridico >= 75 Ã¢ÂÂ NÃÂO incluir alerta de risco jurÃÂ­dico alto
-  Se imÃÂ³vel desocupado confirmado Ã¢ÂÂ NÃÂO incluir alerta de ocupaÃÂ§ÃÂ£o
-Alertas devem ser ACIONÃÂVEIS:
-  Errado: "muito_baixa_liquidez" (cÃÂ³digo interno, nÃÂ£o ÃÂºtil)
-  Correto: "Confirmar ocupaÃÂ§ÃÂ£o presencialmente antes do lance"
-  Correto: "Solicitar certidÃÂ£o de matrÃÂ­cula atualizada (30 dias)"
-  Correto: "Verificar se condomÃÂ­nio aceitarÃÂ¡ novo proprietÃÂ¡rio"
+  Se score_liquidez >= 70 â NÃO incluir alerta "baixa_liquidez"
+  Se score_juridico >= 75 â NÃO incluir alerta de risco jurÃ­dico alto
+  Se imÃ³vel desocupado confirmado â NÃO incluir alerta de ocupaÃ§Ã£o
+Alertas devem ser ACIONÃVEIS:
+  Errado: "muito_baixa_liquidez" (cÃ³digo interno, nÃ£o Ãºtil)
+  Correto: "Confirmar ocupaÃ§Ã£o presencialmente antes do lance"
+  Correto: "Solicitar certidÃ£o de matrÃ­cula atualizada (30 dias)"
+  Correto: "Verificar se condomÃ­nio aceitarÃ¡ novo proprietÃ¡rio"
 
---- REGIÃÂO GEOGRÃÂFICA ---
+IMPORTANTE: NAO use emojis nos campos de texto (alertas, positivos, negativos).
+Use APENAS tags de texto: [CRITICO] [ATENCAO] [OK] [INFO]
+Emojis corrompem o encoding UTF-8 no pipeline de processamento.
+
+--- REGIÃO GEOGRÃFICA ---
 Identificar corretamente a cidade/bairro:
   Contagem Ã¢ÂÂ  Belo Horizonte (sÃÂ£o municÃÂ­pios diferentes)
   Nova Lima Ã¢ÂÂ  BH (municÃÂ­pio diferente, preÃÂ§o/mÃÂ² muito maior)
@@ -367,6 +371,8 @@ INSTRUÃÂÃÂÃÂÃÂES:
 RETORNE APENAS JSON VÃÂLIDO (sem markdown, sem texto fora do JSON).
 NUNCA omitir campos obrigatÃÂ³rios. Use null se nÃÂ£o souber.
 NUNCA usar area_total_m2 para calcular preco_m2_imovel.
+NAO use emojis diretamente nos campos alertas, positivos e negativos.
+Use apenas tags de texto: [CRITICO] [ATENCAO] [OK] [INFO]
 {
   "titulo": "string",
   "endereco": "string",
@@ -437,7 +443,7 @@ NUNCA usar area_total_m2 para calcular preco_m2_imovel.
   "score_mercado": 0.0,      // Calibração: BH classe 4 Luxo→8.5, classe 2 Médio→5.5
   "positivos": ["string1","string2","string3"],
   "negativos": ["string1","string2"],
-  "alertas": ["string acionavel em linguagem clara — use prefixos [CRITICO] [ATENCAO] ou [OK] em vez de emojis"],
+  "alertas": ["string acionavel em linguagem clara — use APENAS prefixos de texto: [CRITICO] [ATENCAO] [OK] [INFO]. NAO use emojis diretamente nos alertas pois corrompem o encoding"],
   "recomendacao": "COMPRAR|AGUARDAR|EVITAR",
   "justificativa": "string detalhada 3-5 linhas explicando a decisÃÂ£o",
   "estrategia_recomendada": "flip|locacao|temporada",
@@ -667,7 +673,47 @@ export function validarECorrigirAnalise(analise) {
 
 export async function extrairFotosImovel(url, claudeKey) {
   if (!url || !claudeKey) return { fotos: [], foto_principal: null }
+
+  // Tentar og:image como fallback rapido antes da IA
+  let ogFallback = null
   try {
+    const htmlRes = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(8000) })
+    if (htmlRes.ok) {
+      const html = await htmlRes.text()
+      const ogMatch = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)
+        || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i)
+      if (ogMatch) ogFallback = ogMatch[1]
+    }
+  } catch { /* ignorar - sites SPA podem nao retornar */ }
+
+  // Extrair dominio e ID do lote da URL para ajudar a IA
+  let dominio = '', loteId = ''
+  try {
+    dominio = new URL(url).hostname
+    const loteMatch = url.match(/\/lote\/(\d+)/)
+    if (loteMatch) loteId = loteMatch[1]
+  } catch {}
+
+  try {
+    const promptFotos = `Preciso das fotos deste imovel de leilao: ${url}
+
+Use web_search para encontrar as fotos. Estrategias em ordem:
+1. Buscar no proprio site: "${dominio} ${loteId || url.split('/').pop()} fotos imovel"
+${loteId ? `2. Para marcoantonioleiloeiro.com.br: buscar pelo lote ${loteId}
+   Padrao de imagem: marcoantonioleiloeiro.com.br/storage/lotes/${loteId}/` : ''}
+3. Para zuk.com.br: /storage/imoveis/[ID]/
+4. Para sold.com.br: /assets/lotes/[ID]/
+5. Para leilaovip.com.br: /assets/products/[ID]/
+6. Para caixa.gov.br: buscar pelo endereco completo
+7. Buscar imagens do imovel em Google Images: "${dominio} ${loteId || ''} apartamento foto"
+
+Retorne SOMENTE este JSON (sem texto adicional):
+{
+  "foto_principal": "URL da melhor foto ou null",
+  "fotos": ["url1", "url2"],
+  "fonte_fotos": "como foram encontradas"
+}`
+
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -677,58 +723,41 @@ export async function extrairFotosImovel(url, claudeKey) {
         'anthropic-dangerous-direct-browser-access': 'true'
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: CLAUDE_MODEL,
         max_tokens: 1000,
         tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-        messages: [{
-          role: 'user',
-          content: `Estou analisando este imovel de leilao: ${url}
-
-IMPORTANTE: Muitos sites de leilao (marcoantonioleiloeiro.com.br, zuk.com.br, sold.com.br)
-usam React/SPA — o HTML inicial NAO contem as imagens. Use web_search para encontra-las.
-
-ESTRATEGIAS (tente TODAS em ordem):
-
-1. META TAG og:image na URL (sempre tem ao menos uma foto principal)
-
-2. PADRAO DE URL POR SITE:
-   - marcoantonioleiloeiro.com.br: /storage/lotes/[ID]/[foto].jpg (ID esta na URL apos "/lote/")
-   - zuk.com.br: /storage/imoveis/[ID]/
-   - sold.com.br: /assets/lotes/[ID]/
-   - leilonavale.com.br: /uploads/lotes/[ID]/
-
-3. WEB SEARCH: busque "site:${new URL(url).hostname} ${url.split('/').pop()} foto" ou
-   o endereco do imovel para encontrar imagens indexadas pelo Google
-
-4. FALLBACK: buscar <img> com src contendo .jpg .jpeg .png .webp
-   Verificar data-src, data-lazy, srcset, data-original
-   Ignorar icones, logos, thumbnails < 200px
-
-Retorne APENAS JSON valido:
-{
-  "fotos": ["url1", "url2"],
-  "foto_principal": "url_principal_fachada_ou_melhor_angulo",
-  "fonte_fotos": "como foram encontradas"
-}
-Maximo 12 fotos. foto_principal = fachada ou melhor angulo externo.
-Se nao encontrar: {"fotos": [], "foto_principal": null, "fonte_fotos": "nenhuma encontrada"}`
-        }]
+        messages: [{ role: 'user', content: promptFotos }]
       })
     })
-    if (!res.ok) return { fotos: [], foto_principal: null }
+    if (!res.ok) {
+      // Se a chamada IA falhou mas temos og:image, usar como fallback
+      if (ogFallback) return { fotos: [ogFallback], foto_principal: ogFallback }
+      return { fotos: [], foto_principal: null }
+    }
     const data = await res.json()
     let txt = ''
     for (const block of (data.content || [])) {
       if (block.type === 'text') txt += block.text
     }
     const jsonMatch = txt.match(/\{[\s\S]*\}/)
-    if (!jsonMatch) return { fotos: [], foto_principal: null }
-    const parsed = JSON.parse(jsonMatch[0])
-    return {
-      fotos: (parsed.fotos || []).filter(f => f && f.startsWith('http')).slice(0, 12),
-      foto_principal: parsed.foto_principal || parsed.fotos?.[0] || null
+    if (!jsonMatch) {
+      if (ogFallback) return { fotos: [ogFallback], foto_principal: ogFallback }
+      return { fotos: [], foto_principal: null }
     }
+    const parsed = JSON.parse(jsonMatch[0])
+    const fotos = (parsed.fotos || []).filter(f => f && f.startsWith('http')).slice(0, 12)
+    let fotoPrincipal = parsed.foto_principal || fotos[0] || null
+
+    // Se IA nao encontrou fotos, usar og:image como fallback
+    if (!fotoPrincipal && ogFallback) {
+      fotoPrincipal = ogFallback
+      if (!fotos.length) fotos.push(ogFallback)
+    }
+
+    return { fotos, foto_principal: fotoPrincipal }
   } catch {
+    // Fallback final: og:image
+    if (ogFallback) return { fotos: [ogFallback], foto_principal: ogFallback }
     return { fotos: [], foto_principal: null }
   }
 }

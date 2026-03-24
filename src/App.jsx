@@ -3,6 +3,7 @@ import { stLoad, stSave } from "./storage.js"
 import Charts from "./components/Charts.jsx"
 import Timeline from "./components/Timeline.jsx"
 import MobileNav from "./components/MobileNav.jsx"
+import { useIsMobile } from "./hooks/useIsMobile.js"
 import BuscaGPT from "./components/BuscaGPT.jsx"
 import { useAuth } from "./lib/AuthContext.jsx"
 import Login from "./pages/Login.jsx"
@@ -59,14 +60,31 @@ const RED = "#E5484D"
 // Normalizar texto de alertas — corrige double-encoding UTF-8 e converte tags para emojis
 function normalizarTextoAlerta(texto) {
   if (!texto) return ''
-  return texto
-    .replace(/Ã°Â[^\s]*/g, '')
+
+  // Decodificar double-encoding UTF-8 (latin1 interpretado como UTF-8)
+  let s = texto
+  try {
+    s = decodeURIComponent(escape(texto))
+  } catch {
+    s = texto
+  }
+
+  // Limpar padrões garbled específicos
+  s = s
+    .replace(/ÃÂÂ°ÃÂÃÂÃÂÃÂÃÂÃÂÃÂ°/g, '⚠️')
+    .replace(/Ã°ÂÃÂÃ°/g, '⚠️')
+    .replace(/Ã°Â\S*/g, '')
+    .replace(/ÃÂÂ[^\s]*/g, '')
     .replace(/Ã¢ÂÂ[^\s]*/g, '')
-    .replace(/[\uFFFD]/g, '')
+    .replace(/[\uFFFD\uFFFE\uFFFF]/g, '')
+    // Tags de texto para emojis
     .replace(/\[CRITICO\]/gi, '🔴')
     .replace(/\[ATENCAO\]/gi, '⚠️')
     .replace(/\[OK\]/gi, '✅')
+    .replace(/\[INFO\]/gi, '💡')
     .trim()
+
+  return s
 }
 const scoreColor = s => s >= 7.5 ? C.emerald : s >= 6 ? C.emerald : s >= 4.5 ? C.mustard : RED
 const scoreLabel = s => s >= 7.5 ? "FORTE" : s >= 6 ? "BOM" : s >= 4.5 ? "MÉDIO" : "FRACO"
@@ -612,7 +630,7 @@ function ApiKeyModal({onClose}) {
 }
 
 // ── NOVO IMÓVEL ───────────────────────────────────────────────────────────────
-function NovoImovel({onSave,onCancel,trello,parametrosBanco,criteriosBanco}) {
+function NovoImovel({onSave,onCancel,trello,parametrosBanco,criteriosBanco,isPhone}) {
   const [url,setUrl]=useState("")
   const [loading,setLoading]=useState(false)
   const [step,setStep]=useState("")
@@ -647,7 +665,7 @@ function NovoImovel({onSave,onCancel,trello,parametrosBanco,criteriosBanco}) {
 
   return <div>
     <Hdr title="Analisar Imóvel" sub="Cole o link do leilão — IA busca e analisa tudo automaticamente"/>
-    <div style={{padding:"24px 28px",maxWidth:"640px"}}>
+    <div style={{padding:isPhone?"20px 16px":"24px 28px",maxWidth:"640px"}}>
       {trello?.listId
         ?<div style={{background:`${K.trello}15`,border:`1px solid ${K.trello}40`,borderRadius:"7px",padding:"12px 16px",marginBottom:"18px",display:"flex",alignItems:"center",gap:"10px"}}>
           <span style={{fontSize:"18px"}}>🔷</span>
@@ -661,7 +679,7 @@ function NovoImovel({onSave,onCancel,trello,parametrosBanco,criteriosBanco}) {
 
       <div style={{marginBottom:"16px"}}>
         <div style={{fontSize:"10px",color:K.t3,textTransform:"uppercase",letterSpacing:"1px",marginBottom:"6px"}}>Link do Leilão *</div>
-        <input style={{...inp,fontSize:"14px"}} placeholder="https://venda-imoveis.caixa.gov.br/..." value={url} onChange={e=>setUrl(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")analyze()}}/>
+        <input type="url" inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false} style={{...inp,fontSize:isPhone?16:14,padding:isPhone?'14px 16px':'10px 14px'}} placeholder="https://venda-imoveis.caixa.gov.br/..." value={url} onChange={e=>setUrl(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")analyze()}}/>
         <div style={{fontSize:"11px",color:K.t3,marginTop:"5px"}}>Portal CAIXA, sites de leiloeiros, qualquer anúncio público</div>
 
       <div style={{marginTop:"12px"}}>
@@ -701,9 +719,9 @@ function NovoImovel({onSave,onCancel,trello,parametrosBanco,criteriosBanco}) {
         <div style={{fontSize:"11px",color:K.t3,marginTop:"6px"}}>Pode levar 20-40 segundos...</div>
       </div>}
 
-      <div style={{display:"flex",gap:"10px"}}>
-        <button style={btn()} onClick={analyze} disabled={loading}>{loading?"⏳ Analisando...":"🔍 Analisar Imóvel"}</button>
-        <button style={btn("s")} onClick={onCancel}>Cancelar</button>
+      <div style={{display:"flex",flexDirection:isPhone?'column':'row',gap:"10px"}}>
+        <button style={{...btn(),width:isPhone?'100%':'auto',padding:isPhone?'14px':'9px 20px'}} onClick={analyze} disabled={loading}>{loading?"⏳ Analisando...":"🔍 Analisar Imóvel"}</button>
+        <button style={{...btn("s"),width:isPhone?'100%':'auto'}} onClick={onCancel}>Cancelar</button>
       </div>
     </div>
   </div>
@@ -995,7 +1013,7 @@ function MetricCard({ titulo, valor, aux, badge, badgeColor, badgeBg, icon: Icon
 }
 
 // ── DASHBOARD ─────────────────────────────────────────────────────────────────
-function Dashboard({props,onNav,profile:prof}) {
+function Dashboard({props,onNav,profile:prof,isMobile,isPhone}) {
   const total=props.length, comprar=props.filter(p=>p.recomendacao==="COMPRAR").length
   const forte=props.filter(p=>(p.score_total||0)>=7.5).length
   const avg=total?(props.reduce((s,p)=>s+(p.score_total||0),0)/total).toFixed(1):"0"
@@ -1007,9 +1025,9 @@ function Dashboard({props,onNav,profile:prof}) {
 
   return <div style={{background:C.bg,minHeight:"100%"}}>
     <AxisHeader profile={prof} imoveis={props} onNav={onNav} />
-    <div style={{padding:"28px 32px",display:"flex",flexDirection:"column",gap:20}}>
+    <div style={{padding:isPhone?"20px 16px":"28px 32px",display:"flex",flexDirection:"column",gap:20}}>
       {/* Linha 1: 3 colunas — Patrimônio | Valorização | Alertas */}
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:18}}>
+      <div style={{display:"grid",gridTemplateColumns:isPhone?"1fr":isMobile?"repeat(2,1fr)":"1fr 1fr 1fr",gap:18}}>
         {/* Card 1 — Patrimônio Monitorado (verde escuro) */}
         <div style={{
           background:"#064E3B",borderRadius:14,padding:"22px 24px",
@@ -1894,7 +1912,7 @@ function CalculadoraROI({ imovel }) {
               <p style={{ margin:'0 0 4px', fontSize:10, color:C.muted }}>Entrada (%)</p>
               <input type="range" min="10" max="90" value={entrada}
                 onChange={e => setEntrada(+e.target.value)}
-                style={{ width:'100%', accentColor: C.emerald }} />
+                style={{ width:'100%', accentColor: C.emerald, touchAction:'none' }} />
               <p style={{ margin:0, fontSize:11, fontWeight:600, color:C.navy,
                 textAlign:'center' }}>{entrada}% = {fmt(entradaValor)}</p>
             </div>
@@ -1902,7 +1920,7 @@ function CalculadoraROI({ imovel }) {
               <p style={{ margin:'0 0 4px', fontSize:10, color:C.muted }}>Vender em (meses)</p>
               <input type="range" min="6" max="60" step="6" value={prazoVenda}
                 onChange={e => setPrazoVenda(+e.target.value)}
-                style={{ width:'100%', accentColor: C.emerald }} />
+                style={{ width:'100%', accentColor: C.emerald, touchAction:'none' }} />
               <p style={{ margin:0, fontSize:11, fontWeight:600, color:C.navy,
                 textAlign:'center' }}>{prazoVenda} meses</p>
             </div>
@@ -1993,7 +2011,7 @@ function ModoAoVivo({ imovel, onClose }) {
 }
 
 // ── PAINEL PORTFÓLIO ─────────────────────────────────────────────────────────
-function PainelPortfolio({ props: imoveis }) {
+function PainelPortfolio({ props: imoveis, isMobile, isPhone }) {
   const STATUS = {
     analisado:   { label:'Em análise',  color:C.mustard, emoji:'🔍' },
     aprovado:    { label:'Aprovado',    color:C.emerald, emoji:'✅' },
@@ -2025,7 +2043,7 @@ function PainelPortfolio({ props: imoveis }) {
       <p style={{ margin:'0 0 24px', fontSize:13, color:C.muted }}>
         Visão consolidada do grupo — {imoveis.length} ativos rastreados
       </p>
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12, marginBottom:24 }}>
+      <div style={{ display:'grid', gridTemplateColumns:isPhone?'1fr':isMobile?'repeat(2,1fr)':'repeat(4,1fr)', gap:12, marginBottom:24 }}>
         {[
           ['Total rastreado', imoveis.length, 'imóveis', C.navy],
           ['Aprovados (COMPRAR)', aprovados, 'imóveis', C.emerald],
@@ -2089,7 +2107,7 @@ function PainelPortfolio({ props: imoveis }) {
 }
 
 // ── DETAIL ────────────────────────────────────────────────────────────────────
-function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze,isAdmin,onArchive}) {
+function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze,isAdmin,onArchive,isMobile,isPhone}) {
   const [sending,setSending]=useState(false)
   const [modoAoVivo, setModoAoVivo]=useState(false)
   const [msg,setMsg]=useState("")
@@ -2156,17 +2174,17 @@ function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze,isAdmin,onArch
         {isAdmin&&<button style={{...btn("d"),padding:"5px 12px",fontSize:"12px"}} onClick={()=>{if(confirm("Excluir?"))onDelete(p.id)}}>🗑</button>}
       </>}/>
     {/* Tabs */}
-    <div style={{display:"flex",gap:0,borderBottom:`1px solid ${K.bd}`,padding:"0 28px",background:K.s1}}>
+    <div style={{display:"flex",gap:isPhone?4:0,borderBottom:`1px solid ${K.bd}`,padding:isPhone?"0 16px":"0 28px",background:K.s1,overflowX:isPhone?'auto':'visible',scrollbarWidth:'none',WebkitOverflowScrolling:'touch',msOverflowStyle:'none'}}>
       {[{id:'resumo',label:'📊 Resumo'},{id:'juridico',label:'⚖️ Jurídico'},{id:'fotos',label:'📸 Fotos'},{id:'mercado',label:'🏙️ Mercado'}].map(tab=>(
         <button key={tab.id} onClick={()=>setAbaDetalhe(tab.id)} style={{
-          background:"none",border:"none",padding:"10px 18px",fontSize:"12.5px",fontWeight:abaDetalhe===tab.id?700:500,
+          background:"none",border:"none",padding:isPhone?"10px 12px":"10px 18px",fontSize:"12.5px",fontWeight:abaDetalhe===tab.id?700:500,whiteSpace:'nowrap',flexShrink:0,
           color:abaDetalhe===tab.id?K.teal:K.t3,cursor:"pointer",
           borderBottom:abaDetalhe===tab.id?`2px solid ${K.teal}`:"2px solid transparent",
           transition:"all 0.15s",
         }}>{tab.label}</button>
       ))}
     </div>
-    <div style={{padding:"20px 28px"}}>
+    <div style={{padding:isPhone?"16px":"20px 28px"}}>
       {msg&&<div style={{background:`${K.teal}10`,border:`1px solid ${K.teal}30`,borderRadius:"6px",padding:"10px",marginBottom:"14px",fontSize:"12px",color:K.teal}}>{msg}</div>}
       {reanalyzing&&reStep&&<div style={{background:`${K.amb}10`,border:`1px solid ${K.amb}30`,borderRadius:"7px",padding:"12px 16px",marginBottom:"14px",display:"flex",alignItems:"center",gap:"10px"}}>
         <div style={{width:8,height:8,borderRadius:"50%",background:K.amb,animation:"pulse 1s infinite",flexShrink:0}}/>
@@ -2251,7 +2269,7 @@ function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze,isAdmin,onArch
           </p>
         </div>
       )}
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"14px",marginBottom:"14px"}}>
+      <div style={{display:"grid",gridTemplateColumns:isPhone?"1fr":"1fr 1fr",gap:"14px",marginBottom:"14px"}}>
         <div style={card()}>
           <div style={{fontWeight:"600",color:K.wh,marginBottom:"12px",fontSize:"13px"}}>💰 Valores</div>
           {[["Avaliação",fmtC(p.valor_avaliacao),K.t2],["Lance mínimo",fmtC(p.valor_minimo),K.amb],["Desconto",p.desconto_percentual?`${p.desconto_percentual}%`:"—",K.grn],["Preço/m² imóvel",p.preco_m2_imovel?`R$ ${p.preco_m2_imovel}/m²`:"—",K.teal],["Preço/m² mercado",p.preco_m2_mercado?`R$ ${p.preco_m2_mercado}/m²`:"—",K.t2],["Aluguel estimado",fmtC(p.aluguel_mensal_estimado)+"/mês",K.pur]].map(([l,v,c])=>(
@@ -2274,7 +2292,7 @@ function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze,isAdmin,onArch
       </div>
       <div style={{...card(),marginBottom:"14px"}}>
         <div style={{fontWeight:"600",color:K.wh,marginBottom:"14px",fontSize:"13px"}}>📊 Score por Dimensão</div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"10px"}}>
+        <div style={{display:"grid",gridTemplateColumns:isPhone?"1fr":isMobile?"repeat(2,1fr)":"repeat(3,1fr)",gap:"10px"}}>
           {scores.map(({l,v,w})=>(
             <div key={l} style={{background:K.s2,borderRadius:"6px",padding:"10px"}}>
               <div style={{display:"flex",justifyContent:"space-between",marginBottom:"6px"}}>
@@ -2295,7 +2313,7 @@ function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze,isAdmin,onArch
       <div style={{...card(),marginBottom:"14px"}}>
         <CalculadoraROI imovel={p} />
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"14px",marginBottom:"14px"}}>
+      <div style={{display:"grid",gridTemplateColumns:isPhone?"1fr":"1fr 1fr",gap:"14px",marginBottom:"14px"}}>
         <div style={card()}>
           <div style={{fontWeight:"600",color:K.wh,marginBottom:"12px",fontSize:"13px"}}>⚖️ Jurídico</div>
           {[["Processos",p.processos_ativos,{Nenhum:K.grn,Possível:K.amb,Confirmado:K.red,Desconhecido:K.t3}],
@@ -2321,7 +2339,7 @@ function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze,isAdmin,onArch
         </div>
       </div>
       {/* Preço/m² e Comparáveis */}
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"14px",marginBottom:"14px"}}>
+      <div style={{display:"grid",gridTemplateColumns:isPhone?"1fr":"1fr 1fr",gap:"14px",marginBottom:"14px"}}>
         <div style={card()}>
           <div style={{fontWeight:"600",color:K.wh,marginBottom:"12px",fontSize:"13px"}}>💰 Preço/m²</div>
           <div style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:`1px solid ${K.bd}`}}>
@@ -2370,7 +2388,7 @@ function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze,isAdmin,onArch
         </div>
         {p.responsabilidade_fonte&&<div style={{fontSize:"10.5px",color:K.t3,marginTop:"4px"}}>Fonte: {p.responsabilidade_fonte}</div>}
       </div>}
-      {(p.positivos?.length>0||p.negativos?.length>0)&&<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"14px",marginBottom:"14px"}}>
+      {(p.positivos?.length>0||p.negativos?.length>0)&&<div style={{display:"grid",gridTemplateColumns:isPhone?"1fr":"1fr 1fr",gap:"14px",marginBottom:"14px"}}>
         <div style={{...card(),borderTop:`2px solid ${K.grn}`}}>
           <div style={{fontWeight:"600",color:K.grn,marginBottom:"10px",fontSize:"13px"}}>✅ Pontos Positivos</div>
           {(p.positivos||[]).map((pt,i)=><div key={i} style={{fontSize:"12.5px",color:K.tx,marginBottom:"6px",display:"flex",gap:"8px"}}><span style={{color:K.grn}}>+</span>{normalizarTextoAlerta(pt)}</div>)}
@@ -2712,6 +2730,8 @@ export default function App() {
 const [parametrosBanco,setParametrosBanco]=useState([])
 const [criteriosBanco,setCriteriosBanco]=useState([])
   const [apiOk,setApiKey]=useState(localStorage.getItem("axis-api-key"))
+  const isMobile = useIsMobile(900)
+  const isPhone  = useIsMobile(480)
 useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("parametros_score").select("*");if(pr)setParametrosBanco(pr);const{data:cr}=await supabase.from("criterios_avaliacao").select("*");if(cr)setCriteriosBanco(cr)}catch(e){console.warn("parametros:",e)}}lp()},[])
 
   // Garante IDs fixos dos boards AXIS no localStorage
@@ -2948,16 +2968,16 @@ useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("param
 
     {/* CONTENT */}
     <div style={{flex:1,overflowY:"auto",background:C.offwhite,display:"flex",flexDirection:"column",minWidth:0}}>
-      {view==="dashboard"&&<Dashboard props={props} onNav={nav} profile={profile}/>}
-  {view==="novo"&&(isAdmin?<NovoImovel onSave={addProp} onCancel={()=>nav("imoveis")} trello={trello} parametrosBanco={parametrosBanco} criteriosBanco={criteriosBanco}/>:<AcessoNegado mensagem="Análise de imóveis é restrita ao administrador."/>)}
+      {view==="dashboard"&&<Dashboard props={props} onNav={nav} profile={profile} isMobile={isMobile} isPhone={isPhone}/>}
+  {view==="novo"&&(isAdmin?<NovoImovel onSave={addProp} onCancel={()=>nav("imoveis")} trello={trello} parametrosBanco={parametrosBanco} criteriosBanco={criteriosBanco} isPhone={isPhone}/>:<AcessoNegado mensagem="Análise de imóveis é restrita ao administrador."/>)}
       {view==="imoveis"&&<Lista props={props} onNav={nav} onDelete={delProp} trello={trello} onUpdateProp={(id,updates)=>setProps(ps=>ps.map(p=>p.id===id?{...p,...updates}:p))}/>}
-      {view==="detail"&&<Detail p={selP} onDelete={delProp} onNav={nav} trello={trello} onUpdateProp={(id,updates)=>setProps(ps=>ps.map(p=>p.id===id?{...p,...updates}:p))} isAdmin={isAdmin} onArchive={handleArquivar}/>}
+      {view==="detail"&&<Detail p={selP} onDelete={delProp} onNav={nav} trello={trello} onUpdateProp={(id,updates)=>setProps(ps=>ps.map(p=>p.id===id?{...p,...updates}:p))} isAdmin={isAdmin} onArchive={handleArquivar} isMobile={isMobile} isPhone={isPhone}/>}
       {view==="comparar"&&<Comparativo props={props}/>}
     {view==="busca"&&(isAdmin?<BuscaGPT onAnalisar={(link)=>{nav("novo");setTimeout(()=>{},100)}}/>:<AcessoNegado mensagem="Busca com IA é restrita ao administrador."/>)}
     {view==="graficos"&&<div><div style={{padding:"22px 28px 16px",borderBottom:`1px solid ${C.borderW}`,background:C.white}}><div style={{fontWeight:700,fontSize:19,color:C.text}}>Gráficos</div></div><div style={{padding:"20px 28px"}}><Charts properties={props}/></div></div>}
     {view==="tarefas"&&<Tarefas/>}
     {view==="arquivados"&&<BancoArquivados session={session} isAdmin={isAdmin}/>}
-    {view==="portfolio"&&isAdmin&&<PainelPortfolio props={props}/>}
+    {view==="portfolio"&&isAdmin&&<PainelPortfolio props={props} isMobile={isMobile} isPhone={isPhone}/>}
     {view==="admin"&&isAdmin&&<div>
       <PainelConvitesAdmin session={session}/>
       <div style={{borderTop:`1px solid ${C.borderW}`,marginTop:24}}><AdminPanel/></div>
