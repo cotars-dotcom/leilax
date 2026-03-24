@@ -210,6 +210,24 @@ Retornar no JSON: escopo_reforma, custo_reforma_estimado, alerta_sobrecap
 export async function pesquisarMercadoGPT(url, cidade, tipo, openaiKey) {
   if (!openaiKey) return null
 
+  // Cache de mercado 72h — evitar chamar ChatGPT para mesma URL
+  const cacheKey = `mkt_${(url||'').replace(/[^a-zA-Z0-9]/g,'_').slice(0,120)}`
+  try {
+    const { supabase } = await import('./supabase')
+    const { data: cached } = await supabase
+      .from('cache_mercado')
+      .select('dados, atualizado_em')
+      .eq('chave', cacheKey)
+      .single()
+    if (cached?.atualizado_em) {
+      const horas = (Date.now() - new Date(cached.atualizado_em)) / 3_600_000
+      if (horas < 72) {
+        console.log('[AXIS Cache] Mercado em cache para:', cacheKey)
+        return cached.dados
+      }
+    }
+  } catch {}
+
   const prompt = `Você é um especialista em mercado imobiliário brasileiro.
 Pesquise na internet dados ATUAIS sobre este imóvel de leilão: ${url}
 
@@ -301,7 +319,17 @@ Retorne APENAS JSON válido (sem markdown):
       .filter(c => c.type === 'output_text')
       .map(c => c.text)
       .join('') || ''
-    return JSON.parse(txt.replace(/```json|```/g, '').trim())
+    const resultado = JSON.parse(txt.replace(/```json|```/g, '').trim())
+    // Salvar no cache
+    try {
+      const { supabase } = await import('./supabase')
+      await supabase.from('cache_mercado').upsert({
+        chave: cacheKey,
+        dados: resultado,
+        atualizado_em: new Date().toISOString()
+      }, { onConflict: 'chave' })
+    } catch(e) { console.warn('[AXIS Cache] Falha ao salvar cache:', e.message) }
+    return resultado
   } catch (e) {
     console.warn('[AXIS] ChatGPT indisponível:', e.message)
     return null

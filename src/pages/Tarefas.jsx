@@ -1,6 +1,7 @@
 import{useState,useEffect}from'react'
 import{getTarefas,saveTarefa,updateTarefaStatus,getAllProfiles}from'../lib/supabase'
 import{useAuth}from'../lib/AuthContext'
+import{useIsMobile}from'../hooks/useIsMobile.js'
 
 const K={bg:'#080B10',s1:'#111620',s2:'#171E2C',bd:'#1C2438',teal:'#00E5BB',red:'#FF4757',tx:'#DDE4F0',t2:'#8896B0',t3:'#3D4E6A',wh:'#FFFFFF',warn:'#FFB627',green:'#2ECC71'}
 
@@ -19,6 +20,7 @@ const PRIOS=[
 ]
 
 export default function Tarefas(){
+  const isPhone=useIsMobile(480)
   const{profile,isAdmin}=useAuth()
   const[tarefas,setTarefas]=useState([])
   const[profiles,setProfiles]=useState([])
@@ -68,7 +70,7 @@ export default function Tarefas(){
   if(loading)return<div style={{color:K.teal,padding:'40px',textAlign:'center',fontFamily:'system-ui'}}>⏳ Carregando tarefas...</div>
 
   return<div style={{fontFamily:"'DM Sans',system-ui,sans-serif",color:K.tx,minHeight:'100%',background:K.bg}}>
-    <div style={{padding:'22px 28px 16px',borderBottom:'1px solid '+K.bd,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+    <div style={{padding:isPhone?'16px 16px 12px':'22px 28px 16px',borderBottom:'1px solid '+K.bd,display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:10}}>
       <div style={{fontWeight:700,fontSize:19,color:K.wh}}>✅ Tarefas</div>
       <div style={{display:'flex',gap:'10px',alignItems:'center'}}>
         {isAdmin&&<select value={filtroMembro} onChange={e=>setFiltroMembro(e.target.value)} style={{...inp,width:'auto',padding:'7px 10px'}}>
@@ -79,7 +81,7 @@ export default function Tarefas(){
       </div>
     </div>
 
-    <div style={{padding:'20px 28px',display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:'16px',overflowX:'auto'}}>
+    <div style={{padding:isPhone?'16px':'20px 28px',display:'grid',gridTemplateColumns:isPhone?'repeat(4,minmax(240px,1fr))':'repeat(4,1fr)',gap:isPhone?'12px':'16px',overflowX:'auto',WebkitOverflowScrolling:'touch'}}>
       {COLS.map(col=>{
         const items=tarefasFiltradas.filter(t=>t.status===col.id)
         return<div key={col.id} style={{background:K.s1,border:'1px solid '+K.bd,borderRadius:'12px',padding:'14px',minHeight:'400px'}}>
@@ -111,8 +113,8 @@ export default function Tarefas(){
       })}
     </div>
 
-    {showModal&&<div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000}}>
-      <div style={{background:K.s1,border:'1px solid '+K.bd,borderRadius:'14px',padding:'28px',width:'100%',maxWidth:'480px'}}>
+    {showModal&&<div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000,padding:isPhone?'16px':0}}>
+      <div style={{background:K.s1,border:'1px solid '+K.bd,borderRadius:'14px',padding:isPhone?'20px':'28px',width:'90vw',maxWidth:'480px',maxHeight:'90vh',overflowY:'auto'}}>
         <div style={{fontWeight:700,fontSize:'16px',color:K.wh,marginBottom:'20px'}}>+ Nova Tarefa</div>
         <form onSubmit={handleSave}>
           <div style={{marginBottom:'14px'}}>

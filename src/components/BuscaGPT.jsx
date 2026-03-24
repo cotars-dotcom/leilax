@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useIsMobile } from "../hooks/useIsMobile.js";
 
 const K = {
   bg:"#080B10", s1:"#111620", s2:"#171E2C", bd:"#1C2438",
@@ -66,6 +67,7 @@ Retorne no mínimo 3 e no máximo 10 imóveis relevantes.`;
 }
 
 export default function BuscaGPT({ onAnalisar }) {
+  const isPhone = useIsMobile(480);
   const [cidade, setCidade] = useState("");
   const [tipo, setTipo] = useState("Apartamento");
   const [maxValor, setMaxValor] = useState("");
@@ -93,7 +95,7 @@ export default function BuscaGPT({ onAnalisar }) {
   const fmtC = v => v ? `R$ ${Number(v).toLocaleString("pt-BR")}` : "—";
 
   return (
-    <div style={{ padding: "20px 28px" }}>
+    <div style={{ padding: isPhone ? "16px" : "20px 28px" }}>
       <div style={{ fontWeight: 700, fontSize: 19, color: K.wh, marginBottom: 4 }}>🔎 Busca de Imóveis com ChatGPT</div>
       <div style={{ fontSize: 11, color: K.t3, marginBottom: 20 }}>ChatGPT busca em tempo real nos portais de leilão brasileiros</div>
 
@@ -115,7 +117,7 @@ export default function BuscaGPT({ onAnalisar }) {
         )}
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr", gap: 12, marginBottom: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isPhone ? "1fr" : "2fr 1fr 1fr 1fr", gap: 12, marginBottom: 16 }}>
         <div>
           <div style={{ fontSize: 10, color: K.t3, textTransform: "uppercase", letterSpacing: 1, marginBottom: 5 }}>Cidade / Região *</div>
           <input style={inp} placeholder="Ex: Belo Horizonte MG" value={cidade} onChange={e => setCidade(e.target.value)} onKeyDown={e => e.key === "Enter" && buscar()} />
@@ -157,7 +159,7 @@ export default function BuscaGPT({ onAnalisar }) {
           <div style={{ fontWeight: 600, color: K.wh, marginBottom: 12 }}>
             {results.total_encontrados || results.imoveis?.length || 0} imóveis encontrados em {results.regiao_pesquisada}
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: isPhone ? "1fr" : "repeat(auto-fill, minmax(300px, 1fr))", gap: 12 }}>
             {(results.imoveis || []).map((im, i) => (
               <div key={i} style={{ background: "#111620", border: `1px solid ${K.bd}`, borderRadius: 8, padding: 16 }}>
                 <div style={{ fontWeight: 600, fontSize: 13, color: K.wh, marginBottom: 4 }}>{im.titulo}</div>

@@ -1,5 +1,18 @@
 export const MERCADO_REGIONAL = {
-  // ── BELO HORIZONTE ──────────────────────────────────────────────
+  // ── BELO HORIZONTE (GERAL) ────────────────────────────────────────
+  bh_geral: {
+    label: "BH Geral",
+    cidade: "Belo Horizonte",
+    preco_m2_venda_medio: 10595,
+    preco_m2_locacao: 48.28,
+    yield_bruto_pct: 5.16,
+    tendencia_loc_12m: 10.52,
+    variacao_mensal_loc: 0.21,
+    fonte: 'FipeZAP Locação Residencial fev/2026',
+    atualizado_em: '2026-02',
+  },
+
+  // ── BELO HORIZONTE (ZONAS) ────────────────────────────────────────
   bh_centro_sul: {
     label: "BH Centro-Sul",
     cidade: "Belo Horizonte",

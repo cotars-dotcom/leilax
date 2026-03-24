@@ -18,6 +18,15 @@ export const REFERENCIAS_BH = Object.freeze({
   variacao_12m_contagem: 0.0333,
   yield_medio_bh:        5.80,
   ticket_medio_bh:       613344,
+  // FipeZAP Locação Residencial fev/2026
+  preco_m2_locacao_bh:      48.28,
+  variacao_mensal_loc:       0.0021,
+  variacao_12m_locacao:      0.1052,
+  variacao_bimestre_loc:     0.0055,
+  rental_yield_bh_anual:     5.16,
+  preco_m2_locacao_brasil:   51.89,
+  fonte_locacao: 'FipeZAP Locação Residencial fev/2026',
+  atualizado_locacao_em: '2026-02',
   fonte: 'FipeZAP fev/2026 + QuintoAndar 3T2025 + Secovi-MG jul/2025',
   atualizado_em: '2026-02',
 })
@@ -25,6 +34,15 @@ export const REFERENCIAS_BH = Object.freeze({
 export const YIELD_POR_ZONA = Object.freeze({
   'Centro Sul': 5.30, 'Oeste': 5.70, 'Nordeste': 6.40,
   'Leste': 5.90, 'Pampulha': 6.40, 'Noroeste': 6.40, 'Norte': 6.60,
+})
+
+export const YIELD_FIPEZAP_BH = Object.freeze({
+  bh_geral:    5.16,  // FipeZAP fev/2026 — sobre preço anúncio
+  // Nota: yield QuintoAndar (sobre preço contrato) é maior
+  // Centro Sul: 5.30% (QA) vs ~4.8% (FZ) — diferença pela discrepância asking/closing
+  // Norte: 6.60% (QA) — maior yield pois preços de anúncio são mais baixos
+  fonte: 'FipeZAP Locação Residencial fev/2026',
+  metodologia: 'preço_anuncio_locacao / preço_anuncio_venda',
 })
 
 export const PRECO_M2_POR_ZONA = Object.freeze({
@@ -42,10 +60,12 @@ export const BAIRROS_BH = [
     yieldBruto:5.30, tendencia12m:8.82, rankingQA:2, tipoPreco:'anuncio_fipezap' },
   { key:'bh_bairro_funcionarios', label:'Funcionários', zona:'Centro Sul',
     precoAnuncioM2:15053, precoContratoM2:11237, classeIpead:4, classeIpeadLabel:'Luxo',
-    yieldBruto:5.30, tendencia12m:8.82, rankingQA:1, tipoPreco:'anuncio_fipezap' },
+    yieldBruto:5.30, tendencia12m:8.82, rankingQA:1, tipoPreco:'anuncio_fipezap',
+    destaque_locacao:true, obs_locacao:'Top 3 bairros mais caros em locação BH (FipeZAP fev/2026)' },
   { key:'bh_bairro_gutierrez', label:'Gutierrez', zona:'Centro Sul',
     precoAnuncioM2:11024, precoContratoM2:null, classeIpead:4, classeIpeadLabel:'Luxo',
-    yieldBruto:5.30, tendencia12m:8.82, rankingQA:null, tipoPreco:'anuncio_fipezap' },
+    yieldBruto:5.30, tendencia12m:8.82, rankingQA:null, tipoPreco:'anuncio_fipezap',
+    destaque_locacao:true, obs_locacao:'Top 3 bairros mais caros em locação BH (FipeZAP fev/2026)' },
   { key:'bh_bairro_serra', label:'Serra', zona:'Centro Sul',
     precoAnuncioM2:null, precoContratoM2:9464, classeIpead:4, classeIpeadLabel:'Luxo',
     yieldBruto:5.30, tendencia12m:68.3, rankingQA:3, tipoPreco:'contrato_qa',
@@ -72,7 +92,8 @@ export const BAIRROS_BH = [
     yieldBruto:5.70, tendencia12m:8.82, rankingQA:6, tipoPreco:'contrato_qa' },
   { key:'bh_bairro_buritis', label:'Buritis', zona:'Oeste',
     precoAnuncioM2:10200, precoContratoM2:6764, classeIpead:3, classeIpeadLabel:'Alto',
-    yieldBruto:5.70, tendencia12m:6.9, rankingQA:8, tipoPreco:'anuncio_fipezap' },
+    yieldBruto:5.70, tendencia12m:6.9, rankingQA:8, tipoPreco:'anuncio_fipezap',
+    destaque_locacao:true, obs_locacao:'Top 3 bairros mais caros em locação BH (FipeZAP fev/2026)' },
   { key:'bh_bairro_luxemburgo', label:'Luxemburgo', zona:'Oeste',
     precoAnuncioM2:null, precoContratoM2:5882, classeIpead:4, classeIpeadLabel:'Luxo',
     yieldBruto:5.70, tendencia12m:8.82, rankingQA:12, tipoPreco:'contrato_qa' },
@@ -107,6 +128,48 @@ export const BAIRROS_BH = [
     precoAnuncioM2:null, precoContratoM2:null, classeIpead:2, classeIpeadLabel:'Médio',
     yieldBruto:6.60, tendencia12m:2.0, rankingQA:null, tipoPreco:'proxy_zona',
     obs:'Classe 2 Médio (5 a 8.5 SM) — dado estimado via zona Norte' },
+  { key:'bh_bairro_mangabeiras', label:'Mangabeiras', zona:'Centro Sul',
+    precoAnuncioM2:null, precoContratoM2:null,
+    classeIpead:4, classeIpeadLabel:'Luxo',
+    yieldBruto:5.30, tendencia12m:8.82, rankingQA:null,
+    tipoPreco:'proxy_zona',
+    obs:'Dado específico pendente — usar proxy zona Centro Sul' },
+  { key:'bh_bairro_belvedere', label:'Belvedere', zona:'Centro Sul',
+    precoAnuncioM2:null, precoContratoM2:null,
+    classeIpead:4, classeIpeadLabel:'Luxo',
+    yieldBruto:5.30, tendencia12m:8.82, rankingQA:null,
+    tipoPreco:'proxy_zona',
+    obs:'Inclui Belvedere Nova Lima — verificar divisa' },
+  { key:'bh_bairro_santa_lucia', label:'Santa Lúcia', zona:'Centro Sul',
+    precoAnuncioM2:null, precoContratoM2:null,
+    classeIpead:4, classeIpeadLabel:'Luxo',
+    yieldBruto:5.30, tendencia12m:8.82, rankingQA:null,
+    tipoPreco:'proxy_zona',
+    obs:'Dado específico pendente' },
+  { key:'bh_bairro_carmo', label:'Carmo', zona:'Centro Sul',
+    precoAnuncioM2:null, precoContratoM2:null,
+    classeIpead:4, classeIpeadLabel:'Luxo',
+    yieldBruto:5.30, tendencia12m:8.82, rankingQA:null,
+    tipoPreco:'proxy_zona',
+    obs:'Dado específico pendente' },
+  { key:'bh_bairro_floresta', label:'Floresta', zona:'Leste',
+    precoAnuncioM2:null, precoContratoM2:null,
+    classeIpead:3, classeIpeadLabel:'Alto',
+    yieldBruto:5.90, tendencia12m:8.82, rankingQA:null,
+    tipoPreco:'proxy_zona',
+    obs:'Bairro histórico próximo ao centro' },
+  { key:'bh_bairro_prado', label:'Prado', zona:'Oeste',
+    precoAnuncioM2:null, precoContratoM2:null,
+    classeIpead:3, classeIpeadLabel:'Alto',
+    yieldBruto:5.70, tendencia12m:8.82, rankingQA:null,
+    tipoPreco:'proxy_zona',
+    obs:'Dado específico pendente' },
+  { key:'bh_bairro_barro_preto', label:'Barro Preto', zona:'Centro Sul',
+    precoAnuncioM2:null, precoContratoM2:null,
+    classeIpead:3, classeIpeadLabel:'Alto',
+    yieldBruto:5.30, tendencia12m:8.82, rankingQA:null,
+    tipoPreco:'proxy_zona',
+    obs:'Polo médico BH — demanda por locação alta' },
 ]
 
 // Função principal — buscar dados de bairro por nome
