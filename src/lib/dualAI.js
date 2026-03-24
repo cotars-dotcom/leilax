@@ -6,7 +6,24 @@
 // Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 
 import { detectarRegiao, getMercado } from '../data/mercado_regional.js'
-import metricasBH, { BAIRROS_BH, calcGapPrecoPct, getClasseIPEAD, calcScoreAxis } from '../data/metricas_bairros_bh.js'
+import {
+  BAIRROS_BH,
+  getBairroDados,
+  calcGapPrecoPct,
+  getClasseIPEAD,
+  REFERENCIAS_BH,
+  YIELD_POR_ZONA,
+} from '../data/metricas_bairros_bh.js'
+import {
+  calcularCustoReforma,
+  verificarSobrecapitalizacao,
+  detectarClasseMercado,
+} from '../data/custos_reforma.js'
+import {
+  RISCOS_JURIDICOS,
+  REGRAS_MODALIDADE,
+  calcularCustoJuridico,
+} from '../data/riscos_juridicos.js'
 
 const CLAUDE_MODEL = 'claude-sonnet-4-20250514'
 const GPT_MODEL = 'gpt-4o'
@@ -746,22 +763,30 @@ DADOS DE MERCADO DA REGIÃO (use para calibrar os scores):
 
   // ── Enriquecimento com dados por bairro (metricas_bairros_bh.js) ──
   const bairroNome = dadosGPT?.bairro || ''
-  const bairroData = BAIRROS_BH[bairroNome.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')]
+  const dadosBairro = getBairroDados(bairroNome)
+  const gapPctBairro = dadosBairro ? calcGapPrecoPct(dadosBairro) : null
+  const classeIPEAD = dadosBairro
+    ? { classe: dadosBairro.classeIpead, label: dadosBairro.classeIpeadLabel }
+    : getClasseIPEAD(bairroNome)
   let contextoBairro = ''
-  if (bairroData) {
-    const gapPct = calcGapPrecoPct(bairroData.preco_m2?.asking, bairroData.preco_m2?.closing)
-    const classeIPEAD = getClasseIPEAD(bairroNome)
+  if (dadosBairro) {
     contextoBairro = `
-DADOS DO BAIRRO (fonte: QuintoAndar 3T2025 + FipeZAP Fev/2026 + IPEAD/UFMG):
-- Bairro: ${bairroData.nome} (${bairroData.zona})
-- Classe IPEAD: ${classeIPEAD?.classe || 'N/A'} (${classeIPEAD?.label || 'N/A'})
-- Preço anúncio (asking): R$ ${bairroData.preco_m2?.asking?.toLocaleString('pt-BR')}/m²
-- Preço contrato (closing): R$ ${bairroData.preco_m2?.closing?.toLocaleString('pt-BR') || 'N/D'}/m²
-- Gap asking/closing: ${gapPct ? gapPct.toFixed(1) + '%' : 'N/D'}
-- Tendência 12m: ${bairroData.tendencia_12m || 'N/D'}%
-- Yield bruto: ${bairroData.yield_bruto_pct || 'N/D'}%
-- Demanda: ${bairroData.demanda}
+DADOS DE BAIRRO (granularidade fina — ${dadosBairro.label}):
+- Zona: ${dadosBairro.zona}
+- Preço anúncio (FipeZAP fev/2026): ${dadosBairro.precoAnuncioM2 ? `R$ ${dadosBairro.precoAnuncioM2.toLocaleString('pt-BR')}/m²` : 'não disponível'}
+- Preço contrato (QuintoAndar 3T2025): ${dadosBairro.precoContratoM2 ? `R$ ${dadosBairro.precoContratoM2.toLocaleString('pt-BR')}/m²` : 'não disponível'}
+- Tipo de dado: ${dadosBairro.tipoPreco === 'proxy_zona' ? '⚠️ estimativa por zona — usar com cautela' : 'dado real de transação'}
+${gapPctBairro !== null ? `- Gap anúncio vs contrato: ${gapPctBairro.toFixed(1)}% (negociação média)` : ''}
+- Yield bruto estimado: ${dadosBairro.yieldBruto}% a.a.
+- Tendência 12m: ${dadosBairro.tendencia12m > 20 ? `⚠️ ${dadosBairro.tendencia12m}% (verificar amostra)` : `${dadosBairro.tendencia12m}%`}
+- Classe socioeconômica IPEAD: ${dadosBairro.classeIpead} — ${dadosBairro.classeIpeadLabel}
+${dadosBairro.obs ? `- Observação: ${dadosBairro.obs}` : ''}
 IMPORTANTE: Use o gap asking/closing para calibrar a negociação e o score de oportunidade.`
+  } else if (classeIPEAD) {
+    contextoBairro = `
+DADOS DE BAIRRO (parcial):
+- Classe IPEAD: ${classeIPEAD.classe} — ${classeIPEAD.label}
+- Dados de preço específico não disponíveis para este bairro`
   }
   // Append bairro context to market context
   const contextoCompleto = (contextoMercadoRegional || '') + contextoBairro
@@ -824,6 +849,55 @@ IMPORTANTE: Use o gap asking/closing para calibrar a negociação e o score de o
   // ValidaÃ§Ã£o pÃ³s-anÃ¡lise: corrigir Ã¡rea, preÃ§o/mÂ², alertas contraditÃ³rios
   progress('ð Validando dados da anÃ¡lise...')
   const analiseValidada = validarECorrigirAnalise(analise)
+
+  // Calcular custo de reforma usando a base estruturada
+  try {
+    const precoM2 = analiseValidada.preco_m2_mercado || 0
+    if (analiseValidada.area_usada_calculo_m2 && analiseValidada.escopo_reforma) {
+      const custoReforma = calcularCustoReforma({
+        area_m2: analiseValidada.area_usada_calculo_m2,
+        escopo: analiseValidada.escopo_reforma,
+        regiao_mercado: regiaoDetectada,
+        preco_m2_atual: precoM2,
+      })
+      if (custoReforma) {
+        analiseValidada.custo_reforma_calculado = custoReforma.custo_total_final
+        const valorRef = analiseValidada.valor_mercado_estimado || analiseValidada.valor_avaliacao || analiseValidada.valor_minimo
+        if (valorRef) {
+          const sobrecap = verificarSobrecapitalizacao(
+            custoReforma.custo_total_final, valorRef, regiaoDetectada, precoM2
+          )
+          if (sobrecap) {
+            analiseValidada.alerta_sobrecap = sobrecap.status
+            if (sobrecap.status !== 'verde') {
+              analiseValidada.alertas = [...(analiseValidada.alertas || []),
+                `${sobrecap.status === 'vermelho' ? '🔴' : '🟡'} ${sobrecap.mensagem}`
+              ]
+            }
+          }
+        }
+      }
+    }
+  } catch(e) { console.warn('[AXIS] Cálculo reforma:', e.message) }
+
+  // Calcular custo jurídico usando a base estruturada
+  try {
+    if (analiseValidada.riscos_presentes?.length > 0) {
+      const aluguelEst = analiseValidada.aluguel_mensal_estimado || 0
+      const custosJur = calcularCustoJuridico(analiseValidada.riscos_presentes, aluguelEst)
+      if (custosJur) {
+        if (!analiseValidada.custo_juridico_estimado)
+          analiseValidada.custo_juridico_estimado = custosJur.custo_total_max
+        if (!analiseValidada.prazo_liberacao_estimado_meses)
+          analiseValidada.prazo_liberacao_estimado_meses = custosJur.prazo_liberacao_meses_max
+      }
+    }
+    // ITBI correto por cidade (BH = 3%, outros MG = 2%)
+    const cidadeLower = (analiseValidada.cidade || '').toLowerCase()
+    if (cidadeLower.includes('belo horizonte') || cidadeLower.includes('bh'))
+      analiseValidada.itbi_pct = 3
+  } catch(e) { console.warn('[AXIS] Cálculo jurídico:', e.message) }
+
   // Recalcular score se a validaÃ§Ã£o corrigiu algo
   const scoreFinal = (analiseValidada._erros_validacao?.length || analiseValidada._avisos_validacao?.length)
     ? (analiseValidada.score_total || calcularScore(analiseValidada, parametros))

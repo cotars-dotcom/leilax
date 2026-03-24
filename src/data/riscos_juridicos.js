@@ -12,7 +12,7 @@ export const RISCOS_JURIDICOS = [
     prazo_pratico_meses_max: 24,
     custo_processual_mg_min: 514.38,
     custo_processual_mg_max: 5818.61,
-    custo_diligencias_mg: { imissao_reintegracao: 141.70, endereco_urbano: 35.40, arrombamento: 177.10 },
+    custo_diligencias_mg: { imissao_reintegracao: 148.34, endereco_urbano: 35.40, arrombamento: 177.10 },
     custo_operacional_extra_min: 5000,
     custo_operacional_extra_max: 30000,
     bloqueia_uso: true,
@@ -57,7 +57,7 @@ export const RISCOS_JURIDICOS = [
     subcategoria: "iptu_previo",
     label: "Débito IPTU anterior — Leilão judicial",
     modalidade_leilao: "judicial",
-    base_legal: "STJ repetitivo — edital não pode transferir tributos ao arrematante em hasta pública. CTN art.130 §único.",
+    base_legal: "CTN art.130 §único + STJ Tema 1.134 (REsp 1.914.902, out/2024) — edital não pode transferir tributos ao arrematante em hasta pública.",
     rota_processual: "nenhuma",
     prazo_legal_dias: 0,
     prazo_pratico_meses_min: 0,
@@ -161,7 +161,7 @@ export const RISCOS_JURIDICOS = [
     rota_processual: "acao_autonoma",
     prazo_legal_dias: 10,
     prazo_pratico_meses_min: 12,
-    prazo_pratico_meses_max: 24,
+    prazo_pratico_meses_max: 60,
     custo_processual_mg_min: 514.38,
     custo_processual_mg_max: 5818.61,
     custo_operacional_extra_min: 0,
@@ -232,13 +232,13 @@ export const RISCOS_JURIDICOS = [
     subcategoria: "arrombamento",
     label: "Custo operacional de desocupação física",
     modalidade_leilao: "qualquer",
-    base_legal: "TJMG tabela 2025: R$141,70 imissão/reintegração + R$35,40/endereço + R$177,10 arrombamento/remoção.",
+    base_legal: "TJMG Tabela de Custas 2026: R$148,34 imissão/reintegração + R$35,40/endereço + R$177,10 arrombamento/remoção.",
     rota_processual: "nenhuma",
     prazo_legal_dias: 0,
     prazo_pratico_meses_min: 0,
     prazo_pratico_meses_max: 1,
-    custo_processual_mg_min: 141.70,
-    custo_processual_mg_max: 354.20,
+    custo_processual_mg_min: 148.34,
+    custo_processual_mg_max: 360.84,
     custo_operacional_extra_min: 500,
     custo_operacional_extra_max: 5000,
     bloqueia_uso: false,
@@ -257,7 +257,7 @@ export const RISCOS_JURIDICOS = [
     subcategoria: "remicao",
     label: "Agravo de instrumento (contestação de liminar) — TJMG",
     modalidade_leilao: "qualquer",
-    base_legal: "TJMG tabela 2025: R$331,86 por agravo de instrumento.",
+    base_legal: "TJMG Tabela de Custas 2026: R$331,86 por agravo de instrumento.",
     rota_processual: "embargos",
     prazo_legal_dias: 0,
     prazo_pratico_meses_min: 2,
@@ -353,4 +353,15 @@ export function calcularCustoJuridico(riscos_presentes, aluguel_atual = 0) {
     score_penalizacao_total: score_reducao,
     bloqueios
   }
+}
+
+// Tabela de custas TJMG 2026 — referência rápida
+export const CUSTAS_TJMG_2026 = {
+  carta_arrematacao: 208.44,
+  alvara_judicial: 69.48,
+  imissao_reintegracao: 148.34,
+  arrombamento_remocao: 177.10,
+  por_endereco_urbano: 35.40,
+  agravo_instrumento: 331.86,
+  fonte: "TJMG Tabela de Custas 2026",
 }

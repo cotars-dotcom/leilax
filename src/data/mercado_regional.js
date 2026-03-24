@@ -3,10 +3,10 @@ export const MERCADO_REGIONAL = {
   bh_centro_sul: {
     label: "BH Centro-Sul",
     cidade: "Belo Horizonte",
-    bairros: ["Lourdes", "Funcionários", "Serra", "Sion", "Anchieta", "Santo Agostinho"],
-    preco_m2_venda_min: 12000,
-    preco_m2_venda_max: 15000,
-    preco_m2_venda_medio: 13500,
+    bairros: ["Anchieta", "Sion", "Serra", "Santo Agostinho", "Santo Antônio", "Gutierrez", "Cruzeiro"],
+    preco_m2_venda_min: 9000,
+    preco_m2_venda_max: 12500,
+    preco_m2_venda_medio: 10500,
     preco_m2_locacao: 72,
     tempo_venda_dias: 75,
     tendencia: "alta",
@@ -27,17 +27,17 @@ export const MERCADO_REGIONAL = {
       condominio_teto: 1200,
       lazer: "completo"
     },
-    alertas: ["risco_enchente_verificar_urbel"],
+    alertas: [],
     viabilidade_temporada: "alta"
   },
 
   bh_savassi: {
     label: "BH Savassi / Lourdes / Belvedere",
     cidade: "Belo Horizonte",
-    bairros: ["Savassi", "Lourdes", "Belvedere", "Luxemburgo", "Cidade Jardim"],
+    bairros: ["Savassi", "Lourdes", "Funcionários", "Belvedere", "Luxemburgo", "Cidade Jardim"],
     preco_m2_venda_min: 12000,
     preco_m2_venda_max: 18000,
-    preco_m2_venda_medio: 15000,
+    preco_m2_venda_medio: 16074,
     preco_m2_locacao: 58,
     tempo_venda_dias: 45,
     tendencia: "alta",
@@ -65,7 +65,7 @@ export const MERCADO_REGIONAL = {
   bh_pampulha: {
     label: "BH Pampulha",
     cidade: "Belo Horizonte",
-    bairros: ["Pampulha", "Castelo", "São Luiz", "Bandeirantes", "Ouro Preto", "Itapoã"],
+    bairros: ["Pampulha", "São Luiz", "Bandeirantes", "Itapoã"],
     preco_m2_venda_min: 8500,
     preco_m2_venda_max: 9800,
     preco_m2_venda_medio: 9150,
@@ -120,21 +120,21 @@ export const MERCADO_REGIONAL = {
       condominio_teto: 1500,
       lazer: "completo"
     },
-    alertas: ["risco_geologico_encostas_verificar"],
+    alertas: ["Verificar risco geológico em encostas — regiões serranas exigem laudo técnico"],
     viabilidade_temporada: "media"
   },
 
   bh_buritis: {
-    label: "BH Buritis / Estoril / Luxemburgo",
+    label: "BH Buritis / Estoril / Barroca",
     cidade: "Belo Horizonte",
-    bairros: ["Buritis", "Estoril", "Luxemburgo", "Salgado Filho", "Gutierrez"],
-    preco_m2_venda_min: 8000,
-    preco_m2_venda_max: 9000,
-    preco_m2_venda_medio: 8500,
+    bairros: ["Buritis", "Estoril", "Ouro Preto", "Salgado Filho", "Castelo", "Alto Barroca", "Barroca"],
+    preco_m2_venda_min: 9000,
+    preco_m2_venda_max: 12000,
+    preco_m2_venda_medio: 10200,
     preco_m2_locacao: 50,
     tempo_venda_dias: 75,
     tendencia: "alta",
-    tendencia_pct_12m: 10.0,
+    tendencia_pct_12m: 6.9,
     demanda: "alta",
     vacancia_pct: 3.5,
     yield_bruto_pct: 6.0,
@@ -158,10 +158,10 @@ export const MERCADO_REGIONAL = {
   bh_santa_efigenia: {
     label: "BH Santa Efigênia / Prates / Floresta",
     cidade: "Belo Horizonte",
-    bairros: ["Santa Efigênia", "Carlos Prates", "Floresta", "Lagoinha", "Colégio Batista"],
-    preco_m2_venda_min: 9500,
-    preco_m2_venda_max: 11000,
-    preco_m2_venda_medio: 10250,
+    bairros: ["Santa Efigênia", "Carlos Prates", "Floresta", "Lagoinha"],
+    preco_m2_venda_min: 5500,
+    preco_m2_venda_max: 8500,
+    preco_m2_venda_medio: 7080,
     preco_m2_locacao: 56,
     tempo_venda_dias: 120,
     tendencia: "estavel_leve_alta",
@@ -182,17 +182,17 @@ export const MERCADO_REGIONAL = {
       condominio_teto: 500,
       lazer: "basico"
     },
-    alertas: ["risco_enchente_corregos_verificar"],
+    alertas: ["Verificar proximidade de córregos — alguns trechos têm histórico de alagamentos"],
     viabilidade_temporada: "baixa"
   },
 
   bh_cidade_nova: {
     label: "BH Cidade Nova / Caiçara / Padre Eustáquio",
     cidade: "Belo Horizonte",
-    bairros: ["Cidade Nova", "Caiçara", "Padre Eustáquio", "Serrano", "Pompeia"],
-    preco_m2_venda_min: 8000,
-    preco_m2_venda_max: 9000,
-    preco_m2_venda_medio: 8500,
+    bairros: ["Cidade Nova", "Caiçara", "Padre Eustáquio", "Planalto", "Jardim Guanabara", "Engenho Nogueira"],
+    preco_m2_venda_min: 4800,
+    preco_m2_venda_max: 7200,
+    preco_m2_venda_medio: 5900,
     preco_m2_locacao: 40,
     tempo_venda_dias: 150,
     tendencia: "estavel_queda_moderada",
@@ -244,7 +244,10 @@ export const MERCADO_REGIONAL = {
       condominio_teto: 250,
       lazer: "nenhum"
     },
-    alertas: ["alta_vacancia", "baixa_liquidez"],
+    alertas: [
+      "Liquidez moderada no bairro — precificar competitivamente para venda rápida",
+      "Vacância acima da média — considerar locação como estratégia principal",
+    ],
     viabilidade_temporada: "nenhuma"
   },
 
@@ -275,7 +278,7 @@ export const MERCADO_REGIONAL = {
       condominio_teto: 300,
       lazer: "nenhum"
     },
-    alertas: ["risco_geologico_verificar"],
+    alertas: ["Verificar risco geológico antes do lance — consultar URBEL/PBH"],
     viabilidade_temporada: "nenhuma"
   },
 
@@ -338,7 +341,10 @@ export const MERCADO_REGIONAL = {
       condominio_teto: 300,
       lazer: "nenhum"
     },
-    alertas: ["muito_baixa_liquidez", "alta_vacancia"],
+    alertas: [
+      "Liquidez abaixo da média — estimar prazo de 90-150 dias para revenda",
+      "Vacância regional elevada — preferir locação a flip rápido",
+    ],
     viabilidade_temporada: "nenhuma"
   },
 
@@ -450,7 +456,7 @@ export const MERCADO_REGIONAL = {
     demanda: "baixa",
     vacancia_pct: 7.0,
     yield_bruto_pct: 4.0,
-    yield_liquido_pct: 2.3,
+    yield_liquido_pct: 2.6,
     imovel_mais_liquido: {
       tipologia: "apartamento",
       quartos_ideal: 2,
@@ -463,32 +469,39 @@ export const MERCADO_REGIONAL = {
       condominio_teto: 350,
       lazer: "nenhum"
     },
-    alertas: ["baixa_liquidez", "lenta_venda"],
+    alertas: [
+      "Liquidez reduzida em regiões periféricas de JF — prazo de venda estimado 6+ meses",
+      "Ciclo de venda lento — evitar operações que exijam saída rápida",
+    ],
     viabilidade_temporada: "nenhuma"
   }
 }
 
 // Mapeamento bairro → regiao_macro
 export const BAIRRO_PARA_REGIAO = {
-  // BH Centro-Sul
-  "lourdes": "bh_centro_sul", "funcionários": "bh_centro_sul",
-  "funcionarios": "bh_centro_sul", "serra": "bh_centro_sul",
-  "sion": "bh_centro_sul", "anchieta": "bh_centro_sul",
-  "santo agostinho": "bh_centro_sul",
-  // BH Savassi
-  "savassi": "bh_savassi", "belvedere": "bh_savassi",
-  "luxemburgo": "bh_savassi", "cidade jardim": "bh_savassi",
+  // BH Centro-Sul (sem Lourdes/Funcionários — esses são bh_savassi classe 4 Luxo)
+  "serra": "bh_centro_sul", "sion": "bh_centro_sul",
+  "anchieta": "bh_centro_sul", "santo agostinho": "bh_centro_sul",
+  "santo antônio": "bh_centro_sul", "santo antonio": "bh_centro_sul",
+  "gutierrez": "bh_centro_sul", "cruzeiro": "bh_centro_sul",
+  // BH Savassi (classe 4 Luxo — inclui Lourdes e Funcionários)
+  "savassi": "bh_savassi", "lourdes": "bh_savassi",
+  "funcionários": "bh_savassi", "funcionarios": "bh_savassi",
+  "belvedere": "bh_savassi", "luxemburgo": "bh_savassi",
+  "cidade jardim": "bh_savassi",
   // BH Pampulha
-  "pampulha": "bh_pampulha", "castelo": "bh_pampulha",
+  "pampulha": "bh_pampulha",
   "são luiz": "bh_pampulha", "sao luiz": "bh_pampulha",
-  "bandeirantes": "bh_pampulha", "ouro preto": "bh_pampulha",
+  "bandeirantes": "bh_pampulha",
   "itapoã": "bh_pampulha", "itapoa": "bh_pampulha",
   // Nova Lima
   "vila da serra": "nova_lima", "morro do chapéu": "nova_lima",
   "nova lima": "nova_lima",
   // BH Buritis
   "buritis": "bh_buritis", "estoril": "bh_buritis",
-  "gutierrez": "bh_buritis", "salgado filho": "bh_buritis",
+  "salgado filho": "bh_buritis", "ouro preto": "bh_buritis",
+  "alto barroca": "bh_buritis", "barroca": "bh_buritis",
+  "castelo": "bh_buritis",
   // BH Santa Efigênia
   "santa efigênia": "bh_santa_efigenia", "santa efigenia": "bh_santa_efigenia",
   "carlos prates": "bh_santa_efigenia", "floresta": "bh_santa_efigenia",
@@ -496,7 +509,8 @@ export const BAIRRO_PARA_REGIAO = {
   // BH Cidade Nova
   "cidade nova": "bh_cidade_nova", "caiçara": "bh_cidade_nova",
   "caicara": "bh_cidade_nova", "padre eustáquio": "bh_cidade_nova",
-  "padre eustaquio": "bh_cidade_nova",
+  "padre eustaquio": "bh_cidade_nova", "planalto": "bh_cidade_nova",
+  "jardim guanabara": "bh_cidade_nova", "engenho nogueira": "bh_cidade_nova",
   // BH Venda Nova
   "venda nova": "bh_venda_nova", "jardim leblon": "bh_venda_nova",
   "mantiqueira": "bh_venda_nova", "tupi": "bh_venda_nova",
@@ -513,6 +527,8 @@ export const BAIRRO_PARA_REGIAO = {
   "ribeirão das neves": "bh_rmbh", "vespasiano": "bh_rmbh",
   "santa luzia": "bh_rmbh", "eldorado": "contagem_europa",
   // JF
+  "centro jf": "jf_centro", "centro juiz de fora": "jf_centro",
+  "centro bh": "bh_cidade_nova",
   "centro": "jf_centro", "centro histórico": "jf_centro",
   "santa helena": "jf_centro", "monte castelo": "jf_centro",
   "manoel honório": "jf_bairros_nobres", "benfica": "jf_bairros_nobres",
