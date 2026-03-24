@@ -170,57 +170,6 @@ function ScoreRing({score,size=80}) {
 }
 
 
-// ── AI ────────────────────────────────────────────────────────────────────────
-const ANTHROPIC_API = "https://api.anthropic.com/v1/messages"
-
-async function analyzeProperty(url) {
-  const sys = `Você é AXIS, especialista em análise de imóveis em leilão para investimento imobiliário no Brasil. Use web search para buscar informações sobre o imóvel.
-
-Retorne SOMENTE JSON válido sem markdown:
-{
-  "titulo":"","endereco":"","cidade":"","estado":"","tipo":"Apartamento|Casa|Terreno|Comercial",
-  "area_m2":0,"quartos":0,"vagas":0,"andar":"","modalidade":"","leiloeiro":"",
-  "data_leilao":"DD/MM/AAAA","valor_avaliacao":0,"valor_minimo":0,"desconto_percentual":0,
-  "ocupacao":"Desocupado|Ocupado|Desconhecido","financiavel":true,"fgts_aceito":false,
-  "debitos_condominio":"Sem débitos|Com débitos|Desconhecido",
-  "debitos_iptu":"Sem débitos|Com débitos|Desconhecido",
-  "processos_ativos":"Nenhum|Possível|Confirmado|Desconhecido",
-  "matricula_status":"Limpa|Com ônus|Desconhecido",
-  "obs_juridicas":"",
-  "preco_m2_imovel":0,"preco_m2_mercado":0,"aluguel_mensal_estimado":0,
-  "liquidez":"Alta|Média|Baixa","prazo_revenda_meses":0,
-  "positivos":[""],"negativos":[""],"alertas":[""],
-  "recomendacao":"COMPRAR|AGUARDAR|EVITAR","justificativa":"",
-  "estrutura_recomendada":"CPF único|Condomínio voluntário|PJ",
-  "custo_regularizacao":0,"custo_reforma":0,
-  "retorno_venda_pct":0,"retorno_locacao_anual_pct":0,
-  "mercado_tendencia":"Alta|Estável|Queda","mercado_demanda":"Alta|Média|Baixa",
-  "mercado_tempo_venda_meses":0,"mercado_obs":"",
-  "score_localizacao":0,"score_desconto":0,"score_juridico":0,
-  "score_ocupacao":0,"score_liquidez":0,"score_mercado":0,"score_total":0
-}
-Scores 0-10. score_total = média ponderada (loc 20%, desc 18%, jur 18%, ocup 15%, liq 15%, merc 14%).
-Se score_juridico < 4 → score_total *= 0.75. Se ocupado → score_total *= 0.85.`
-
-  const apiKey = localStorage.getItem("axis-api-key") || ""
-  if (!apiKey) throw new Error("Configure a chave da API Anthropic nas configurações")
-
-  const r = await fetch(ANTHROPIC_API, {
-    method:"POST",
-    headers:{"Content-Type":"application/json","x-api-key":apiKey,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
-    body:JSON.stringify({
-      model:"claude-sonnet-4-6", max_tokens:4000, system:sys,
-      tools:[{type:"web_search_20250305",name:"web_search"}],
-      messages:[{role:"user",content:`Analise o imóvel em leilão: ${url}`}]
-    })
-  })
-  const d = await r.json()
-  if (d.error) throw new Error(d.error.message || "Erro na API")
-  const txt = (d.content||[]).filter(b=>b.type==="text").map(b=>b.text).join("\n")
-  try { return JSON.parse(txt.replace(/```json|```/g,"").trim()) }
-  catch { throw new Error("Falha ao interpretar resposta. Tente novamente.") }
-}
-
 // ── TRELLO ────────────────────────────────────────────────────────────────────
 const BASE = "https://api.trello.com/1"
 const tGet  = async (path,key,token) => { const sep=path.includes('?')?'&':'?'; const r=await fetch(`${BASE}${path}${sep}key=${key}&token=${token}`); if(!r.ok) throw new Error(await r.text()); return r.json() }
@@ -642,7 +591,7 @@ function ApiKeyModal({onClose}) {
 }
 
 // ── NOVO IMÓVEL ───────────────────────────────────────────────────────────────
-function NovoImovel({onSave,onCancel,trello,parametrosBanco,criteriosBanco,isPhone}) {
+function NovoImovel({onSave,onCancel,onNav,trello,parametrosBanco,criteriosBanco,isPhone}) {
   const [url,setUrl]=useState("")
   const [loading,setLoading]=useState(false)
   const [step,setStep]=useState("")
@@ -729,12 +678,12 @@ function NovoImovel({onSave,onCancel,trello,parametrosBanco,criteriosBanco,isPho
       </div>
       </div>
 
-      {duplicado&&<div style={{background:`${C.mustardL}`,border:`1px solid ${C.mustard}40`,borderRadius:"8px",padding:"14px",marginBottom:"14px"}}>
-        <div style={{fontSize:"13px",fontWeight:600,color:C.mustard,marginBottom:6}}>⚠️ Imóvel já analisado</div>
-        <div style={{fontSize:"12.5px",color:C.text,marginBottom:8}}><b>{duplicado.codigo_axis}</b> — {duplicado.titulo} · Score {(duplicado.score_total||0).toFixed(1)} · {duplicado.recomendacao}</div>
+      {duplicado&&<div style={{background:C.mustardL,border:`1px solid ${C.mustard}40`,borderLeft:`3px solid ${C.mustard}`,borderRadius:10,padding:"12px 16px",marginBottom:16}}>
+        <div style={{fontSize:13,fontWeight:700,color:C.mustard,marginBottom:6}}>⚠️ Imóvel já analisado</div>
+        <div style={{fontSize:12.5,color:C.text,marginBottom:10}}><b>{duplicado.codigo_axis}</b> — {duplicado.titulo} · Score {(duplicado.score_total||0).toFixed(1)} · {duplicado.recomendacao}</div>
         <div style={{display:"flex",gap:8}}>
-          <button style={{...btn("s"),fontSize:"12px"}} onClick={()=>{setDuplicado(null);analyze()}}>Reanalisar mesmo assim</button>
-          <button style={{...btn(),fontSize:"12px"}} onClick={()=>onCancel()}>Ver análise existente</button>
+          <button style={{padding:"7px 14px",borderRadius:7,fontSize:12,fontWeight:600,cursor:"pointer",background:C.navy,color:"#fff",border:"none"}} onClick={()=>{if(duplicado.id&&onNav)onNav("detail",{id:duplicado.id});setDuplicado(null)}}>Ver análise existente {duplicado.codigo_axis?`#${duplicado.codigo_axis}`:""}</button>
+          <button style={{padding:"7px 14px",borderRadius:7,fontSize:12,cursor:"pointer",background:"transparent",border:`1px solid ${C.borderW}`,color:C.muted}} onClick={()=>{setDuplicado(null);analyze()}}>Reanalisar mesmo assim</button>
         </div>
       </div>}
       {error&&<div style={{background:`${K.red}15`,border:`1px solid ${K.red}40`,borderRadius:"6px",padding:"12px",marginBottom:"14px",fontSize:"12.5px",color:K.red}}>⚠️ {error}</div>}
@@ -2995,7 +2944,7 @@ useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("param
     {/* CONTENT */}
     <div style={{flex:1,overflowY:"auto",background:C.offwhite,display:"flex",flexDirection:"column",minWidth:0}}>
       {view==="dashboard"&&<Dashboard props={props} onNav={nav} profile={profile} isMobile={isMobile} isPhone={isPhone}/>}
-  {view==="novo"&&(isAdmin?<NovoImovel onSave={addProp} onCancel={()=>nav("imoveis")} trello={trello} parametrosBanco={parametrosBanco} criteriosBanco={criteriosBanco} isPhone={isPhone}/>:<AcessoNegado mensagem="Análise de imóveis é restrita ao administrador."/>)}
+  {view==="novo"&&(isAdmin?<NovoImovel onSave={addProp} onCancel={()=>nav("imoveis")} onNav={nav} trello={trello} parametrosBanco={parametrosBanco} criteriosBanco={criteriosBanco} isPhone={isPhone}/>:<AcessoNegado mensagem="Análise de imóveis é restrita ao administrador."/>)}
       {view==="imoveis"&&<Lista props={props} onNav={nav} onDelete={delProp} trello={trello} onUpdateProp={(id,updates)=>setProps(ps=>ps.map(p=>p.id===id?{...p,...updates}:p))}/>}
       {view==="detail"&&<Detail p={selP} onDelete={delProp} onNav={nav} trello={trello} onUpdateProp={(id,updates)=>setProps(ps=>ps.map(p=>p.id===id?{...p,...updates}:p))} isAdmin={isAdmin} onArchive={handleArquivar} isMobile={isMobile} isPhone={isPhone}/>}
       {view==="comparar"&&<Comparativo props={props}/>}
