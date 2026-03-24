@@ -637,12 +637,22 @@ function NovoImovel({onSave,onCancel,trello,parametrosBanco,criteriosBanco,isPho
   const [error,setError]=useState("")
   const [trelloMsg,setTrelloMsg]=useState("")
   const [anexos,setAnexos]=useState([])
+  const [duplicado,setDuplicado]=useState(null)
   const fileRef=useRef(null)
 
   const analyze = async () => {
     if(!url.trim()){setError("Cole o link do leilão");return}
     const hasKey = localStorage.getItem("axis-api-key")
     if(!hasKey){setError("Configure a chave da API Anthropic nas Configurações (⚙️)");return}
+    // Verificar duplicata por URL
+    if(!duplicado) {
+      try {
+        const{verificarImovelDuplicado}=await import('./lib/supabase.js')
+        const dups=await verificarImovelDuplicado(url.trim())
+        if(dups?.length>0){setDuplicado(dups[0]);return}
+      } catch{}
+    }
+    setDuplicado(null)
     setLoading(true);setError("");setTrelloMsg("")
     setStep("🔍 Buscando informações do imóvel...")
     try {
@@ -707,6 +717,14 @@ function NovoImovel({onSave,onCancel,trello,parametrosBanco,criteriosBanco,isPho
       </div>
       </div>
 
+      {duplicado&&<div style={{background:`${C.mustardL}`,border:`1px solid ${C.mustard}40`,borderRadius:"8px",padding:"14px",marginBottom:"14px"}}>
+        <div style={{fontSize:"13px",fontWeight:600,color:C.mustard,marginBottom:6}}>⚠️ Imóvel já analisado</div>
+        <div style={{fontSize:"12.5px",color:C.text,marginBottom:8}}><b>{duplicado.codigo_axis}</b> — {duplicado.titulo} · Score {(duplicado.score_total||0).toFixed(1)} · {duplicado.recomendacao}</div>
+        <div style={{display:"flex",gap:8}}>
+          <button style={{...btn("s"),fontSize:"12px"}} onClick={()=>{setDuplicado(null);analyze()}}>Reanalisar mesmo assim</button>
+          <button style={{...btn(),fontSize:"12px"}} onClick={()=>onCancel()}>Ver análise existente</button>
+        </div>
+      </div>}
       {error&&<div style={{background:`${K.red}15`,border:`1px solid ${K.red}40`,borderRadius:"6px",padding:"12px",marginBottom:"14px",fontSize:"12.5px",color:K.red}}>⚠️ {error}</div>}
       {error&&(error.includes('credit balance')||error.includes('balance is too low')||error.includes('insufficient')||error.includes('billing'))&&<div style={{background:'rgba(245,166,35,0.1)',border:'1px solid rgba(245,166,35,0.3)',borderRadius:8,padding:'12px 14px',marginBottom:14}}><div style={{color:'#F5A623',fontWeight:700,marginBottom:4,fontSize:13}}>💳 Saldo insuficiente</div><div style={{color:'rgba(221,228,240,0.7)',fontSize:12,lineHeight:1.6}}>Acesse <b style={{color:'#fff'}}>platform.claude.com → Plans & Billing</b> para adicionar créditos.<br/>O app volta a funcionar automaticamente após adicionar saldo.</div></div>}
       {trelloMsg&&<div style={{background:`${K.teal}10`,border:`1px solid ${K.teal}30`,borderRadius:"6px",padding:"10px",marginBottom:"14px",fontSize:"12px",color:K.teal}}>{trelloMsg}</div>}
@@ -2816,7 +2834,17 @@ useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("param
   useEffect(()=>{if(loaded&&trello)stSave("axis-trello",trello)},[trello,loaded])
 
   const addProp=async(p)=>{
-    showToast(`✓ ${p.titulo||"Imóvel"} — Score ${(p.score_total||0).toFixed(1)} · ${p.recomendacao}`)
+    // Gerar código AXIS único
+    if(!p.codigo_axis) {
+      try {
+        const{gerarAxisId}=await import('./lib/supabase.js')
+        p.codigo_axis=await gerarAxisId(p.cidade)
+      } catch(e) {
+        console.warn('[AXIS] Fallback codigo_axis:',e.message)
+        p.codigo_axis=`MG-${new Date().getFullYear()}-${Date.now().toString().slice(-4)}`
+      }
+    }
+    showToast(`✓ ${p.codigo_axis} · ${p.titulo||"Imóvel"} — Score ${(p.score_total||0).toFixed(1)} · ${p.recomendacao}`)
     nav("detail",{id:p.id})
     // Salvar no Supabase primeiro, depois atualizar estado
     if(session) {
