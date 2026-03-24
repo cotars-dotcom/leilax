@@ -434,6 +434,13 @@ NUNCA usar area_total_m2 para calcular preco_m2_imovel.
   "recomendacao": "COMPRAR|AGUARDAR|EVITAR",
   "justificativa": "string detalhada 3-5 linhas explicando a decisÃ£o",
   "estrategia_recomendada": "flip|locacao|temporada",
+  "sintese_executiva": "string — 3 frases em linguagem simples para membros não-especialistas. Ex: 'Este apartamento está sendo vendido por menos da metade do preço de mercado em um bairro de alta demanda. O maior risco é a ocupação incerta, que pode exigir ação judicial de 6 a 18 meses. Para o grupo AXIS, o cenário mais conservador ainda entrega retorno acima de 40%.'",
+  "estrategia_recomendada_detalhe": {
+    "tipo": "flip_rapido|renda_passiva|airbnb|reforma_revenda|locacao_longa",
+    "motivo": "string — por que este imóvel se encaixa nessa estratégia",
+    "prazo_estimado_meses": 0,
+    "roi_estimado_pct": 0
+  },
   "estrutura_recomendada": "cpf_unico|condominio_voluntario|holding|ltda",
   "custo_regularizacao": 0,
   "custo_reforma": 0,
