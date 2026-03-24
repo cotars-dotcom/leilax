@@ -256,6 +256,39 @@ export async function usarConvite(token) {
     .eq('token', token)
 }
 
+export async function revogarConvite(id) {
+  const { error } = await supabase
+    .from('convites')
+    .update({ expira_em: new Date().toISOString() })
+    .eq('id', id)
+  if (error) throw error
+}
+
+export async function getUsuarios() {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .order('criado_em', { ascending: false })
+  if (error) throw error
+  return data || []
+}
+
+export async function atualizarRoleUsuario(userId, novoRole) {
+  const { error } = await supabase
+    .from('profiles')
+    .update({ role: novoRole, atualizado_em: new Date().toISOString() })
+    .eq('id', userId)
+  if (error) throw error
+}
+
+export async function toggleAtivoUsuario(userId, ativo) {
+  const { error } = await supabase
+    .from('profiles')
+    .update({ ativo, atualizado_em: new Date().toISOString() })
+    .eq('id', userId)
+  if (error) throw error
+}
+
 // == ATIVIDADES ==
 export async function getAtividades() {
   const { data, error } = await supabase
