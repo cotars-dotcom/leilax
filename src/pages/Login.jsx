@@ -173,21 +173,13 @@ export default function Login() {
             due diligence e análise de ativos imobiliários.
           </p>
         </div>
-
-        <div style={{ display:'flex', gap:32 }}>
-          {[
-            { label:'Patrimônio gerido', val:'R$ 8,9M' },
-            { label:'Imóveis analisados', val:'24+' },
-            { label:'Score médio', val:'7,4' },
-          ].map(s => (
-            <div key={s.label}>
-              <p style={{ margin:0, fontSize:20, fontWeight:800, color:C.emerald }}>
-                {s.val}
-              </p>
-              <p style={{ margin:'2px 0 0', fontSize:10.5, color:'rgba(255,255,255,0.4)',
-                textTransform:'uppercase', letterSpacing:'0.5px' }}>
-                {s.label}
-              </p>
+        <div style={{background:K.s1,border:'1px solid '+K.bd,borderRadius:'14px',padding:'32px'}}>
+          <div style={{fontWeight:'700',fontSize:'18px',color:K.wh,marginBottom:'6px'}}>Entrar</div>
+          <div style={{fontSize:'12px',color:K.t3,marginBottom:'28px'}}>Acesso restrito a membros autorizados</div>
+          <form onSubmit={handleLogin}>
+            <div style={{marginBottom:'16px'}}>
+              <div style={{fontSize:'11px',color:K.t3,textTransform:'uppercase',letterSpacing:'1px',marginBottom:'6px'}}>E-mail</div>
+              <input style={inp} type="email" placeholder="seu@email.com" value={email} onChange={e=>setEmail(e.target.value)} autoComplete="email"/>
             </div>
           ))}
         </div>
@@ -358,6 +350,7 @@ export default function Login() {
           </div>
         </div>
       </div>
+      <style>{'*{box-sizing:border-box}input::placeholder{color:#3D4E6A}'}</style>
     </div>
   )
 }

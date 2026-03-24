@@ -11,7 +11,7 @@ import { supabase, getImoveis, saveImovel, deleteImovel } from "./lib/supabase.j
 import Tarefas from "./pages/Tarefas.jsx"
 import AdminPanel from "./pages/AdminPanel.jsx"
 import { analisarImovelCompleto } from "./lib/dualAI.js"
-import { setupBoardLeilax, criarCardImovel } from "./lib/trelloService.js"
+import { setupBoardAxis, criarCardImovel, AXIS_BOARDS } from "./lib/trelloService.js"
 import { LayoutDashboard, TrendingUp, Package, ShieldCheck, FileText, BarChart3, Settings, Search, Bell, AlertTriangle, ArrowUpRight, Plus, MessageSquare, Scale, CheckSquare, LogOut } from "lucide-react"
 
 const uid = () => Math.random().toString(36).slice(2,9) + Date.now().toString(36)
@@ -411,9 +411,10 @@ function ModalAuditoriaTrello({ config, imoveis, onClose }) {
 
   async function carregarBoards() {
     try {
-      const { getBoardsAxis } = await import('./lib/trelloService.js')
+      const { getBoardsAxis, AXIS_BOARDS } = await import('./lib/trelloService.js')
       const data = await getBoardsAxis(key, token)
-      setBoards(data.filter(b => b.name.includes('AXIS')))
+      const idsOficiais = [AXIS_BOARDS.PIPELINE, AXIS_BOARDS.MANUAL]
+      setBoards(data.filter(b => idsOficiais.includes(b.id)))
     } catch {}
   }
 
@@ -440,14 +441,8 @@ function ModalAuditoriaTrello({ config, imoveis, onClose }) {
   async function rodarAuditoria() {
     setLoading(true); setMsg('Auditando board...')
     try {
-      const { auditarBoard, getBoardsExistentes } = await import('./lib/trelloService.js')
-      let bid = boardId
-      if (!bid) {
-        const existentes = await getBoardsExistentes(key, token)
-        const b = existentes.find(b => b.name.includes('Pipeline') || b.name.includes('AXIS'))
-        bid = b?.id
-      }
-      if (!bid) { setMsg('Board não encontrado. Crie o workspace primeiro.'); setLoading(false); return }
+      const { auditarBoard, AXIS_BOARDS } = await import('./lib/trelloService.js')
+      const bid = boardId || AXIS_BOARDS.PIPELINE
       const res = await auditarBoard(bid, key, token)
       setAuditoria(res)
       setMsg('')
@@ -464,19 +459,12 @@ function ModalAuditoriaTrello({ config, imoveis, onClose }) {
     }
     setLoading(true); setMsg('Preparando sincronização...')
     try {
-      const { criarOuAtualizarCardImovel, getBoardsExistentes, getListasBoard } = await import('./lib/trelloService.js')
-      // Se não tiver boardId salvo, buscar o board existente
-      let bid = boardId || trelloConf.boardId
+      const { criarOuAtualizarCardImovel, getListasBoard } = await import('./lib/trelloService.js')
+      const { AXIS_BOARDS } = await import('./lib/trelloService.js')
+      let bid = boardId || trelloConf.boardId || AXIS_BOARDS.PIPELINE
       let listIds = trelloConf.listIds || {}
-      if (!bid) {
-        const existentes = await getBoardsExistentes(key, token)
-        const boardPipeline = existentes.find(b => b.name.includes('Pipeline') || b.name.includes('AXIS'))
-        if (!boardPipeline) {
-          setMsg('Board AXIS não encontrado. Clique em "Criar Workspace AXIS" primeiro.')
-          setLoading(false); return
-        }
-        bid = boardPipeline.id
-        // Salvar para próximas vezes
+      if (bid !== AXIS_BOARDS.PIPELINE) {
+        bid = AXIS_BOARDS.PIPELINE
         localStorage.setItem('axis-trello', JSON.stringify({ ...trelloConf, boardId: bid }))
       }
       // Buscar listas do board se não tiver salvas
@@ -2746,6 +2734,20 @@ const [criteriosBanco,setCriteriosBanco]=useState([])
   const isPhone  = useIsMobile(480)
 useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("parametros_score").select("*");if(pr)setParametrosBanco(pr);const{data:cr}=await supabase.from("criterios_avaliacao").select("*");if(cr)setCriteriosBanco(cr)}catch(e){console.warn("parametros:",e)}}lp()},[])
 
+  // Garante IDs fixos dos boards AXIS no localStorage
+  useEffect(() => {
+    try {
+      const conf = JSON.parse(localStorage.getItem('axis-trello') || '{}')
+      if (conf.key && conf.token) {
+        localStorage.setItem('axis-trello', JSON.stringify({
+          ...conf,
+          boardId: '69c0ac769abcec1a62851eb4',
+          boardManualId: '69c0ac820802ca9e0ce94ce1',
+        }))
+      }
+    } catch {}
+  }, [])
+
   // FIX 1: Sync API keys from Supabase (cross-device)
   useEffect(()=>{
     if(!session) return
@@ -2851,7 +2853,7 @@ useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("param
   const saveTrello=cfg=>{
     setTrello(cfg);setShowTrello(false);showToast("✓ Trello configurado — "+cfg.boardName,K.trello)
     if(cfg.boardId&&cfg.key&&cfg.token){
-      setupBoardLeilax(cfg.boardId,cfg.key,cfg.token)
+      setupBoardAxis(AXIS_BOARDS.PIPELINE,cfg.key,cfg.token)
         .then(()=>console.log('[AXIS] Board Trello configurado'))
         .catch(e=>console.warn('[AXIS] Setup Trello:',e.message))
     }
