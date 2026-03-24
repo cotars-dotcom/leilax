@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useIsMobile } from "../hooks/useIsMobile.js";
+import { useAuth } from "../lib/AuthContext.jsx";
+import { supabase } from "../lib/supabase.js";
 
 const K = {
   bg:"#080B10", s1:"#111620", s2:"#171E2C", bd:"#1C2438",
@@ -68,6 +70,7 @@ Retorne no mínimo 3 e no máximo 10 imóveis relevantes.`;
 
 export default function BuscaGPT({ onAnalisar }) {
   const isPhone = useIsMobile(480);
+  const { session } = useAuth();
   const [cidade, setCidade] = useState("");
   const [tipo, setTipo] = useState("Apartamento");
   const [maxValor, setMaxValor] = useState("");
@@ -83,6 +86,12 @@ export default function BuscaGPT({ onAnalisar }) {
   const buscar = async () => {
     if (!cidade.trim()) { setError("Informe a cidade"); return; }
     if (!openaiKey.trim()) { setError("Configure a API Key do ChatGPT (OpenAI) abaixo"); setShowKey(true); return; }
+    // Verificar permissão de API por usuário
+    try {
+      const { data: perfilUser } = await supabase.from('profiles').select('pode_usar_api, role').eq('id', session?.user?.id).single()
+      const podeUsar = perfilUser?.role === 'admin' || perfilUser?.pode_usar_api === true
+      if (!podeUsar) { setError('⚠️ Acesso à busca IA não liberado. Solicite ao administrador.'); return }
+    } catch {}
     setLoading(true); setError(""); setResults(null);
     try {
       const query = `Busque imóveis em leilão em ${cidade}. Tipo: ${tipo}. ${maxValor ? `Valor máximo: R$ ${maxValor}` : ""} ${minDesconto ? `Desconto mínimo de ${minDesconto}%` : ""} Priorize imóveis desocupados e financiáveis pela CAIXA. Busque nos portais de leilão brasileiros e retorne os melhores resultados disponíveis hoje.`;

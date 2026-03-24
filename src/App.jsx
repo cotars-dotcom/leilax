@@ -602,7 +602,7 @@ function ApiKeyModal({onClose}) {
 }
 
 // ── NOVO IMÓVEL ───────────────────────────────────────────────────────────────
-function NovoImovel({onSave,onCancel,onNav,trello,parametrosBanco,criteriosBanco,isPhone,existingProps=[]}) {
+function NovoImovel({onSave,onCancel,onNav,trello,parametrosBanco,criteriosBanco,isPhone,existingProps=[],session}) {
   const [url,setUrl]=useState("")
   const [loading,setLoading]=useState(false)
   const [step,setStep]=useState("")
@@ -616,6 +616,13 @@ function NovoImovel({onSave,onCancel,onNav,trello,parametrosBanco,criteriosBanco
     if(!url.trim()){setError("Cole o link do leilão");return}
     const hasKey = localStorage.getItem("axis-api-key")
     if(!hasKey){setError("Configure a chave da API Anthropic nas Configurações (⚙️)");return}
+    // Verificar permissão de API por usuário
+    try {
+      const { supabase } = await import('./lib/supabase.js')
+      const { data: perfilUser } = await supabase.from('profiles').select('pode_usar_api, role').eq('id', session?.user?.id).single()
+      const podeUsar = perfilUser?.role === 'admin' || perfilUser?.pode_usar_api === true
+      if (!podeUsar) { setError('⚠️ Acesso à análise por IA não liberado. Solicite ao administrador.'); return }
+    } catch {}
     // Verificar duplicata: local primeiro, depois Supabase
     if(!duplicado) {
       const urlNorm=url.trim()
@@ -1771,6 +1778,19 @@ function PainelConvitesAdmin({ session, imoveis: propImoveis, isPhone }) {
                       {u.ativo ? 'Desativar' : 'Reativar'}
                     </button>
                   )}
+                  {u.email !== session?.user?.email && (
+                    <button onClick={async () => {
+                      await supabase.from('profiles').update({ pode_usar_api: !u.pode_usar_api }).eq('id', u.id)
+                      await carregarDados()
+                    }}
+                      style={{ padding:'5px 12px', borderRadius:6,
+                        fontSize:11, fontWeight:600, cursor:'pointer',
+                        border:'none',
+                        background: u.pode_usar_api ? C.emeraldL : C.surface,
+                        color: u.pode_usar_api ? C.emerald : C.muted }}>
+                      {u.pode_usar_api ? '🤖 API ativa' : '🔒 Sem API'}
+                    </button>
+                  )}
                   {u.email === session?.user?.email && (
                     <span style={{ fontSize:10, color:C.hint, fontStyle:'italic' }}>você</span>
                   )}
@@ -2163,7 +2183,7 @@ function PainelPortfolio({ props: imoveis, isMobile, isPhone }) {
 }
 
 // ── DETAIL ────────────────────────────────────────────────────────────────────
-function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze,isAdmin,onArchive,isMobile,isPhone}) {
+function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze,isAdmin,onArchive,isMobile,isPhone,session}) {
   const [sending,setSending]=useState(false)
   const [modoAoVivo, setModoAoVivo]=useState(false)
   const [msg,setMsg]=useState("")
@@ -2175,6 +2195,12 @@ function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze,isAdmin,onArch
     if(!p?.fonte_url){setMsg("⚠️ Imóvel sem URL de origem para reanalisar");return}
     const claudeKey=localStorage.getItem("axis-api-key")||""
     if(!claudeKey){setMsg("⚠️ Configure a API Key do Claude em Admin → API Keys");return}
+    // Verificar permissão de API por usuário
+    try {
+      const { data: perfilUser } = await supabase.from('profiles').select('pode_usar_api, role').eq('id', session?.user?.id).single()
+      const podeUsar = perfilUser?.role === 'admin' || perfilUser?.pode_usar_api === true
+      if (!podeUsar) { setMsg('⚠️ Acesso à análise por IA não liberado. Solicite ao administrador.'); return }
+    } catch {}
     if(!confirm("Reanalisar este imóvel com a IA? Os dados serão atualizados.")) return
     setReanalyzing(true);setMsg("")
     try {
@@ -3029,9 +3055,9 @@ useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("param
     {/* CONTENT */}
     <div className="axis-main" style={{flex:1,overflowY:"auto",background:C.offwhite,display:"flex",flexDirection:"column",minWidth:0}}>
       {view==="dashboard"&&<Dashboard props={props} onNav={nav} profile={profile} isMobile={isMobile} isPhone={isPhone}/>}
-  {view==="novo"&&(isAdmin?<NovoImovel onSave={addProp} onCancel={()=>nav("imoveis")} onNav={nav} trello={trello} parametrosBanco={parametrosBanco} criteriosBanco={criteriosBanco} isPhone={isPhone} existingProps={props}/>:<AcessoNegado mensagem="Análise de imóveis é restrita ao administrador."/>)}
+  {view==="novo"&&(isAdmin?<NovoImovel onSave={addProp} onCancel={()=>nav("imoveis")} onNav={nav} trello={trello} parametrosBanco={parametrosBanco} criteriosBanco={criteriosBanco} isPhone={isPhone} existingProps={props} session={session}/>:<AcessoNegado mensagem="Análise de imóveis é restrita ao administrador."/>)}
       {view==="imoveis"&&<Lista props={props} onNav={nav} onDelete={delProp} trello={trello} onUpdateProp={(id,updates)=>setProps(ps=>ps.map(p=>p.id===id?{...p,...updates}:p))}/>}
-      {view==="detail"&&<Detail p={selP} onDelete={delProp} onNav={nav} trello={trello} onUpdateProp={(id,updates)=>setProps(ps=>ps.map(p=>p.id===id?{...p,...updates}:p))} isAdmin={isAdmin} onArchive={handleArquivar} isMobile={isMobile} isPhone={isPhone}/>}
+      {view==="detail"&&<Detail p={selP} onDelete={delProp} onNav={nav} trello={trello} onUpdateProp={(id,updates)=>setProps(ps=>ps.map(p=>p.id===id?{...p,...updates}:p))} isAdmin={isAdmin} onArchive={handleArquivar} isMobile={isMobile} isPhone={isPhone} session={session}/>}
       {view==="comparar"&&<Comparativo props={props}/>}
     {view==="busca"&&(isAdmin?<BuscaGPT onAnalisar={(link)=>{nav("novo");setTimeout(()=>{},100)}}/>:<AcessoNegado mensagem="Busca com IA é restrita ao administrador."/>)}
     {view==="graficos"&&<div><div style={{padding:isPhone?"16px":"22px 28px 16px",borderBottom:`1px solid ${C.borderW}`,background:C.white}}><div style={{fontWeight:700,fontSize:19,color:C.text}}>Gráficos</div></div><div style={{padding:isPhone?"16px":"20px 28px"}}><Charts properties={props}/></div></div>}
