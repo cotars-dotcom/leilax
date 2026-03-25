@@ -13,7 +13,7 @@ export default function MobileNav({ items = [], activeKey = "", onNavigate = () 
     return () => mq.removeEventListener?.("change", h);
   }, [breakpointPx]);
 
-  const css = `.axis-shell{min-height:100vh;display:flex;background:#080B10;color:#DDE4F0}.axis-sidebar{width:200px;flex:0 0 200px;background:${THEME.card};border-right:1px solid ${THEME.border}}.axis-main{flex:1 1 auto;min-width:0;overflow-y:auto}@media(max-width:${breakpointPx}px){.axis-sidebar{display:none!important}.axis-main{padding-bottom:calc(86px + env(safe-area-inset-bottom))}}@media(max-width:480px){input,select,textarea{font-size:16px!important}.axis-main{-webkit-overflow-scrolling:touch}.axis-main *{word-break:break-word}}`;
+  const css = `.axis-shell{min-height:100dvh;display:flex;background:#080B10;color:#DDE4F0}.axis-sidebar{width:200px;flex:0 0 200px;background:${THEME.card};border-right:1px solid ${THEME.border}}.axis-main{flex:1 1 auto;min-width:0;overflow-y:auto}@media(max-width:${breakpointPx}px){.axis-sidebar{display:none!important}.axis-main{padding-bottom:calc(86px + env(safe-area-inset-bottom))}}@media(max-width:480px){input,select,textarea{font-size:16px!important}.axis-main{-webkit-overflow-scrolling:touch}.axis-main *{word-break:break-word}}`;
 
   if (!isMobile) return <style>{css}</style>;
 

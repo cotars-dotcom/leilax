@@ -604,6 +604,16 @@ function NovoImovel({onSave,onCancel,onNav,trello,parametrosBanco,criteriosBanco
     if(!url.trim()){setError("Cole o link do leilão");return}
     const hasKey = localStorage.getItem("axis-api-key")
     if(!hasKey){setError("Configure a chave da API Anthropic nas Configurações (⚙️)");return}
+    // Verificar permissão de uso da API
+    try {
+      const { supabase } = await import('./lib/supabase.js')
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data: perfil } = await supabase.from('profiles').select('pode_usar_api, role').eq('id', user.id).single()
+        const podeUsar = perfil?.role === 'admin' || perfil?.pode_usar_api === true
+        if (!podeUsar) { setError('⚠️ Acesso à análise por IA não liberado. Solicite ao administrador.'); return }
+      }
+    } catch (e) { console.warn('[AXIS] Verificação pode_usar_api:', e.message) }
     // Verificar duplicata: local primeiro, depois Supabase
     if(!duplicado) {
       const urlNorm=url.trim()
@@ -1749,7 +1759,7 @@ function PainelConvitesAdmin({ session, imoveis: propImoveis, isPhone }) {
                     <option value="member">Membro</option>
                     <option value="viewer">Visualizador</option>
                   </select>
-                  {u.email !== session?.user?.email && (
+                  {u.email !== session?.user?.email && (<>
                     <button onClick={() => toggleAtivo(u.id, u.ativo)}
                       style={{ padding:'5px 12px', borderRadius:6,
                         fontSize:11, fontWeight:600, cursor:'pointer',
@@ -1758,7 +1768,18 @@ function PainelConvitesAdmin({ session, imoveis: propImoveis, isPhone }) {
                         color: u.ativo ? '#C0392B' : C.emerald }}>
                       {u.ativo ? 'Desativar' : 'Reativar'}
                     </button>
-                  )}
+                    <button onClick={async()=>{
+                      await supabase.from('profiles').update({ pode_usar_api: !u.pode_usar_api }).eq('id', u.id)
+                      carregarDados()
+                    }}
+                      style={{ padding:'5px 12px', borderRadius:6,
+                        fontSize:11, fontWeight:600, cursor:'pointer',
+                        border:'none',
+                        background: u.pode_usar_api ? '#d1fae5' : '#f3f4f6',
+                        color: u.pode_usar_api ? '#065f46' : '#6b7280' }}>
+                      {u.pode_usar_api ? '🤖 API ativa' : '🔒 Sem API'}
+                    </button>
+                  </>)}
                   {u.email === session?.user?.email && (
                     <span style={{ fontSize:10, color:C.hint, fontStyle:'italic' }}>você</span>
                   )}
@@ -2163,6 +2184,15 @@ function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze,isAdmin,onArch
     if(!p?.fonte_url){setMsg("⚠️ Imóvel sem URL de origem para reanalisar");return}
     const claudeKey=localStorage.getItem("axis-api-key")||""
     if(!claudeKey){setMsg("⚠️ Configure a API Key do Claude em Admin → API Keys");return}
+    // Verificar permissão de uso da API
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data: perfil } = await supabase.from('profiles').select('pode_usar_api, role').eq('id', user.id).single()
+        const podeUsar = perfil?.role === 'admin' || perfil?.pode_usar_api === true
+        if (!podeUsar) { setMsg('⚠️ Acesso à análise por IA não liberado. Solicite ao administrador.'); return }
+      }
+    } catch (e) { console.warn('[AXIS] Verificação pode_usar_api:', e.message) }
     if(!confirm("Reanalisar este imóvel com a IA? Os dados serão atualizados.")) return
     setReanalyzing(true);setMsg("")
     try {
@@ -2760,9 +2790,9 @@ export default function App() {
   const isViewer = !isAdmin && profile?.role === 'viewer'
   const podeEditar = isAdmin
   const podeSoVer = !isAdmin
-  if (authLoading) return <div style={{display:'flex',flexDirection:'column',height:'100vh',background:C.offwhite,justifyContent:'center',alignItems:'center',color:C.navy,fontFamily:"'Inter',system-ui,sans-serif",fontSize:'16px',fontWeight:'700'}}>Carregando...</div>
+  if (authLoading) return <div style={{display:'flex',flexDirection:'column',height:'100dvh',background:C.offwhite,justifyContent:'center',alignItems:'center',color:C.navy,fontFamily:"'Inter',system-ui,sans-serif",fontSize:'16px',fontWeight:'700'}}>Carregando...</div>
   if (!session) return <Login />
-  if (profile && !profile.ativo) return <div style={{display:'flex',height:'100vh',background:C.offwhite,justifyContent:'center',alignItems:'center',color:'#E5484D',fontFamily:"'Inter',system-ui,sans-serif",flexDirection:'column',gap:'12px'}}><div style={{fontSize:'16px',fontWeight:'700'}}>Acesso desativado</div><div style={{fontSize:'13px',color:C.muted}}>Contate o administrador</div></div>
+  if (profile && !profile.ativo) return <div style={{display:'flex',height:'100dvh',background:C.offwhite,justifyContent:'center',alignItems:'center',color:'#E5484D',fontFamily:"'Inter',system-ui,sans-serif",flexDirection:'column',gap:'12px'}}><div style={{fontSize:'16px',fontWeight:'700'}}>Acesso desativado</div><div style={{fontSize:'13px',color:C.muted}}>Contate o administrador</div></div>
   const [view,setView]=useState("dashboard")
   const [vp,setVp]=useState({})
   const [props,setProps]=useState([])
@@ -2949,12 +2979,12 @@ useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("param
   const isAct=v=>view===v||(v==="imoveis"&&view==="detail")
   const selP=vp.id?props.find(p=>p.id===vp.id):null
 
-  if(!loaded) return <div style={{display:"flex",height:"100vh",background:C.offwhite,justifyContent:"center",alignItems:"center",flexDirection:"column",gap:"12px",fontFamily:"'Inter',system-ui,sans-serif"}}>
+  if(!loaded) return <div style={{display:"flex",height:"100dvh",background:C.offwhite,justifyContent:"center",alignItems:"center",flexDirection:"column",gap:"12px",fontFamily:"'Inter',system-ui,sans-serif"}}>
     <AxisLogo size="lg" />
     <div style={{color:C.muted,fontWeight:"500",fontSize:"14px",marginTop:8}}>Carregando...</div>
   </div>
 
-  return <div style={{display:"flex",minHeight:"100vh",background:C.offwhite,color:C.text,fontFamily:"'Inter',system-ui,sans-serif",fontSize:"14px",overflow:"hidden"}}>
+  return <div style={{display:"flex",minHeight:"100dvh",background:C.offwhite,color:C.text,fontFamily:"'Inter',system-ui,sans-serif",fontSize:"14px",overflow:"hidden"}}>
     <style>{`*{box-sizing:border-box;}::-webkit-scrollbar{width:4px;}::-webkit-scrollbar-track{background:${C.offwhite};}::-webkit-scrollbar-thumb{background:${C.border};border-radius:2px;}select option{background:${C.white};}@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}a:hover{opacity:.8;}`}</style>
 
     {showTrello&&<TrelloModal config={trello} onSave={saveTrello} onClose={()=>setShowTrello(false)}/>}
@@ -2963,7 +2993,7 @@ useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("param
 
 {/* SIDEBAR — AXIS expandida 200px */}
 <aside className="axis-sidebar" style={{
-  width:200,minWidth:200,height:'100vh',position:'sticky',top:0,
+  width:200,minWidth:200,height:'100dvh',position:'sticky',top:0,
   background:C.navy,display:'flex',flexDirection:'column',
   borderRight:`1px solid ${C.navy2}`,flexShrink:0,
 }}>

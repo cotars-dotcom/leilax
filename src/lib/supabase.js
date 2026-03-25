@@ -669,3 +669,45 @@ export async function verificarImovelDuplicado(url) {
     .limit(3)
   return data?.length > 0 ? data : null
 }
+
+// ── Log de uso de chamadas de API ────────────────────────────────
+export async function logUsoChamadaAPI({
+  tipo, modelo, tokensInput = 0, tokensOutput = 0,
+  imovelId = null, imovelTitulo = null, modoTeste = false, sucesso = true
+}) {
+  try {
+    const PRECOS = {
+      'claude-sonnet-4-20250514': { input: 3.00, output: 15.00 },
+      'claude-haiku-4-5-20251001': { input: 1.00, output: 5.00 },
+      'gpt-4o': { input: 2.50, output: 10.00 },
+    }
+    const preco = PRECOS[modelo] || { input: 3.00, output: 15.00 }
+    const custoUSD = (tokensInput / 1_000_000) * preco.input +
+                     (tokensOutput / 1_000_000) * preco.output
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    await supabase.from('api_usage_log').insert({
+      user_id: user.id, tipo, modelo,
+      tokens_input: tokensInput, tokens_output: tokensOutput,
+      custo_usd: parseFloat(custoUSD.toFixed(6)),
+      imovel_id: imovelId, imovel_titulo: imovelTitulo,
+      modo_teste: modoTeste, sucesso,
+    })
+  } catch (e) {
+    console.warn('[AXIS Log]', e.message)
+  }
+}
+
+export async function getUsoChamadas({ dias = 30 } = {}) {
+  try {
+    const desde = new Date()
+    desde.setDate(desde.getDate() - dias)
+    const { data } = await supabase
+      .from('api_usage_log')
+      .select('*')
+      .gte('criado_em', desde.toISOString())
+      .order('criado_em', { ascending: false })
+      .limit(500)
+    return data || []
+  } catch { return [] }
+}

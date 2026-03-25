@@ -83,6 +83,16 @@ export default function BuscaGPT({ onAnalisar }) {
   const buscar = async () => {
     if (!cidade.trim()) { setError("Informe a cidade"); return; }
     if (!openaiKey.trim()) { setError("Configure a API Key do ChatGPT (OpenAI) abaixo"); setShowKey(true); return; }
+    // Verificar permissão de uso da API
+    try {
+      const { supabase } = await import('../lib/supabase.js')
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data: perfil } = await supabase.from('profiles').select('pode_usar_api, role').eq('id', user.id).single()
+        const podeUsar = perfil?.role === 'admin' || perfil?.pode_usar_api === true
+        if (!podeUsar) { setError('⚠️ Acesso à busca por IA não liberado. Solicite ao administrador.'); return }
+      }
+    } catch (e) { console.warn('[AXIS] Verificação pode_usar_api:', e.message) }
     setLoading(true); setError(""); setResults(null);
     try {
       const query = `Busque imóveis em leilão em ${cidade}. Tipo: ${tipo}. ${maxValor ? `Valor máximo: R$ ${maxValor}` : ""} ${minDesconto ? `Desconto mínimo de ${minDesconto}%` : ""} Priorize imóveis desocupados e financiáveis pela CAIXA. Busque nos portais de leilão brasileiros e retorne os melhores resultados disponíveis hoje.`;

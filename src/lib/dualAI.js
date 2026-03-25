@@ -14,6 +14,8 @@ import {
   REFERENCIAS_BH,
   YIELD_POR_ZONA,
 } from '../data/metricas_bairros_bh.js'
+import { calcularCustoReforma, verificarSobrecapitalizacao } from '../data/custos_reforma.js'
+import { calcularCustoJuridico } from '../data/riscos_juridicos.js'
 
 const CLAUDE_MODEL = 'claude-sonnet-4-20250514'
 const GPT_MODEL = 'gpt-4o'
@@ -320,6 +322,16 @@ Retorne APENAS JSON válido (sem markdown):
       .map(c => c.text)
       .join('') || ''
     const resultado = JSON.parse(txt.replace(/```json|```/g, '').trim())
+    // Log de uso ChatGPT
+    try {
+      const { logUsoChamadaAPI } = await import('./supabase')
+      logUsoChamadaAPI({
+        tipo: 'mercado_chatgpt', modelo: GPT_MODEL,
+        tokensInput: data.usage?.input_tokens || data.usage?.prompt_tokens || 0,
+        tokensOutput: data.usage?.output_tokens || data.usage?.completion_tokens || 0,
+        modoTeste: localStorage.getItem('axis-modo-teste') === 'true',
+      })
+    } catch {}
     // Salvar no cache
     try {
       const { supabase } = await import('./supabase')
@@ -547,6 +559,17 @@ Use apenas tags de texto: [CRITICO] [ATENCAO] [OK] [INFO]
     }
   }
 
+  // Log de uso Claude análise principal
+  try {
+    const { logUsoChamadaAPI } = await import('./supabase')
+    logUsoChamadaAPI({
+      tipo: 'analise_principal', modelo: CLAUDE_MODEL,
+      tokensInput: data.usage?.input_tokens || 0,
+      tokensOutput: data.usage?.output_tokens || 0,
+      modoTeste: localStorage.getItem('axis-modo-teste') === 'true',
+    })
+  } catch {}
+
   const jsonMatch = txt.match(/\{[\s\S]*\}/)
   if (!jsonMatch) throw new Error('Claude não retornou JSON válido')
   return JSON.parse(jsonMatch[0])
@@ -772,6 +795,17 @@ Retorne SOMENTE este JSON (sem texto adicional):
       if (ogFallback) return { fotos: [ogFallback], foto_principal: ogFallback }
       return { fotos: [], foto_principal: null }
     }
+    // Log de uso Haiku fotos
+    try {
+      const { logUsoChamadaAPI } = await import('./supabase')
+      logUsoChamadaAPI({
+        tipo: 'fotos', modelo: 'claude-haiku-4-5-20251001',
+        tokensInput: data.usage?.input_tokens || 0,
+        tokensOutput: data.usage?.output_tokens || 0,
+        modoTeste: localStorage.getItem('axis-modo-teste') === 'true',
+      })
+    } catch {}
+
     const parsed = JSON.parse(jsonMatch[0])
     const fotos = (parsed.fotos || []).filter(f => f && f.startsWith('http')).slice(0, 12)
     let fotoPrincipal = parsed.foto_principal || fotos[0] || null
