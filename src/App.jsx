@@ -597,6 +597,7 @@ function NovoImovel({onSave,onCancel,onNav,trello,parametrosBanco,criteriosBanco
   const [error,setError]=useState("")
   const [trelloMsg,setTrelloMsg]=useState("")
   const [anexos,setAnexos]=useState([])
+  const [urlsDocumentos,setUrlsDocumentos]=useState("")
   const [duplicado,setDuplicado]=useState(null)
   const fileRef=useRef(null)
 
@@ -635,6 +636,37 @@ function NovoImovel({onSave,onCancel,onNav,trello,parametrosBanco,criteriosBanco
       const openaiKey = localStorage.getItem("axis-openai-key") || ""
         const data = await analisarImovelCompleto(url.trim(), hasKey, openaiKey, parametrosBanco, criteriosBanco, (msg) => setStep(msg), anexos)
       data.fonte_url = url.trim()
+      // Analisar documentos (edital, RGI, débitos) se fornecidos
+      const docUrls = urlsDocumentos.split('\n').map(u=>u.trim()).filter(Boolean)
+      if (docUrls.length > 0) {
+        try {
+          setStep("📄 Analisando documentos do leilão...")
+          const { analisarDocumentos } = await import('./lib/analisadorDocumentos.js')
+          const docs = await analisarDocumentos(docUrls, hasKey, (msg) => setStep(msg))
+          if (docs.edital) {
+            data.edital_dados = docs.edital
+            if (docs.edital.valor_avaliacao && !data.valor_avaliacao) data.valor_avaliacao = docs.edital.valor_avaliacao
+            if (docs.edital.data_leilao && !data.data_leilao) data.data_leilao = docs.edital.data_leilao
+            if (docs.edital.leiloeiro && !data.leiloeiro) data.leiloeiro = docs.edital.leiloeiro
+            if (docs.edital.comissao_pct && !data.comissao_leiloeiro_pct) data.comissao_leiloeiro_pct = docs.edital.comissao_pct
+            if (docs.edital.ocupacao && !data.ocupacao) data.ocupacao = docs.edital.ocupacao
+            if (docs.edital.processo_numero && !data.processo_numero) data.processo_numero = docs.edital.processo_numero
+          }
+          if (docs.rgi) {
+            data.rgi_dados = docs.rgi
+            if (docs.rgi.area_m2 && !data.area_usada_calculo_m2) data.area_usada_calculo_m2 = docs.rgi.area_m2
+            if (docs.rgi.onus?.length > 0) data.riscos_presentes = [...(data.riscos_presentes||[]), ...docs.rgi.onus]
+          }
+          if (docs.debitos) {
+            data.debitos_dados = docs.debitos
+            if (docs.debitos.iptu_atraso) data.debitos_iptu = `R$ ${docs.debitos.iptu_atraso.toLocaleString('pt-BR')}`
+            if (docs.debitos.condominio_atraso) data.debitos_condominio = `R$ ${docs.debitos.condominio_atraso.toLocaleString('pt-BR')}`
+            if (docs.debitos.responsabilidade_arrematante === false) data.responsabilidade_debitos = 'sub_rogado'
+            else if (docs.debitos.responsabilidade_arrematante === true) data.responsabilidade_debitos = 'arrematante'
+          }
+          if (docs.erros.length > 0) setTrelloMsg(prev => (prev ? prev + ' | ' : '') + `⚠️ Docs: ${docs.erros.join('; ')}`)
+        } catch (e) { console.warn('[AXIS] Erro documentos:', e.message) }
+      }
       const property = {...data, id:uid(), createdAt:new Date().toISOString()}
       if(trello?.listId&&trello?.boardId) {
         setStep("🔷 Enviando para o Trello...")
@@ -689,6 +721,16 @@ function NovoImovel({onSave,onCancel,onNav,trello,parametrosBanco,criteriosBanco
             <span style={{cursor:"pointer",color:K.red,fontWeight:700}} onClick={()=>setAnexos(anexos.filter((_,j)=>j!==i))}>×</span>
           </span>)}
         </div>}
+      </div>
+      <div style={{marginTop:"12px"}}>
+        <label style={{fontSize:"13px",color:K.t2,fontWeight:600,display:"block",marginBottom:"6px"}}>📄 URLs de documentos — Edital, RGI, Débitos (opcional)</label>
+        <textarea
+          placeholder={"URLs dos documentos (uma por linha)\nEx: https://site.com/edital.pdf\nhttps://site.com/rgi.pdf"}
+          value={urlsDocumentos}
+          onChange={e=>setUrlsDocumentos(e.target.value)}
+          style={{...inp,minHeight:"72px",resize:"vertical",fontSize:isPhone?14:13,lineHeight:"1.5"}}
+        />
+        <div style={{fontSize:"11px",color:K.t3,marginTop:"4px"}}>PDFs de edital, matrícula/RGI e planilha de débitos — serão analisados automaticamente pela IA</div>
       </div>
       </div>
 
@@ -2171,6 +2213,34 @@ function PainelPortfolio({ props: imoveis, isMobile, isPhone }) {
   )
 }
 
+// ── CARD COMPARÁVEL (Accordion) ──────────────────────────────────────────────
+function CardComparavel({item:c, K, isPhone}) {
+  const [aberto, setAberto] = useState(false)
+  const fmtV = v => v ? `R$ ${Number(v).toLocaleString('pt-BR')}` : '—'
+  return <div style={{marginBottom:6,borderRadius:8,overflow:"hidden",border:`1px solid ${K.bd}`}}>
+    <div onClick={()=>setAberto(!aberto)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 12px",cursor:"pointer",background:K.s2}}>
+      <div style={{flex:1,minWidth:0}}>
+        <div style={{fontSize:13,fontWeight:600,color:K.wh,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{c.descricao||'Comparável'}</div>
+        <div style={{fontSize:11,color:K.t3}}>
+          {c.preco_m2?`R$ ${c.preco_m2.toLocaleString('pt-BR')}/m²`:''}
+          {c.similaridade?` · ${c.similaridade.toFixed(1)} compatib.`:''}
+          {c.fonte?` · ${c.fonte}`:''}
+        </div>
+      </div>
+      <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0,marginLeft:8}}>
+        <span style={{fontWeight:700,fontSize:13,color:K.teal}}>{c.valor?`${(c.valor/1000).toFixed(0)}K`:''}</span>
+        <span style={{fontSize:14,color:K.t3}}>{aberto?'▲':'▼'}</span>
+      </div>
+    </div>
+    {aberto&&<div style={{padding:"10px 12px",background:K.bg,borderTop:`1px solid ${K.bd}`,display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6}}>
+      {[['Área',c.area_m2?`${c.area_m2}m²`:'—'],['Quartos',c.quartos??'—'],['Vagas',c.vagas??'—'],
+        ['Tipo',c.tipo??'—'],['Andar',c.andar??'—'],['Cond./mês',c.condominio_mes?fmtV(c.condominio_mes):'—']
+      ].map(([label,val],i)=><div key={i}><div style={{fontSize:10,color:K.t3,textTransform:"uppercase",letterSpacing:.5}}>{label}</div><div style={{fontSize:12.5,fontWeight:600,color:K.wh}}>{val}</div></div>)}
+      {c.link&&<a href={c.link} target="_blank" rel="noreferrer" style={{gridColumn:"1/-1",fontSize:11,color:K.teal,textDecoration:"none"}}>Ver anúncio →</a>}
+    </div>}
+  </div>
+}
+
 // ── DETAIL ────────────────────────────────────────────────────────────────────
 function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze,isAdmin,onArchive,isMobile,isPhone}) {
   const [sending,setSending]=useState(false)
@@ -2447,13 +2517,8 @@ function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze,isAdmin,onArch
       </div>
       {/* Comparáveis */}
       {p.comparaveis?.length>0&&<div style={{...card(),marginBottom:"14px"}}>
-        <div style={{fontWeight:"600",color:K.wh,marginBottom:"10px",fontSize:"13px"}}>🏘️ Comparáveis encontrados</div>
-        {p.comparaveis.map((c,i)=>(
-          <div key={i} style={{display:"flex",justifyContent:"space-between",fontSize:"12px",marginBottom:"6px",padding:"6px 8px",background:K.s2,borderRadius:"6px"}}>
-            <span style={{color:K.t2,flex:1}}>{c.descricao}</span>
-            <span style={{color:K.wh,fontWeight:"600",whiteSpace:"nowrap",marginLeft:"8px"}}>R$ {c.valor?.toLocaleString('pt-BR')} · R$ {c.preco_m2?.toLocaleString('pt-BR')}/m²</span>
-          </div>
-        ))}
+        <div style={{fontWeight:"600",color:K.wh,marginBottom:"10px",fontSize:"13px"}}>🏘️ Comparáveis encontrados ({p.comparaveis.length})</div>
+        {p.comparaveis.map((c,i)=><CardComparavel key={i} item={c} K={K} isPhone={isPhone}/>)}
       </div>}
       {/* Responsabilidade passivos */}
       {p.responsabilidade_debitos&&<div style={{...card(),marginBottom:"14px",background:p.responsabilidade_debitos==='exonerado'?`${K.grn}15`:p.responsabilidade_debitos==='sub_rogado'?`${K.teal}15`:`${K.red}15`,border:`1px solid ${p.responsabilidade_debitos==='exonerado'?K.grn:p.responsabilidade_debitos==='sub_rogado'?K.teal:K.red}30`}}>

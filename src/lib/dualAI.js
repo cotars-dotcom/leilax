@@ -247,6 +247,9 @@ REGRAS DE PESQUISA:
    Para COBERTURA ou DUPLEX:
    - Buscar especificamente "cobertura [bairro] [cidade]"
    - Não comparar com apartamento padrão
+   Para cada comparável, preencher TODOS os campos: quartos, vagas, tipo, andar, condominio_mes, link, fonte.
+   Calcular similaridade (0-10): mesmo tipo +3, mesma faixa área ±20% +3, mesmos quartos +2, mesmas vagas +1, mesmo bairro +1.
+   Retornar apenas comparáveis com similaridade ≥ 6.0, ordenados do mais similar.
 
 3. COLETAR PREÇO/m² CORRETO:
    - Usar ZAP Imóveis → seção "Quanto vale o m² em [bairro]?"
@@ -277,7 +280,10 @@ Retorne APENAS JSON válido (sem markdown):
   "preco_m2_mercado": number,
   "preco_m2_fonte": "string (URL ou descrição da fonte)",
   "comparaveis": [
-    {"descricao": "string", "valor": number, "area_m2": number, "preco_m2": number}
+    {"descricao": "string", "valor": number, "area_m2": number, "preco_m2": number,
+     "quartos": number, "vagas": number, "tipo": "apartamento|cobertura|casa|comercial",
+     "andar": null, "condominio_mes": null, "link": "URL ou null", "fonte": "ZAP|VivaReal|OLX",
+     "similaridade": 8.5}
   ],
   "valor_avaliacao_encontrado": null,
   "lance_minimo_encontrado": null,
@@ -360,7 +366,7 @@ export async function analisarComClaude(url, claudeKey, parametros, criterios, d
     .join('\n')
 
   const comparaveisTexto = (dadosGPT?.comparaveis || [])
-    .map(c => `    - ${c.descricao}: R$ ${c.valor?.toLocaleString('pt-BR')} (${c.area_m2}m\u00b2 = R$ ${c.preco_m2}/m\u00b2)`)
+    .map(c => `    - ${c.descricao}: R$ ${c.valor?.toLocaleString('pt-BR')} (${c.area_m2}m\u00b2 = R$ ${c.preco_m2}/m\u00b2)${c.quartos?` ${c.quartos}Q`:''}${c.vagas?` ${c.vagas}V`:''}${c.tipo?` [${c.tipo}]`:''}${c.similaridade?` sim=${c.similaridade}`:''}`)
     .join('\n')
 
   const contextoGPT = dadosGPT ? `
@@ -465,7 +471,7 @@ Use apenas tags de texto: [CRITICO] [ATENCAO] [OK] [INFO]
   "preco_m2_imovel": 0,
   "preco_m2_mercado": 0,
   "preco_m2_fonte": "string (ex: ZAP bairro Europa/Contagem)",
-  "comparaveis": [{"descricao":"string","valor":0,"area_m2":0,"preco_m2":0}],
+  "comparaveis": [{"descricao":"string","valor":0,"area_m2":0,"preco_m2":0,"quartos":0,"vagas":0,"tipo":"string","andar":null,"condominio_mes":null,"link":null,"fonte":"string","similaridade":0}],
   "valor_mercado_estimado": null,
   "desconto_sobre_mercado_pct": null,
   "gap_preco_asking_closing_pct": null,
