@@ -15,36 +15,25 @@ const C = {
   text:    '#0A1628',
 }
 
-function AxisLogo() {
+function AxisLogo({ corFundo = 'escuro' }) {
+  const corTexto = corFundo === 'escuro' ? '#FFFFFF' : '#052990'
+  const corSeta = '#05A86B'
   return (
-    <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-      <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
-        <rect width="44" height="44" rx="11" fill={C.navy}/>
-        <text x="7" y="31" fontFamily="'Inter',sans-serif"
-          fontWeight="900" fontSize="22" fill="white">A</text>
-        <line x1="26" y1="18" x2="37" y2="9"
-          stroke={C.emerald} strokeWidth="2.5" strokeLinecap="round"/>
-        <polyline points="31,9 37,9 37,15"
-          fill="none" stroke={C.emerald} strokeWidth="2.5"
-          strokeLinecap="round" strokeLinejoin="round"/>
+    <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+      <svg width="160" height="56" viewBox="0 0 200 70" xmlns="http://www.w3.org/2000/svg">
+        {/* Seta verde — acima-direita do A */}
+        <g transform="translate(8, 0)">
+          <line x1="0" y1="18" x2="14" y2="4" stroke={corSeta} strokeWidth="3" strokeLinecap="round"/>
+          <line x1="14" y1="4" x2="14" y2="12" stroke={corSeta} strokeWidth="3" strokeLinecap="round"/>
+          <line x1="6" y1="4" x2="14" y2="4" stroke={corSeta} strokeWidth="3" strokeLinecap="round"/>
+        </g>
+        {/* A */}
+        <text x="0" y="52" fontFamily="'Inter','Helvetica Neue',Arial,sans-serif" fontWeight="800" fontSize="48" letterSpacing="2" fill={corTexto}>A</text>
+        {/* Ponto central verde */}
+        <circle cx="42" cy="44" r="4" fill={corSeta}/>
+        {/* XIS. */}
+        <text x="50" y="52" fontFamily="'Inter','Helvetica Neue',Arial,sans-serif" fontWeight="800" fontSize="48" letterSpacing="2" fill={corTexto}>XIS.</text>
       </svg>
-      <div>
-        <div style={{
-          fontFamily:"'Inter',sans-serif",
-          fontWeight:900, fontSize:24,
-          color:C.navy, letterSpacing:'-1px', lineHeight:1,
-        }}>
-          <span>A</span>
-          <span style={{position:'relative'}}>X</span>
-          <span>IS</span>
-        </div>
-        <div style={{
-          fontSize:9, color:C.muted, letterSpacing:'2px',
-          textTransform:'uppercase', marginTop:1,
-        }}>
-          InteligÃªncia Patrimonial
-        </div>
-      </div>
     </div>
   )
 }
@@ -77,7 +66,7 @@ export default function Login() {
 
   async function handleCadastro(e) {
     e?.preventDefault()
-    if (!convite) { setErro('CÃ³digo de convite obrigatÃ³rio'); return }
+    if (!convite) { setErro('Código de convite obrigatório'); return }
     setLoading(true); setErro('')
     try {
       const { data: conv } = await supabase
@@ -86,7 +75,7 @@ export default function Login() {
         .eq('token', convite)
         .eq('usado', false)
         .single()
-      if (!conv) throw new Error('Convite invÃ¡lido ou jÃ¡ utilizado')
+      if (!conv) throw new Error('Convite inválido ou já utilizado')
       const { data, error } = await supabase.auth.signUp({ email, password: senha })
       if (error) throw error
       await supabase.from('profiles').upsert({
@@ -112,7 +101,7 @@ export default function Login() {
       fontFamily:"'Inter', system-ui, sans-serif",
       background: C.bg,
     }}>
-      {/* ââ LADO ESQUERDO: Brand âââââââââââââââââââââââââââ */}
+      {/* ── LADO ESQUERDO: Brand ─────────────────────────── */}
       <div style={{
         width: isMobileLogin ? '100%' : '45%',
         minHeight: isMobileLogin ? 'auto' : '100vh',
@@ -162,23 +151,23 @@ export default function Login() {
             color:'#FFFFFF', fontSize:40, fontWeight:800,
             letterSpacing:'-1.5px', lineHeight:1.15, margin:'0 0 16px',
           }}>
-            VisÃ£o de<br/>Oportunidade.<br/>
-            <span style={{color:C.emerald}}>Base de<br/>ConfianÃ§a.</span>
+            Visão de<br/>Oportunidade.<br/>
+            <span style={{color:C.emerald}}>Base de<br/>Confiança.</span>
           </h1>
           <p style={{
             color:'rgba(255,255,255,0.5)', fontSize:15,
             lineHeight:1.6, margin:0, maxWidth:320,
           }}>
-            Plataforma de inteligÃªncia patrimonial para leilÃµes estratÃ©gicos,
-            due diligence e anÃ¡lise de ativos imobiliÃ¡rios.
+            Plataforma de inteligência patrimonial para leilões estratégicos,
+            due diligence e análise de ativos imobiliários.
           </p>
         </div>
 
         <div style={{ display:'flex', gap:32 }}>
           {[
-            { label:'PatrimÃ´nio gerido', val:'R$ 8,9M' },
-            { label:'ImÃ³veis analisados', val:'24+' },
-            { label:'Score mÃ©dio', val:'7,4' },
+            { label:'Patrimônio gerido', val:'R$ 8,9M' },
+            { label:'Imóveis analisados', val:'24+' },
+            { label:'Score médio', val:'7,4' },
           ].map(s => (
             <div key={s.label}>
               <p style={{ margin:0, fontSize:20, fontWeight:800, color:C.emerald }}>
@@ -193,7 +182,7 @@ export default function Login() {
         </div>
       </div>
 
-      {/* ââ LADO DIREITO: FormulÃ¡rio âââââââââââââââââââââââ */}
+      {/* ── LADO DIREITO: Formulário ─────────────────────── */}
       <div style={{
         flex:1, display:'flex', flexDirection:'column',
         alignItems:'center', justifyContent:'center',
@@ -249,7 +238,7 @@ export default function Login() {
                 </label>
                 <input
                   type="password" value={senha} onChange={e=>setSenha(e.target.value)}
-                  placeholder="â¢â¢â¢â¢â¢â¢â¢â¢" required autoComplete="current-password"
+                  placeholder="••••••••" required autoComplete="current-password"
                   style={{
                     width:'100%', padding:'12px 14px', borderRadius:9,
                     border:`1.5px solid ${C.border}`, fontSize:14,
@@ -265,7 +254,7 @@ export default function Login() {
                 <div style={{
                   padding:'10px 14px', borderRadius:8,
                   background:'#FEE8E8', color:'#C0392B', fontSize:13,
-                }}>â ï¸ {erro}</div>
+                }}>⚠️ {erro}</div>
               )}
 
               <button type="submit" disabled={loading}
@@ -277,7 +266,7 @@ export default function Login() {
                   transition:'all 0.15s', marginTop:4,
                   letterSpacing:'-0.3px',
                 }}>
-                {loading ? 'Entrando...' : 'Entrar na plataforma â'}
+                {loading ? 'Entrando...' : 'Entrar na plataforma →'}
               </button>
             </form>
           ) : (
@@ -288,14 +277,14 @@ export default function Login() {
                 border:'1px solid rgba(0,43,128,0.12)',
                 fontSize:12.5, color:C.navy, lineHeight:1.5,
               }}>
-                ð Acesso por <b>convite</b>. Insira o cÃ³digo recebido pelo administrador.
+                🔐 Acesso por <b>convite</b>. Insira o código recebido pelo administrador.
               </div>
 
               {[
                 { label:'Nome completo', val:nome, set:setNome, type:'text', ph:'Gabriel Mattos', ac:'name' },
                 { label:'Email', val:email, set:setEmail, type:'email', ph:'seu@email.com', ac:'email' },
                 { label:'Senha', val:senha, set:setSenha, type:'password', ph:'min. 6 caracteres', ac:'new-password' },
-                { label:'CÃ³digo de convite', val:convite, set:setConvite, type:'text', ph:'TOKEN-CONVITE', ac:'off' },
+                { label:'Código de convite', val:convite, set:setConvite, type:'text', ph:'TOKEN-CONVITE', ac:'off' },
               ].map(f => (
                 <div key={f.label}>
                   <label style={{fontSize:12,fontWeight:600,color:C.muted,
@@ -321,13 +310,13 @@ export default function Login() {
                 <div style={{
                   padding:'10px 14px', borderRadius:8,
                   background:'#FEE8E8', color:'#C0392B', fontSize:13,
-                }}>â ï¸ {erro}</div>
+                }}>⚠️ {erro}</div>
               )}
               {sucesso && (
                 <div style={{
                   padding:'10px 14px', borderRadius:8,
                   background:C.emeraldL, color:C.emerald, fontSize:13, fontWeight:500,
-                }}>â {sucesso}</div>
+                }}>✅ {sucesso}</div>
               )}
 
               <button type="submit" disabled={loading}
@@ -338,7 +327,7 @@ export default function Login() {
                   fontSize:15, fontWeight:700, cursor: loading ? 'wait' : 'pointer',
                   transition:'all 0.15s', marginTop:4,
                 }}>
-                {loading ? 'Criando conta...' : 'Criar conta â'}
+                {loading ? 'Criando conta...' : 'Criar conta →'}
               </button>
             </form>
           )}
@@ -353,7 +342,7 @@ export default function Login() {
               AXIS Intelligence v2.1
             </p>
             <p style={{margin:0, fontSize:11, color:C.hint}}>
-              Belo Horizonte Â· MG
+              Belo Horizonte · MG
             </p>
           </div>
         </div>
