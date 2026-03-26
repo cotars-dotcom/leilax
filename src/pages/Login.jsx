@@ -15,12 +15,12 @@ const C = {
   text:    '#0A1628',
 }
 
-function AxisLogo({ corFundo = 'escuro' }) {
+function AxisLogo({ tamanho = 120, corFundo = 'escuro' }) {
   const corTexto = corFundo === 'escuro' ? '#FFFFFF' : '#052990'
   const corSeta = '#05A86B'
   return (
     <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-      <svg width="160" height="56" viewBox="0 0 200 70" xmlns="http://www.w3.org/2000/svg">
+      <svg width={tamanho} height={tamanho * 0.35} viewBox="0 0 200 70" xmlns="http://www.w3.org/2000/svg">
         {/* Seta verde — acima-direita do A */}
         <g transform="translate(8, 0)">
           <line x1="0" y1="18" x2="14" y2="4" stroke={corSeta} strokeWidth="3" strokeLinecap="round"/>
@@ -30,9 +30,9 @@ function AxisLogo({ corFundo = 'escuro' }) {
         {/* A */}
         <text x="0" y="52" fontFamily="'Inter','Helvetica Neue',Arial,sans-serif" fontWeight="800" fontSize="48" letterSpacing="2" fill={corTexto}>A</text>
         {/* Ponto central verde */}
-        <circle cx="42" cy="44" r="4" fill={corSeta}/>
+        <circle cx="58" cy="44" r="4" fill={corSeta}/>
         {/* XIS. */}
-        <text x="50" y="52" fontFamily="'Inter','Helvetica Neue',Arial,sans-serif" fontWeight="800" fontSize="48" letterSpacing="2" fill={corTexto}>XIS.</text>
+        <text x="66" y="52" fontFamily="'Inter','Helvetica Neue',Arial,sans-serif" fontWeight="800" fontSize="48" letterSpacing="2" fill={corTexto}>XIS.</text>
       </svg>
     </div>
   )
@@ -144,7 +144,7 @@ export default function Login() {
             fill="rgba(5,168,109,0.06)"/>
         </svg>
 
-        <AxisLogo />
+        <AxisLogo tamanho={160} corFundo="escuro" />
 
         <div>
           <h1 style={{

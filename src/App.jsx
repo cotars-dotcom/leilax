@@ -137,6 +137,7 @@ function AxisLogo({ collapsed = false, light = false, size }) {
     <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 3, position: "relative" }}>
         <span style={{ fontFamily: "'Inter',sans-serif", fontWeight: 900, fontSize: 26, color: textColor, letterSpacing: "-1px", lineHeight: 1 }}>A</span>
+        <span style={{ color: arrowColor, fontWeight: 900, fontSize: 18, lineHeight: 1, marginBottom: -2 }}>·</span>
         <span style={{ position: "relative", fontFamily: "'Inter',sans-serif", fontWeight: 900, fontSize: 26, color: textColor, letterSpacing: "-1px", lineHeight: 1 }}>
           X
           <svg style={{ position: "absolute", top: -2, left: 0, width: "100%", height: "110%", pointerEvents: "none" }} viewBox="0 0 20 28">
@@ -144,11 +145,11 @@ function AxisLogo({ collapsed = false, light = false, size }) {
             <polyline points="11,4 16,4 16,9" fill="none" stroke={arrowColor} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         </span>
-        <span style={{ fontFamily: "'Inter',sans-serif", fontWeight: 900, fontSize: 26, color: textColor, letterSpacing: "-1px", lineHeight: 1 }}>IS</span>
+        <span style={{ fontFamily: "'Inter',sans-serif", fontWeight: 900, fontSize: 26, color: textColor, letterSpacing: "-1px", lineHeight: 1 }}>IS.</span>
       </div>
       {!light && (
         <span style={{ fontSize: 8.5, color: C.muted, letterSpacing: "1.5px", textTransform: "uppercase", paddingLeft: 1 }}>
-          Intelig&ecirc;ncia Patrimonial
+          Inteligência Patrimonial
         </span>
       )}
     </div>
@@ -1969,6 +1970,15 @@ function CalculadoraROI({ imovel }) {
   const lucroFinanciado = vmercado - saldoDevedor - entradaValor - reforma - comissao - itbi - doc
   const fmt = n => n ? `R$ ${Math.round(n).toLocaleString('pt-BR')}` : '—'
   const pct = n => n ? `${n.toFixed(1)}%` : '—'
+  // MAO — Lance Máximo para margem mínima de 20%
+  const custosFixos = comissao + itbi + doc + reforma
+  const capRatePct  = imovel.classe_ipead === 'Classe 4 - Luxo' ? 4.0
+                    : imovel.classe_ipead === 'Classe 3 - Alto' ? 5.0 : 6.0
+  const maoFlip     = vmercado > 0 ? vmercado * 0.80 - custosFixos : 0
+  const maoLocacao  = aluguelMensal > 0
+                    ? (aluguelMensal * 12) / (capRatePct / 100) - custosFixos
+                    : 0
+  const lanceViavel = lance <= maoFlip
   return (
     <div style={{ marginTop: 20 }}>
       <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
@@ -2031,6 +2041,20 @@ function CalculadoraROI({ imovel }) {
               {pct(roiFlip)}
             </span>
           </div>
+          {maoFlip > 0 && (
+            <div style={{background:C.surface, borderRadius:8, padding:'8px 12px',
+              marginTop:8, border:`1px solid ${lanceViavel ? C.emerald+'40' : RED+'40'}`}}>
+              <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                <span style={{fontSize:11, color:C.muted}}>Lance máximo (margem 20%)</span>
+                <span style={{fontSize:14, fontWeight:800,
+                  color: lanceViavel ? C.emerald : RED}}>{fmt(maoFlip)}</span>
+              </div>
+              <p style={{margin:'4px 0 0', fontSize:11,
+                color: lanceViavel ? C.emerald : RED}}>
+                {lanceViavel ? '✓ Lance atual está dentro do MAO' : '✗ Lance atual supera o MAO'}
+              </p>
+            </div>
+          )}
         </div>
       )}
       {estrategia === 'locacao' && (
@@ -2046,6 +2070,14 @@ function CalculadoraROI({ imovel }) {
               <span style={{ color:C.navy, fontWeight:600 }}>{v}</span>
             </div>
           ))}
+          {maoLocacao > 0 && (
+            <div style={{background:C.surface, borderRadius:8, padding:'8px 12px', marginTop:8}}>
+              <span style={{fontSize:11, color:C.muted}}>Lance máximo (yield {capRatePct}% a.a.)</span>
+              <span style={{fontSize:14, fontWeight:800, color:C.navy, marginLeft:8}}>
+                {fmt(maoLocacao)}
+              </span>
+            </div>
+          )}
         </div>
       )}
       {estrategia === 'financiado' && (
@@ -2334,7 +2366,7 @@ function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze,isAdmin,onArch
     setSending(false)
   }
   return <div>
-    <Hdr title={<>{p.titulo||"Imóvel"}{p.codigo_axis&&<span style={{fontSize:"10.5px",fontWeight:700,padding:"2px 8px",borderRadius:4,background:"#002B8010",color:"#002B80",border:"1px solid #002B8020",fontFamily:"monospace",letterSpacing:"0.5px",marginLeft:10,verticalAlign:"middle"}}>{p.codigo_axis}</span>}{p.trello_card_url&&<a href={p.trello_card_url} target="_blank" rel="noreferrer" style={{fontSize:11,color:"#0052CC",marginLeft:8,verticalAlign:"middle",textDecoration:"none"}}>Trello</a>}</>} sub={`${p.cidade}/${p.estado} · ${fmtD(p.createdAt)}`}
+    <Hdr title={<>{p.titulo||"Imóvel"}{p.codigo_axis&&<span style={{fontSize:"10.5px",fontWeight:700,padding:"2px 8px",borderRadius:4,background:"#002B8010",color:"#002B80",border:"1px solid #002B8020",fontFamily:"monospace",letterSpacing:"0.5px",marginLeft:10,verticalAlign:"middle"}}>{p.codigo_axis}</span>}{p.num_leilao&&<span style={{display:"inline-block",background:p.num_leilao>=2?"#FEF3C7":"#ECFDF5",color:p.num_leilao>=2?"#D97706":"#065F46",fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:4,marginLeft:6,verticalAlign:"middle"}}>{p.num_leilao}º LEILÃO{p.num_leilao>=2?" · mín. 50%":""}</span>}{p.trello_card_url&&<a href={p.trello_card_url} target="_blank" rel="noreferrer" style={{fontSize:11,color:"#0052CC",marginLeft:8,verticalAlign:"middle",textDecoration:"none"}}>Trello</a>}</>} sub={`${p.cidade}/${p.estado} · ${fmtD(p.createdAt)}`}
       actions={<>
         {p.fonte_url&&<a href={p.fonte_url} target="_blank" rel="noopener noreferrer" style={{...btn("s"),textDecoration:"none",display:"inline-block"}}>🔗 Anúncio</a>}
         {isAdmin&&<button style={{...btn("s"),background:`${K.amb}15`,color:K.amb,border:`1px solid ${K.amb}30`}} onClick={handleReanalyze} disabled={reanalyzing}>{reanalyzing?"⏳ Reanalisando...":"🔄 Reanalisar"}</button>}

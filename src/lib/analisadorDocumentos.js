@@ -74,9 +74,12 @@ export async function analisarEdital(url, apiKey) {
 - Imóvel desocupado ou ocupado (se mencionado)
 - Restrições especiais (ITBI, condomínio em atraso, débitos sub-rogados, etc.)
 - Número do processo judicial
+- Vara judicial (ex: "7ª Vara do Trabalho de Belo Horizonte")
+- Tipo de justiça: "TRT-3" | "TJMG" | "FEDERAL" | "EXTRAJUDICIAL"
+- Número do leilão (1 ou 2)
 Responda SOMENTE em JSON, sem markdown, sem explicações.
 Formato: {"data_leilao":"","data_2o_leilao":"","valor_avaliacao":0,"lance_minimo_1":0,"lance_minimo_2":0,
-"leiloeiro":"","comissao_pct":0,"prazo_pagamento":"","ocupacao":"","restricoes":"","processo_numero":""}`, 1500)
+"leiloeiro":"","comissao_pct":0,"prazo_pagamento":"","ocupacao":"","restricoes":"","processo_numero":"","vara_judicial":"","tipo_justica":"","num_leilao":1}`, 1500)
 }
 
 export async function analisarRGI(url, apiKey) {

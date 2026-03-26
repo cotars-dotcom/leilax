@@ -128,6 +128,7 @@ const IMOVEIS_COLS = new Set([
   'trello_card_id','trello_card_url','trello_list_id','trello_sincronizado_em',
   'analise_dupla_ia','comparaveis','sintese_executiva',
   'edital_dados','rgi_dados','debitos_dados',
+  'vara_judicial','tipo_justica',
 ])
 
 export async function saveImovelCompleto(imovel, userId) {
