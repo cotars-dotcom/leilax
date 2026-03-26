@@ -73,6 +73,8 @@ function normalizarTextoAlerta(texto) {
   s = s
     .replace(/[ÃÐÂ°]{3,}[^\s]*/g, '')
     .replace(/ÃÐÂ°[^\s]*/g, '')
+    .replace(/ÃÐ\s?/g, '')
+    .replace(/^[ÃÐÂ°\s]+/, '')
     .replace(/ÃÂÂ°ÃÂÃÂÃÂÃÂÃÂÃÂÃÂ°/g, '⚠️')
     .replace(/Ã°ÂÃÂÃ°/g, '⚠️')
     .replace(/Ã°Â\S*/g, '')
