@@ -560,11 +560,31 @@ function ModalAuditoriaTrello({ config, imoveis, onClose }) {
 }
 
 // ── API KEY MODAL ─────────────────────────────────────────────────────────────
-function ApiKeyModal({onClose}) {
+function ApiKeyModal({onClose, session}) {
  const [key,setKey]=useState(localStorage.getItem("axis-api-key")||"")
  const [oaiKey,setOaiKey]=useState(localStorage.getItem("axis-openai-key")||"")
  const [modoTeste,setModoTeste]=useState(localStorage.getItem('axis-modo-teste')==='true')
- const save=()=>{localStorage.setItem("axis-api-key",key.trim());if(oaiKey.trim())localStorage.setItem("axis-openai-key",oaiKey.trim());onClose()}
+ const [saving,setSaving]=useState(false)
+ // Carregar do Supabase ao abrir (se logado)
+ useEffect(()=>{
+   if(!session?.user?.id) return
+   import('./lib/supabase.js').then(({loadApiKeys})=>{
+     loadApiKeys(session.user.id).then(({claudeKey,openaiKey})=>{
+       if(claudeKey&&!localStorage.getItem("axis-api-key")){setKey(claudeKey);localStorage.setItem("axis-api-key",claudeKey)}
+       if(openaiKey&&!localStorage.getItem("axis-openai-key")){setOaiKey(openaiKey);localStorage.setItem("axis-openai-key",openaiKey)}
+     })
+   })
+ },[session])
+ const save=async()=>{
+   const k=key.trim(),ok=oaiKey.trim()
+   if(k)localStorage.setItem("axis-api-key",k)
+   if(ok)localStorage.setItem("axis-openai-key",ok)
+   if(session?.user?.id&&k){
+     setSaving(true)
+     try{const{persistApiKeys}=await import('./lib/supabase.js');await persistApiKeys(session.user.id,{claudeKey:k,openaiKey:ok})}catch(e){console.warn('[AXIS] save keys:',e)}finally{setSaving(false)}
+   }
+   onClose()
+ }
   return <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.75)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:"20px"}}>
     <div style={{background:K.s1,border:`1px solid ${K.bd}`,borderRadius:"10px",padding:"28px",maxWidth:"480px",width:"100%"}}>
       <div style={{display:"flex",justifyContent:"space-between",marginBottom:"20px"}}>
@@ -589,7 +609,7 @@ function ApiKeyModal({onClose}) {
   Obtenha em: <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" style={{color:K.blue}}>platform.openai.com</a> · Usada na Busca GPT
  </div>
       <div style={{background:`${K.amb}10`,border:`1px solid ${K.amb}30`,borderRadius:"6px",padding:"12px",marginBottom:"16px",fontSize:"11.5px",color:K.amb}}>
- ⚠️ As chaves ficam salvas apenas no seu navegador (localStorage). Nunca são enviadas para servidores externos além da Anthropic/OpenAI.
+ ⚠️ As chaves são salvas no Supabase (por usuário) e sincronizadas entre dispositivos. Nunca enviadas para servidores externos além da Anthropic/OpenAI.
       </div>
       <div style={{marginTop:16,display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 14px',background:K.s2,borderRadius:8,border:`1px solid ${K.bd}`}}>
         <div>
@@ -2904,15 +2924,13 @@ useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("param
     } catch {}
   }, [])
 
-  // FIX 1: Sync API keys from Supabase (cross-device)
+  // Sync API keys from Supabase por usuário (cross-device)
   useEffect(()=>{
-    if(!session) return
-    import('./lib/supabase.js').then(({getAppSetting})=>{
-      getAppSetting('anthropic_api_key').then(k=>{
-        if(k&&k.length>10){localStorage.setItem('axis-api-key',k);setApiKey(k)}
-      }).catch(()=>{})
-      getAppSetting('openai_api_key').then(k=>{
-        if(k&&k.length>10){localStorage.setItem('axis-openai-key',k)}
+    if(!session?.user?.id) return
+    import('./lib/supabase.js').then(({loadApiKeys})=>{
+      loadApiKeys(session.user.id).then(({claudeKey,openaiKey})=>{
+        if(claudeKey&&!localStorage.getItem('axis-api-key')){localStorage.setItem('axis-api-key',claudeKey);setApiKey(claudeKey)}
+        if(openaiKey&&!localStorage.getItem('axis-openai-key')){localStorage.setItem('axis-openai-key',openaiKey)}
       }).catch(()=>{})
     }).catch(()=>{})
   },[session])
@@ -3069,7 +3087,7 @@ useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("param
     <style>{`*{box-sizing:border-box;}::-webkit-scrollbar{width:4px;}::-webkit-scrollbar-track{background:${C.offwhite};}::-webkit-scrollbar-thumb{background:${C.border};border-radius:2px;}select option{background:${C.white};}@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}a:hover{opacity:.8;}`}</style>
 
     {showTrello&&<TrelloModal config={trello} onSave={saveTrello} onClose={()=>setShowTrello(false)}/>}
-    {showApiKey&&<ApiKeyModal onClose={()=>setShowApiKey(false)}/>}
+    {showApiKey&&<ApiKeyModal onClose={()=>setShowApiKey(false)} session={session}/>}
     {showTrelloModal&&<ModalAuditoriaTrello config={trello||JSON.parse(localStorage.getItem('axis-trello')||'{}')} imoveis={props} onClose={()=>setShowTrelloModal(false)}/>}
 
 {/* SIDEBAR — AXIS expandida 200px */}
