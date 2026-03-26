@@ -313,6 +313,33 @@ export async function setAppSetting(chave, valor, userId) {
   invalidarCache('app_settings')
 }
 
+// == API KEYS POR USUÁRIO (cross-device sync) ==
+export async function loadApiKeys(userId) {
+  try {
+    const { data } = await supabase
+      .from('app_settings')
+      .select('valor')
+      .eq('chave', `api_keys_${userId}`)
+      .single()
+    if (data?.valor) {
+      const keys = JSON.parse(data.valor)
+      return { claudeKey: keys.claude || '', openaiKey: keys.openai || '' }
+    }
+  } catch {}
+  return { claudeKey: '', openaiKey: '' }
+}
+
+export async function persistApiKeys(userId, { claudeKey, openaiKey }) {
+  try {
+    await supabase.from('app_settings').upsert({
+      chave: `api_keys_${userId}`,
+      valor: JSON.stringify({ claude: claudeKey, openai: openaiKey }),
+      atualizado_em: new Date().toISOString()
+    }, { onConflict: 'chave' })
+  } catch(e) { console.warn('[AXIS] persistApiKeys:', e.message) }
+}
+
+
 // == CONVITES ==
 export async function criarConvite(email, nome, role, adminId) {
   const token = Math.random().toString(36).slice(2) + Date.now().toString(36)
