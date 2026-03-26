@@ -47,7 +47,7 @@ export async function getSession() {
     const { data, error } = await supabase.auth.getSession()
     if (error) return null
     return data?.session ?? null
-  } catch { return null }
+  } catch(e) { console.warn('[AXIS] getSession:', e.message); return null }
 }
 
 // == PROFILES ==
@@ -287,7 +287,7 @@ export async function getAppSetting(chave) {
         .from('app_settings').select('valor').eq('chave', chave).single()
       if (error) return null
       return data?.valor || null
-    } catch { return null }
+    } catch(e) { console.warn('[AXIS] getAppSetting:', e.message); return null }
   })
 }
 
@@ -298,7 +298,7 @@ export async function getAppSettings() {
         .from('app_settings').select('chave, valor, descricao')
       if (error) return {}
       return Object.fromEntries((data || []).map(r => [r.chave, r]))
-    } catch { return {} }
+    } catch(e) { console.warn('[AXIS] getAppSettings:', e.message); return {} }
   })
 }
 
@@ -341,7 +341,7 @@ export async function validarConvite(token) {
       .from('convites').select('*').eq('token', token).eq('usado', false).single()
     if (!data || new Date(data.expira_em) < new Date()) return null
     return data
-  } catch { return null }
+  } catch(e) { console.warn('[AXIS] validarConvite:', e.message); return null }
 }
 
 export async function usarConvite(token) {
@@ -400,7 +400,7 @@ export async function logAtividade(userId, acao, entidade, entidadeId, detalhes)
       usuario_id: userId, acao, entidade,
       entidade_id: entidadeId, detalhes
     })
-  } catch {}
+  } catch(e) { console.warn('[AXIS] registrarAtividade:', e.message) }
 }
 
 // == MERCADO REGIONAL ==
@@ -710,5 +710,5 @@ export async function getUsoChamadas({ dias = 30 } = {}) {
       .order('criado_em', { ascending: false })
       .limit(500)
     return data || []
-  } catch { return [] }
+  } catch(e) { console.warn('[AXIS] getUsoChamadas:', e.message); return [] }
 }

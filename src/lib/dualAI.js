@@ -39,7 +39,7 @@ IMÓVEL CAIXA (leilão ou venda direta):
 
 BLOQUEIOS AUTOMÁTICOS:
 - Divergência edital vs matrícula: score máximo 35, recomendação EVITAR
-- Imóvel ocupado: score × 0.85
+- Imóvel ocupado: refletir no score_ocupacao (não aplicar multiplicador extra)
 - Risco nota ≥ 9: penalizar -35 pontos no score
 
 Para qualquer campo jurídico identificado, informe:
@@ -228,7 +228,7 @@ export async function pesquisarMercadoGPT(url, cidade, tipo, openaiKey) {
         return cached.dados
       }
     }
-  } catch {}
+  } catch(e) { console.warn('[AXIS] Cache mercado read:', e.message) }
 
   const prompt = `Você é um especialista em mercado imobiliário brasileiro.
 Pesquise na internet dados ATUAIS sobre este imóvel de leilão: ${url}
@@ -303,6 +303,7 @@ Retorne APENAS JSON válido (sem markdown):
   try {
     const res = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
+      signal: AbortSignal.timeout(45000),
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${openaiKey}`
@@ -337,7 +338,7 @@ Retorne APENAS JSON válido (sem markdown):
         tokensOutput: data.usage?.output_tokens || data.usage?.completion_tokens || 0,
         modoTeste: localStorage.getItem('axis-modo-teste') === 'true',
       })
-    } catch {}
+    } catch(e) { console.warn('[AXIS] Log GPT:', e.message) }
     // Salvar no cache
     try {
       const { supabase } = await import('./supabase')
@@ -410,7 +411,7 @@ INSTRUÇÕES:
 1. Acesse a URL e extraia todos os dados disponíveis do imóvel
 2. Use os dados do ChatGPT para calibrar scores de localização e mercado
 3. Calcule o score_total como média ponderada usando os pesos acima
-4. Aplique penalizações: juridico<4 → ×0.75; ocupado → ×0.85
+4. Penalize DENTRO de cada dimensão (score_juridico e score_ocupacao) — NÃO aplique multiplicadores extras ao score_total
 5. Seja conservador nas estimativas de retorno
 6. Indique estrutura de aquisição ideal (CPF, Condomínio, PJ, Procuração)
 
@@ -522,6 +523,7 @@ Use apenas tags de texto: [CRITICO] [ATENCAO] [OK] [INFO]
 
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
+    signal: AbortSignal.timeout(60000),
     headers: {
       'Content-Type': 'application/json',
       'x-api-key': claudeKey,
@@ -574,7 +576,7 @@ Use apenas tags de texto: [CRITICO] [ATENCAO] [OK] [INFO]
       tokensOutput: data.usage?.output_tokens || 0,
       modoTeste: localStorage.getItem('axis-modo-teste') === 'true',
     })
-  } catch {}
+  } catch(e) { console.warn('[AXIS] Log Sonnet:', e.message) }
 
   const jsonMatch = txt.match(/\{[\s\S]*\}/)
   if (!jsonMatch) throw new Error('Claude não retornou JSON válido')
@@ -606,8 +608,8 @@ export function calcularScore(analise, parametros) {
     (analise.score_liquidez    || 0) * p.liquidez    +
     (analise.score_mercado     || 0) * p.mercado
 
-  if ((analise.score_juridico || 0) < 4) score *= 0.75
-  if ((analise.ocupacao || '').toLowerCase() === 'ocupado') score *= 0.85
+  // Penalidades removidas — Claude já penaliza nas dimensões score_juridico e score_ocupacao.
+  // Aplicar multiplicadores extras causava distorção (D2/D3 do diagnóstico).
 
   return Math.min(10, Math.max(0, parseFloat(score.toFixed(2))))
 }
@@ -712,10 +714,7 @@ export function validarECorrigirAnalise(analise) {
       (analise.score_ocupacao    || 0) * pesos.ocupacao +
       (analise.score_liquidez    || 0) * pesos.liquidez +
       (analise.score_mercado     || 0) * pesos.mercado
-    let fator = 1
-    if ((analise.score_juridico || 0) < 4) fator *= 0.75
-    if (ocupLower === 'ocupado') fator *= 0.85
-    analise.score_total = Math.min(10, Math.round(scoreBase * fator * 10) / 10)
+    analise.score_total = Math.min(10, Math.round(scoreBase * 10) / 10)
     if (analise.score_total >= 7.5) analise.recomendacao = 'COMPRAR'
     else if (analise.score_total >= 6.0) analise.recomendacao = 'AGUARDAR'
     else analise.recomendacao = 'EVITAR'
@@ -731,8 +730,9 @@ export function validarECorrigirAnalise(analise) {
 export async function extrairFotosImovel(url, claudeKey) {
   if (!url || !claudeKey) return { fotos: [], foto_principal: null }
 
-  // Tentar og:image como fallback rapido antes da IA
+  // Tentar og:image + img src como fallback rapido antes da IA
   let ogFallback = null
+  let imgsDoHTML = []
   try {
     const htmlRes = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(8000) })
     if (htmlRes.ok) {
@@ -740,8 +740,32 @@ export async function extrairFotosImovel(url, claudeKey) {
       const ogMatch = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)
         || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i)
       if (ogMatch) ogFallback = ogMatch[1]
+      // Extrair <img src> relevantes do HTML
+      const imgMatches = [...html.matchAll(/<img[^>]+src=["']([^"']+)["']/gi)]
+      const baseOrigin = new URL(url).origin
+      imgsDoHTML = imgMatches
+        .map(m => {
+          const src = m[1]
+          if (src.startsWith('http')) return src
+          if (src.startsWith('//')) return 'https:' + src
+          if (src.startsWith('/')) return baseOrigin + src
+          return null
+        })
+        .filter(src => src
+          && !src.includes('logo') && !src.includes('icon') && !src.includes('banner')
+          && !src.includes('favicon') && !src.includes('sprite')
+          && (src.includes('foto') || src.includes('lote') || src.includes('imovel')
+            || src.includes('storage') || src.includes('upload')
+            || /\.(jpg|jpeg|png|webp)/i.test(src))
+        )
+        .slice(0, 8)
     }
-  } catch { /* ignorar - sites SPA podem nao retornar */ }
+  } catch(e) { console.warn('[AXIS] HTML fetch fotos:', e.message) }
+
+  // Se HTML já tem fotos suficientes, retornar sem chamar Haiku (economiza R$0,02)
+  if (imgsDoHTML.length >= 3) {
+    return { fotos: imgsDoHTML, foto_principal: imgsDoHTML[0] }
+  }
 
   // Extrair dominio e ID do lote da URL para ajudar a IA
   let dominio = '', loteId = ''
@@ -749,7 +773,7 @@ export async function extrairFotosImovel(url, claudeKey) {
     dominio = new URL(url).hostname
     const loteMatch = url.match(/\/lote\/(\d+)/)
     if (loteMatch) loteId = loteMatch[1]
-  } catch {}
+  } catch(e) { console.warn('[AXIS] Parse URL fotos:', e.message) }
 
   try {
     const promptFotos = `Preciso das fotos deste imovel de leilao: ${url}
@@ -773,6 +797,7 @@ Retorne SOMENTE este JSON (sem texto adicional):
 
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
+      signal: AbortSignal.timeout(20000),
       headers: {
         'Content-Type': 'application/json',
         'x-api-key': claudeKey,
@@ -810,7 +835,7 @@ Retorne SOMENTE este JSON (sem texto adicional):
         tokensOutput: data.usage?.output_tokens || 0,
         modoTeste: localStorage.getItem('axis-modo-teste') === 'true',
       })
-    } catch {}
+    } catch(e) { console.warn('[AXIS] Log Haiku:', e.message) }
 
     const parsed = JSON.parse(jsonMatch[0])
     const fotos = (parsed.fotos || []).filter(f => f && f.startsWith('http')).slice(0, 12)
@@ -823,8 +848,8 @@ Retorne SOMENTE este JSON (sem texto adicional):
     }
 
     return { fotos, foto_principal: fotoPrincipal }
-  } catch {
-    // Fallback final: og:image
+  } catch(e) {
+    console.warn('[AXIS] Fotos Haiku fallback:', e.message)
     if (ogFallback) return { fotos: [ogFallback], foto_principal: ogFallback }
     return { fotos: [], foto_principal: null }
   }
