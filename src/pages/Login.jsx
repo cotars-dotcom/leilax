@@ -97,14 +97,14 @@ export default function Login() {
   return (
     <div style={{
       display:'flex', flexDirection: isMobileLogin ? 'column' : 'row',
-      minHeight:'100vh',
+      minHeight:'100dvh',
       fontFamily:"'Inter', system-ui, sans-serif",
       background: C.bg,
     }}>
       {/* ── LADO ESQUERDO: Brand ─────────────────────────── */}
       <div style={{
         width: isMobileLogin ? '100%' : '45%',
-        minHeight: isMobileLogin ? 'auto' : '100vh',
+        minHeight: isMobileLogin ? 'auto' : '100dvh',
         background: C.navy,
         display:'flex', flexDirection:'column',
         justifyContent: isMobileLogin ? 'center' : 'space-between',

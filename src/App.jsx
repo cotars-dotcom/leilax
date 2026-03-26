@@ -2281,9 +2281,9 @@ function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze,isAdmin,onArch
       const merged={...p,...novaAnalise,id:p.id,createdAt:p.createdAt,criado_por:p.criado_por}
       if(onUpdateProp) onUpdateProp(p.id,merged)
       // Salvar no Supabase
-      import('./lib/supabase.js').then(({saveImovel})=>{
+      import('./lib/supabase.js').then(({saveImovelCompleto})=>{
         const session=JSON.parse(localStorage.getItem('sb-session')||'null')
-        saveImovel(merged,session?.user?.id).catch(()=>{})
+        saveImovelCompleto(merged,session?.user?.id).catch(()=>{})
       }).catch(()=>{})
       setMsg("✅ Imóvel reanalisado com sucesso!")
     } catch(e) { setMsg(`⚠️ Erro ao reanalisar: ${e.message}`) }
