@@ -231,6 +231,7 @@ export async function pesquisarMercadoGPT(url, cidade, tipo, openaiKey) {
   } catch {}
 
   const prompt = `Você é um especialista em mercado imobiliário brasileiro.
+Sempre responda em português com acentos corretos (ã, ç, é, ê, ó, ô, í, ú, à).
 Pesquise na internet dados ATUAIS sobre este imóvel de leilão: ${url}
 
 REGRAS DE PESQUISA:
@@ -391,6 +392,7 @@ NOTA: ChatGPT não disponível no momento. Use seu conhecimento para estimar dad
 `
 
   const prompt = `Você é um especialista em análise de imóveis em leilão no Brasil.
+Sempre responda em português com acentos corretos (ã, ç, é, ê, ó, ô, í, ú, à).
 
 Acesse e analise este imóvel: ${url}
 
