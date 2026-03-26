@@ -71,6 +71,8 @@ function normalizarTextoAlerta(texto) {
 
   // Limpar padrões garbled específicos
   s = s
+    .replace(/[ÃÐÂ°]{3,}[^\s]*/g, '')
+    .replace(/ÃÐÂ°[^\s]*/g, '')
     .replace(/ÃÂÂ°ÃÂÃÂÃÂÃÂÃÂÃÂÃÂ°/g, '⚠️')
     .replace(/Ã°ÂÃÂÃ°/g, '⚠️')
     .replace(/Ã°Â\S*/g, '')
@@ -90,7 +92,7 @@ function normalizarTextoAlerta(texto) {
 const scoreColor = s => s >= 7.5 ? C.emerald : s >= 6 ? C.emerald : s >= 4.5 ? C.mustard : RED
 const scoreLabel = s => s >= 7.5 ? "FORTE" : s >= 6 ? "BOM" : s >= 4.5 ? "MÉDIO" : "FRACO"
 const recColor = r => ({ COMPRAR: C.emerald, AGUARDAR: C.mustard, EVITAR: "#E5484D" })[r] || C.hint
-const ESTRUTURA_MAP = { bom: 'Bom', regular: 'Regular', ruim: 'Ruim', excelente: 'Excelente' }
+const ESTRUTURA_MAP = { cpf_unico: 'Pessoa Física (CPF único)', cpf_multiplo: 'Múltiplos CPFs', pj: 'Pessoa Jurídica', judicial: 'Bloqueio Judicial', espolio: 'Espólio', 'espólio': 'Espólio' }
 const LIQUIDEZ_MAP = { alta: 'Alta', media: 'Média', baixa: 'Baixa' }
 const TENDENCIA_MAP = { alta: 'Alta', estavel: 'Estável', queda: 'Queda' }
 const DEMANDA_MAP = { alta: 'Alta', media: 'Média', baixa: 'Baixa' }
@@ -2431,7 +2433,7 @@ function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze,isAdmin,onArch
           {[["Tipo",p.tipologia||p.tipo],["Área privativa",(p.area_privativa_m2||p.area_m2)?`${p.area_privativa_m2||p.area_m2}m²`:"—"],
             ...(p.area_total_m2&&p.area_total_m2!==(p.area_privativa_m2||p.area_m2)?[["Área total (registral)",`${p.area_total_m2}m² · inclui área comum`]]:[]
             ),["Base de cálculo",(p.area_usada_calculo_m2||p.area_privativa_m2)?`${p.area_usada_calculo_m2||p.area_privativa_m2}m² (privativa)`:"—"],
-            ["Quartos",p.quartos],["Suítes",p.suites],["Vagas",p.vagas],["Andar",p.andar],["Condomínio",p.condominio_mensal?`R$ ${p.condominio_mensal.toLocaleString('pt-BR')}/mês`:null],["Padrão",p.padrao_acabamento],["Leiloeiro",p.leiloeiro],["Data leilão",p.data_leilao],["Nº leilão",p.num_leilao?`${p.num_leilao}º leilão`:null],["Liquidez",LIQUIDEZ_MAP[p.liquidez]||p.liquidez],["Revenda est.",p.prazo_revenda_meses?`${p.prazo_revenda_meses} meses`:"—"]].filter(([,v])=>v&&v!==null&&v!=="—"&&v!=="0"&&v!==0).map(([l,v])=>(
+            ["Quartos",p.quartos],["Suítes",p.suites],["Vagas",p.vagas],["Andar",p.andar],["Condomínio",p.condominio_mensal?`R$ ${p.condominio_mensal.toLocaleString('pt-BR')}/mês`:null],["Padrão",p.padrao_acabamento],["Leiloeiro",p.leiloeiro],["Data leilão",p.data_leilao],["Nº leilão",p.num_leilao?`${p.num_leilao}º leilão`:null],["Liquidez",LIQUIDEZ_MAP[p.liquidez?.toLowerCase()]||p.liquidez],["Revenda est.",p.prazo_revenda_meses?`${p.prazo_revenda_meses} meses`:"—"]].filter(([,v])=>v&&v!==null&&v!=="—"&&v!=="0"&&v!==0).map(([l,v])=>(
             <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:`1px solid ${K.bd}`}}>
               <span style={{fontSize:"12px",color:K.t3}}>{l}</span><span style={{fontSize:"12.5px",color:K.tx}}>{v}</span>
             </div>
@@ -2479,7 +2481,7 @@ function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze,isAdmin,onArch
         </div>
         <div style={card()}>
           <div style={{fontWeight:"600",color:K.wh,marginBottom:"12px",fontSize:"13px"}}>📈 Retorno e Custos</div>
-          {[["Custo regularização",fmtC(p.custo_regularizacao),K.amb],["Custo reforma",fmtC(p.custo_reforma),K.amb],["Retorno revenda",p.retorno_venda_pct?`+${p.retorno_venda_pct}%`:"—",K.grn],["Locação a.a.",p.retorno_locacao_anual_pct?`${p.retorno_locacao_anual_pct}%`:"—",K.teal],["Estrutura rec.",ESTRUTURA_MAP[p.estrutura_recomendada]||p.estrutura_recomendada,K.pur],["Tendência",TENDENCIA_MAP[p.mercado_tendencia]||p.mercado_tendencia,(TENDENCIA_MAP[p.mercado_tendencia]||p.mercado_tendencia)==="Alta"?K.grn:K.amb],["Demanda",DEMANDA_MAP[p.mercado_demanda]||p.mercado_demanda,(DEMANDA_MAP[p.mercado_demanda]||p.mercado_demanda)==="Alta"?K.grn:K.amb]].filter(([,v])=>v&&v!=="—").map(([l,v,c])=>(
+          {[["Custo regularização",fmtC(p.custo_regularizacao),K.amb],["Custo reforma",fmtC(p.custo_reforma),K.amb],["Retorno revenda",p.retorno_venda_pct?`+${p.retorno_venda_pct}%`:"—",K.grn],["Locação a.a.",p.retorno_locacao_anual_pct?`${p.retorno_locacao_anual_pct}%`:"—",K.teal],["Estrutura rec.",ESTRUTURA_MAP[p.estrutura_recomendada?.toLowerCase()]||p.estrutura_recomendada,K.pur],["Tendência",TENDENCIA_MAP[p.mercado_tendencia?.toLowerCase()]||p.mercado_tendencia,(TENDENCIA_MAP[p.mercado_tendencia?.toLowerCase()]||p.mercado_tendencia)==="Alta"?K.grn:K.amb],["Demanda",DEMANDA_MAP[p.mercado_demanda?.toLowerCase()]||p.mercado_demanda,(DEMANDA_MAP[p.mercado_demanda?.toLowerCase()]||p.mercado_demanda)==="Alta"?K.grn:K.amb]].filter(([,v])=>v&&v!=="—").map(([l,v,c])=>(
             <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:`1px solid ${K.bd}`}}>
               <span style={{fontSize:"12px",color:K.t3}}>{l}</span><span style={{fontSize:"12.5px",fontWeight:"600",color:c}}>{v}</span>
             </div>
