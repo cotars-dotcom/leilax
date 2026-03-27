@@ -129,6 +129,7 @@ const IMOVEIS_COLS = new Set([
   'analise_dupla_ia','comparaveis','sintese_executiva',
   'edital_dados','rgi_dados','debitos_dados',
   'vara_judicial','tipo_justica',
+  'jurimetria_vara','jurimetria_taxa_embargo',
 ])
 
 export async function saveImovelCompleto(imovel, userId) {
