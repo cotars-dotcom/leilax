@@ -358,13 +358,19 @@ Retorne APENAS JSON válido (sem markdown):
         modoTeste: localStorage.getItem('axis-modo-teste') === 'true',
       })
     } catch(e) { console.warn('[AXIS dualAI] Log uso GPT:', e.message) }
-    // Salvar no cache
+    // Salvar no cache com TTL variável por bairro
     try {
       const { supabase } = await import('./supabase')
+      const bairroCache = resultado?.bairro || ''
+      const bairrosNobres = ['Savassi','Lourdes','Belvedere','Serra','Funcionários',
+        'Buritis','Gutierrez','Mangabeiras','Santo Antônio','Jardim América']
+      const ttlHoras = bairrosNobres.includes(bairroCache) ? 168 : 72
+      const expiraEm = new Date(Date.now() + ttlHoras * 3600 * 1000).toISOString()
       await supabase.from('cache_mercado').upsert({
         chave: cacheKey,
         dados: resultado,
-        atualizado_em: new Date().toISOString()
+        atualizado_em: new Date().toISOString(),
+        expira_em: expiraEm
       }, { onConflict: 'chave' })
     } catch(e) { console.warn('[AXIS Cache] Falha ao salvar cache:', e.message) }
     return resultado
@@ -1077,6 +1083,27 @@ DADOS DE BAIRRO (parcial):
     if (cidadeLower.includes('belo horizonte') || cidadeLower.includes('bh'))
       analiseValidada.itbi_pct = 3
   } catch(e) { console.warn('[AXIS] Cálculo jurídico:', e.message) }
+
+    // Jurimetria: calibrar prazo com dados reais da vara
+    try {
+      const varaJudicial = analiseValidada.vara_judicial || ''
+      const tipoJustica = analiseValidada.tipo_justica || ''
+      if (varaJudicial || tipoJustica) {
+        const { supabase } = await import('./supabase')
+        const { data: juri } = await supabase
+          .from('jurimetria_varas')
+          .select('tempo_total_ciclo_dias, taxa_embargo_pct, vara_nome')
+          .or(`vara_nome.ilike.%${varaJudicial.split(' ').slice(0,3).join(' ')}%,tipo_justica.eq.${tipoJustica}`)
+          .order('vara_nome', { ascending: false })
+          .limit(1)
+          .single()
+        if (juri?.tempo_total_ciclo_dias) {
+          analiseValidada.prazo_liberacao_estimado_meses = Math.round(juri.tempo_total_ciclo_dias / 30)
+          analiseValidada.jurimetria_vara = juri.vara_nome
+          analiseValidada.jurimetria_taxa_embargo = juri.taxa_embargo_pct
+        }
+      }
+    } catch(e) { console.warn('[AXIS] Jurimetria vara:', e.message) }
 
   // Recalcular score se a validação corrigiu algo
   const scoreFinal = (analiseValidada._erros_validacao?.length || analiseValidada._avisos_validacao?.length)
