@@ -326,7 +326,7 @@ export async function loadApiKeys(userId) {
       const keys = JSON.parse(data.valor)
       return { claudeKey: keys.claude || '', openaiKey: keys.openai || '' }
     }
-  } catch {}
+  } catch(e) { console.warn('[AXIS supabase] Load API keys:', e.message) }
   return { claudeKey: '', openaiKey: '' }
 }
 
@@ -428,7 +428,7 @@ export async function logAtividade(userId, acao, entidade, entidadeId, detalhes)
       usuario_id: userId, acao, entidade,
       entidade_id: entidadeId, detalhes
     })
-  } catch {}
+  } catch(e) { console.warn('[AXIS supabase] Log atividade:', e.message) }
 }
 
 // == MERCADO REGIONAL ==

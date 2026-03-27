@@ -228,7 +228,7 @@ export async function pesquisarMercadoGPT(url, cidade, tipo, openaiKey) {
         return cached.dados
       }
     }
-  } catch {}
+  } catch(e) { console.warn('[AXIS dualAI] Cache mercado read:', e.message) }
 
   const prompt = `Você é um especialista em mercado imobiliário brasileiro.
 Sempre responda em português com acentos corretos (ã, ç, é, ê, ó, ô, í, ú, à).
@@ -313,7 +313,8 @@ Retorne APENAS JSON válido (sem markdown):
         max_output_tokens: 3000,
         tools: [{ type: 'web_search_preview' }],
         input: prompt
-      })
+      }),
+      signal: AbortSignal.timeout(45000)
     })
 
     if (!res.ok) {
@@ -338,7 +339,7 @@ Retorne APENAS JSON válido (sem markdown):
         tokensOutput: data.usage?.output_tokens || data.usage?.completion_tokens || 0,
         modoTeste: localStorage.getItem('axis-modo-teste') === 'true',
       })
-    } catch {}
+    } catch(e) { console.warn('[AXIS dualAI] Log uso GPT:', e.message) }
     // Salvar no cache
     try {
       const { supabase } = await import('./supabase')
@@ -548,7 +549,8 @@ Use apenas tags de texto: [CRITICO] [ATENCAO] [OK] [INFO]
         }
         return parts
       })() }]
-    })
+    }),
+    signal: AbortSignal.timeout(60000)
   })
 
   if (!res.ok) {
@@ -576,7 +578,7 @@ Use apenas tags de texto: [CRITICO] [ATENCAO] [OK] [INFO]
       tokensOutput: data.usage?.output_tokens || 0,
       modoTeste: localStorage.getItem('axis-modo-teste') === 'true',
     })
-  } catch {}
+  } catch(e) { console.warn('[AXIS dualAI] Log uso Sonnet:', e.message) }
 
   const jsonMatch = txt.match(/\{[\s\S]*\}/)
   if (!jsonMatch) throw new Error('Claude não retornou JSON válido')
@@ -608,8 +610,9 @@ export function calcularScore(analise, parametros) {
     (analise.score_liquidez    || 0) * p.liquidez    +
     (analise.score_mercado     || 0) * p.mercado
 
-  if ((analise.score_juridico || 0) < 4) score *= 0.75
-  if ((analise.ocupacao || '').toLowerCase() === 'ocupado') score *= 0.85
+  // Penalidades removidas — score_juridico e score_ocupacao já refletem esses riscos nas dimensões
+  // if ((analise.score_juridico || 0) < 4) score *= 0.75
+  // if ((analise.ocupacao || '').toLowerCase() === 'ocupado') score *= 0.85
 
   return Math.min(10, Math.max(0, parseFloat(score.toFixed(2))))
 }
@@ -714,10 +717,11 @@ export function validarECorrigirAnalise(analise) {
       (analise.score_ocupacao    || 0) * pesos.ocupacao +
       (analise.score_liquidez    || 0) * pesos.liquidez +
       (analise.score_mercado     || 0) * pesos.mercado
-    let fator = 1
-    if ((analise.score_juridico || 0) < 4) fator *= 0.75
-    if (ocupLower === 'ocupado') fator *= 0.85
-    analise.score_total = Math.min(10, Math.round(scoreBase * fator * 10) / 10)
+    // Penalidades removidas — score_juridico e score_ocupacao já refletem esses riscos nas dimensões
+    // let fator = 1
+    // if ((analise.score_juridico || 0) < 4) fator *= 0.75
+    // if (ocupLower === 'ocupado') fator *= 0.85
+    analise.score_total = Math.min(10, Math.round(scoreBase * 10) / 10)
     if (analise.score_total >= 7.5) analise.recomendacao = 'COMPRAR'
     else if (analise.score_total >= 6.0) analise.recomendacao = 'AGUARDAR'
     else analise.recomendacao = 'EVITAR'
@@ -730,20 +734,49 @@ export function validarECorrigirAnalise(analise) {
 
 // -- FASE 4: Extrair fotos do site do imovel via Claude --
 
+function extrairImgsDoHTML(html, baseUrl) {
+  if (!html) return []
+  const matches = [...html.matchAll(/<img[^>]+src=["']([^"']+)["']/gi)]
+  return matches
+    .map(m => {
+      const src = m[1]
+      if (src.startsWith('http')) return src
+      if (src.startsWith('//')) return 'https:' + src
+      if (src.startsWith('/')) {
+        try { return new URL(baseUrl).origin + src } catch { return null }
+      }
+      return null
+    })
+    .filter(Boolean)
+    .filter(src =>
+      !src.includes('logo') && !src.includes('icon') && !src.includes('banner') &&
+      (src.includes('foto') || src.includes('lote') || src.includes('imovel') ||
+       src.includes('storage') || src.match(/\.(jpg|jpeg|png|webp)/i))
+    )
+    .slice(0, 5)
+}
+
 export async function extrairFotosImovel(url, claudeKey) {
   if (!url || !claudeKey) return { fotos: [], foto_principal: null }
 
   // Tentar og:image como fallback rapido antes da IA
   let ogFallback = null
+  let htmlText = null
   try {
     const htmlRes = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(8000) })
     if (htmlRes.ok) {
-      const html = await htmlRes.text()
-      const ogMatch = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)
-        || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i)
+      htmlText = await htmlRes.text()
+      const ogMatch = htmlText.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)
+        || htmlText.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i)
       if (ogMatch) ogFallback = ogMatch[1]
     }
-  } catch { /* ignorar - sites SPA podem nao retornar */ }
+  } catch(e) { console.warn('[AXIS dualAI] Fetch HTML fotos:', e.message) }
+
+  // Extrair <img src> do HTML como fallback antes de chamar Haiku
+  const imgsDoHTML = extrairImgsDoHTML(htmlText, url)
+  if (imgsDoHTML.length >= 2) {
+    return { fotos: imgsDoHTML, foto_principal: imgsDoHTML[0] }
+  }
 
   // Extrair dominio e ID do lote da URL para ajudar a IA
   let dominio = '', loteId = ''
@@ -751,7 +784,7 @@ export async function extrairFotosImovel(url, claudeKey) {
     dominio = new URL(url).hostname
     const loteMatch = url.match(/\/lote\/(\d+)/)
     if (loteMatch) loteId = loteMatch[1]
-  } catch {}
+  } catch(e) { console.warn('[AXIS dualAI] Parse URL fotos:', e.message) }
 
   try {
     const promptFotos = `Preciso das fotos deste imovel de leilao: ${url}
@@ -786,7 +819,8 @@ Retorne SOMENTE este JSON (sem texto adicional):
         max_tokens: 500,
         tools: [{ type: 'web_search_20250305', name: 'web_search' }],
         messages: [{ role: 'user', content: promptFotos }]
-      })
+      }),
+      signal: AbortSignal.timeout(20000)
     })
     if (!res.ok) {
       // Se a chamada IA falhou mas temos og:image, usar como fallback
@@ -812,7 +846,7 @@ Retorne SOMENTE este JSON (sem texto adicional):
         tokensOutput: data.usage?.output_tokens || 0,
         modoTeste: localStorage.getItem('axis-modo-teste') === 'true',
       })
-    } catch {}
+    } catch(e) { console.warn('[AXIS dualAI] Log uso Haiku:', e.message) }
 
     const parsed = JSON.parse(jsonMatch[0])
     const fotos = (parsed.fotos || []).filter(f => f && f.startsWith('http')).slice(0, 12)
@@ -825,7 +859,8 @@ Retorne SOMENTE este JSON (sem texto adicional):
     }
 
     return { fotos, foto_principal: fotoPrincipal }
-  } catch {
+  } catch(e) {
+    console.warn('[AXIS dualAI] Fotos IA fallback:', e.message)
     // Fallback final: og:image
     if (ogFallback) return { fotos: [ogFallback], foto_principal: ogFallback }
     return { fotos: [], foto_principal: null }
