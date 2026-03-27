@@ -18,7 +18,8 @@ import { calcularCustoReforma, verificarSobrecapitalizacao } from '../data/custo
 import { calcularCustoJuridico } from '../data/riscos_juridicos.js'
 
 const CLAUDE_MODEL = 'claude-sonnet-4-20250514'
-const GPT_MODEL = 'gpt-4o'
+const GPT_MODEL_MARKET  = 'gpt-4o-mini'   // comparáveis e pesquisa de mercado (~16x mais barato)
+const GPT_MODEL_COMPLEX = 'gpt-4o'        // fallback se mini falhar ou retornar sem dados
 
 const REGRAS_MODALIDADE_TEXTO = `
 REGRAS CRÍTICAS POR MODALIDADE (APLIQUE SEMPRE):
@@ -301,7 +302,8 @@ Retorne APENAS JSON válido (sem markdown):
   "observacoes_mercado": "string detalhada"
 }`
 
-  try {
+  // Função interna de fetch com model paramétrico
+  const fetchMercado = async (model) => {
     const res = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
       headers: {
@@ -309,19 +311,17 @@ Retorne APENAS JSON válido (sem markdown):
         'Authorization': `Bearer ${openaiKey}`
       },
       body: JSON.stringify({
-        model: GPT_MODEL,
+        model,
         max_output_tokens: 3000,
         tools: [{ type: 'web_search_preview' }],
         input: prompt
       }),
       signal: AbortSignal.timeout(45000)
     })
-
     if (!res.ok) {
       const err = await res.json()
       throw new Error(err.error?.message || `OpenAI erro ${res.status}`)
     }
-
     const data = await res.json()
     const txt = (data.output || [])
       .filter(o => o.type === 'message')
@@ -330,11 +330,29 @@ Retorne APENAS JSON válido (sem markdown):
       .map(c => c.text)
       .join('') || ''
     const resultado = JSON.parse(txt.replace(/```json|```/g, '').trim())
+    return { resultado, data, model }
+  }
+
+  try {
+    let modeloUsado = GPT_MODEL_MARKET
+    let resultado, data
+
+    // Cascade: tenta mini primeiro, fallback para full se falhar ou sem dados de mercado
+    try {
+      ;({ resultado, data } = await fetchMercado(GPT_MODEL_MARKET))
+      if (!resultado?.valor_mercado_m2) {
+        console.warn('[AXIS] GPT-mini sem valor_mercado_m2, escalando para GPT-4o')
+        ;({ resultado, data, model: modeloUsado } = await fetchMercado(GPT_MODEL_COMPLEX))
+      }
+    } catch(e) {
+      console.warn('[AXIS] GPT-mini falhou, escalando para GPT-4o:', e.message)
+      ;({ resultado, data, model: modeloUsado } = await fetchMercado(GPT_MODEL_COMPLEX))
+    }
     // Log de uso ChatGPT
     try {
       const { logUsoChamadaAPI } = await import('./supabase')
       logUsoChamadaAPI({
-        tipo: 'mercado_chatgpt', modelo: GPT_MODEL,
+        tipo: 'mercado_chatgpt', modelo: modeloUsado,
         tokensInput: data.usage?.input_tokens || data.usage?.prompt_tokens || 0,
         tokensOutput: data.usage?.output_tokens || data.usage?.completion_tokens || 0,
         modoTeste: localStorage.getItem('axis-modo-teste') === 'true',
