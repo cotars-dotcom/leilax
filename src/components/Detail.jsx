@@ -771,7 +771,7 @@ export default function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze
       </div>
       {/* Plano de Reforma */}
       <div style={{...card(),marginBottom:"14px"}}>
-        <PainelReforma imovel={p} />
+        <div style={{padding:16,color:'#888',fontSize:13,textAlign:'center'}}>Plano de reforma — em breve</div>
       </div>
       <div style={{display:"grid",gridTemplateColumns:isPhone?"1fr":"1fr 1fr",gap:"14px",marginBottom:"14px"}}>
         <div style={card()}>
