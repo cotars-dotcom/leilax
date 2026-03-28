@@ -58,8 +58,60 @@ function buildTrelloCard(p) {
 - **Lance mínimo:** ${fmtC(p.valor_minimo)}
 - **Desconto:** ${p.desconto_percentual||"—"}%
 - **Preço/m² imóvel:** R$ ${p.preco_m2_imovel||"—"}/m²
-- **Preço/m² mercado:** R$ ${p.preco_m2_mercado||"—"}/m²`
-  return { name: `${emoji} ${(p.titulo||p.endereco||"Imóvel").slice(0,60)} — ${score}`, desc }
+- **Preço/m² mercado:** R$ ${p.preco_m2_mercado||"—"}/m²
+
+---
+
+### ⚖️ Jurídico
+- **Processos:** ${p.processos_ativos||"—"}
+- **Matrícula:** ${p.matricula_status||"—"}
+- **Déb. condomínio:** ${p.debitos_condominio||"—"}
+- **Déb. IPTU:** ${p.debitos_iptu||"—"}
+${p.obs_juridicas?`\n${p.obs_juridicas}`:""}
+
+---
+
+### 📊 Scores
+| Dimensão | Score | Peso |
+|---|---|---|
+| Localização | ${p.score_localizacao||0}/10 | 20% |
+| Desconto | ${p.score_desconto||0}/10 | 18% |
+| Jurídico | ${p.score_juridico||0}/10 | 18% |
+| Ocupação | ${p.score_ocupacao||0}/10 | 15% |
+| Liquidez | ${p.score_liquidez||0}/10 | 15% |
+| Mercado | ${p.score_mercado||0}/10 | 14% |
+| **TOTAL** | **${score}/10** | |
+
+---
+
+### 📈 Retorno
+- **Revenda:** +${p.retorno_venda_pct||"—"}%
+- **Locação a.a.:** ${p.retorno_locacao_anual_pct||"—"}%
+- **Custo regularização:** ${fmtC(p.custo_regularizacao)}
+- **Custo reforma:** ${fmtC(p.custo_reforma)}
+- **Estrutura recomendada:** ${p.estrutura_recomendada||"—"}
+
+---
+
+### ✅ Pontos Positivos
+${(p.positivos||[]).map(x=>`- ${x}`).join("\n")||"—"}
+
+### ⚠️ Pontos de Atenção
+${(p.negativos||[]).map(x=>`- ${x}`).join("\n")||"—"}
+
+### 🚨 Alertas
+${(p.alertas||[]).map(x=>`- ${x}`).join("\n")||"Nenhum"}
+
+---
+
+### 💬 Justificativa
+${p.justificativa||"—"}
+
+---
+*Analisado pelo AXIS · ${new Date().toLocaleDateString("pt-BR")}*
+${p.fonte_url?`\n🔗 ${p.fonte_url}`:""}`
+
+  return { name:`${emoji} [${score}] ${p.titulo||p.tipo||"Imóvel"} — ${p.cidade||""}`, desc }
 }
 
 function GaleriaFotos({ fotos = [], foto_principal = null, url = null }) {
