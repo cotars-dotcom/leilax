@@ -249,9 +249,16 @@ REGRAS DE PESQUISA:
    Para COBERTURA ou DUPLEX:
    - Buscar especificamente "cobertura [bairro] [cidade]"
    - Não comparar com apartamento padrão
-   Para cada comparável, preencher TODOS os campos: quartos, vagas, tipo, andar, condominio_mes, link, fonte.
-   Calcular similaridade (0-10): mesmo tipo +3, mesma faixa área ±20% +3, mesmos quartos +2, mesmas vagas +1, mesmo bairro +1.
-   Retornar apenas comparáveis com similaridade ≥ 6.0, ordenados do mais similar.
+   Para cada comparável, preencher OBRIGATORIAMENTE todos os campos:
+   - descricao: endereço ou nome do condomínio
+   - valor: preço total em R$, area_m2, preco_m2: valor/area
+   - quartos, vagas: números, tipo: apartamento|cobertura|casa
+   - andar, condominio_mes: se disponível
+   - link: URL COMPLETA do anúncio (obrigatório — não deixar null se encontrou)
+   - fonte: "ZAP"|"VivaReal"|"OLX"|"QuintoAndar"
+   - similaridade: 0-10 (mesmo tipo +3, área ±20% +3, quartos iguais +2, vagas +1, bairro +1)
+   Retornar apenas comparáveis com similaridade >= 6.0, ordenados do mais similar.
+   Se não encontrar nenhum comparável com link real, retornar array vazio — não inventar.
 
 3. COLETAR PREÇO/m² CORRETO:
    - Usar ZAP Imóveis → seção "Quanto vale o m² em [bairro]?"
@@ -264,9 +271,17 @@ REGRAS DE PESQUISA:
    - Verificar se há lances já registrados
    - Verificar data e hora do leilão
 
-5. SITUAÇÃO JURÍDICA:
-   - Verificar se há processos no TJMG além do leilão
-   - Confirmar modalidade (judicial/extrajudicial/extinção condomínio)
+5. SITUAÇÃO JURÍDICA (preencher campos com dados REAIS, não genéricos):
+   - processos_ativos: listar processos reais (ex: "Execução nº 0001234-56.2024.5.03.0001")
+     Se não houver: "Nenhum processo identificado no edital"
+   - matricula_status: estado real da matrícula
+     (ex: "Matrícula nº 45.123 — penhora R$120.000") Se limpa: "Matrícula sem ônus aparentes"
+   - obs_juridicas: observações específicas do caso
+     (ex: "IPTU 2019-2022 R$8.400 sub-rogado no preço") Se nada: "Sem observações adicionais"
+   - riscos_presentes: mapear para IDs do sistema:
+     ocupado→"ocupacao_judicial", inquilino→"inquilino_regular", penhora→"penhora_simples",
+     embargo→"embargo_arrematacao", iptu+caixa→"iptu_previo_caixa", iptu+judicial→"iptu_previo_judicial"
+   - Verificar modalidade (judicial/extrajudicial/extinção condomínio)
    - Verificar matrícula se disponível
 
 6. Preço médio de ${tipo} em ${cidade} (R$/m²)
@@ -532,6 +547,15 @@ Use apenas tags de texto: [CRITICO] [ATENCAO] [OK] [INFO]
   "custo_reforma": 0,
   "custo_reforma_estimado": 0,
   "escopo_reforma": "refresh_giro|leve_funcional|leve_reforcada_1_molhado|media|pesada",
+  "plano_reforma": {
+    "escopo_recomendado": "refresh_giro|leve_funcional|leve_reforcada_1_molhado|media|pesada",
+    "itens_principais": ["string — ex: Pintura geral", "Troca piso"],
+    "itens_facultativos": ["string — ex: Modernização cozinha"],
+    "custo_estimado_min": 0,
+    "custo_estimado_max": 0,
+    "prazo_obra_semanas": 0,
+    "observacao_mercado": "string — ex: Reforma leve valoriza 18-25% neste bairro"
+  },
   "prazo_reforma_meses": null,
   "valor_pos_reforma_estimado": null,
   "retorno_venda_pct": 0,
@@ -772,12 +796,18 @@ function extrairImgsDoHTML(html, baseUrl) {
       return null
     })
     .filter(Boolean)
-    .filter(src =>
-      !src.includes('logo') && !src.includes('icon') && !src.includes('banner') &&
-      (src.includes('foto') || src.includes('lote') || src.includes('imovel') ||
-       src.includes('storage') || src.match(/\.(jpg|jpeg|png|webp)/i))
-    )
-    .slice(0, 5)
+    .filter(src => {
+      const lower = src.toLowerCase()
+      if (lower.includes('logo') || lower.includes('favicon') ||
+          lower.includes('sprite') || lower.includes('icon') ||
+          lower.includes('loading') || lower.includes('placeholder')) return false
+      if (lower.match(/\.(jpg|jpeg|png|webp)(\?|$)/i)) return true
+      if (lower.includes('storage') || lower.includes('lote') ||
+          lower.includes('imovel') || lower.includes('foto') ||
+          lower.includes('imagem') || lower.includes('galeria')) return true
+      return false
+    })
+    .slice(0, 8)
 }
 
 export async function extrairFotosImovel(url, claudeKey) {
@@ -1026,7 +1056,7 @@ DADOS DE BAIRRO (parcial):
   }
 
   // Extrair fotos do site
-  progress('\xf0\x9f\x93\xb8 Extraindo fotos do imovel...')
+  progress('[FOTOS] Extraindo fotos do imovel...')
   let fotosResult = { fotos: [], foto_principal: null }
   try {
     fotosResult = await extrairFotosImovel(url, claudeKey) || { fotos: [], foto_principal: null }
@@ -1057,7 +1087,7 @@ DADOS DE BAIRRO (parcial):
             analiseValidada.alerta_sobrecap = sobrecap.status
             if (sobrecap.status !== 'verde') {
               analiseValidada.alertas = [...(analiseValidada.alertas || []),
-                `${sobrecap.status === 'vermelho' ? 'ð´' : 'ð¡'} ${sobrecap.mensagem}`
+                `${sobrecap.status === 'vermelho' ? '[CRITICO]' : '[ATENCAO]'} ${sobrecap.mensagem}`
               ]
             }
           }

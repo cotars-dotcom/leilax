@@ -769,6 +769,10 @@ export default function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze
       <div style={{...card(),marginBottom:"14px"}}>
         <CalculadoraROI imovel={p} />
       </div>
+      {/* Plano de Reforma */}
+      <div style={{...card(),marginBottom:"14px"}}>
+        <PainelReforma imovel={p} />
+      </div>
       <div style={{display:"grid",gridTemplateColumns:isPhone?"1fr":"1fr 1fr",gap:"14px",marginBottom:"14px"}}>
         <div style={card()}>
           <div style={{fontWeight:"600",color:K.wh,marginBottom:"12px",fontSize:"13px"}}>⚖️ Jurídico</div>

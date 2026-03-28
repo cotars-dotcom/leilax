@@ -74,11 +74,26 @@ export async function updateProfile(id, updates) {
 }
 
 // == IMOVEIS ==
+const IMOVEIS_LIST_COLS = `id,codigo_axis,titulo,cidade,estado,bairro,tipo,tipologia,score_total,recomendacao,status,valor_minimo,valor_avaliacao,desconto_percentual,area_m2,area_privativa_m2,ocupacao,processos_ativos,foto_principal,fotos,fonte_url,criado_em,criado_por,num_leilao,data_leilao,modalidade_leilao,score_localizacao,score_desconto,score_juridico,score_ocupacao,score_liquidez,score_mercado,jurimetria_vara,prazo_liberacao_estimado_meses,aluguel_mensal_estimado,valor_mercado_estimado,custo_reforma_calculado,mao_flip,financiavel,analise_dupla_ia`
+
 export async function getImoveis() {
   const { data, error } = await supabase
-    .from('imoveis').select('*').order('criado_em', { ascending: false })
-  if (error) throw error
-  return data || []
+    .from('imoveis')
+    .select(`${IMOVEIS_LIST_COLS},criador:profiles!imoveis_criado_por_fkey(nome)`)
+    .order('criado_em', { ascending: false })
+    .limit(100)
+  if (error) {
+    const { data: d2, error: e2 } = await supabase
+      .from('imoveis').select(IMOVEIS_LIST_COLS)
+      .order('criado_em', { ascending: false }).limit(100)
+    if (e2) throw e2
+    return d2 || []
+  }
+  return (data || []).map(d => ({
+    ...d,
+    criador_nome: d.criador?.nome || null,
+    criador: undefined
+  }))
 }
 
 export async function saveImovel(imovel, userId) {
@@ -589,11 +604,23 @@ export async function desarquivarImovel(imovelId) {
 export async function getImoveisAtivos() {
   const { data, error } = await supabase
     .from('imoveis')
-    .select('*')
+    .select(`${IMOVEIS_LIST_COLS},criador:profiles!imoveis_criado_por_fkey(nome)`)
     .or('status_operacional.eq.ativo,status_operacional.is.null')
     .order('criado_em', { ascending: false })
-  if (error) throw error
-  return data || []
+    .limit(100)
+  if (error) {
+    const { data: d2, error: e2 } = await supabase
+      .from('imoveis').select(IMOVEIS_LIST_COLS)
+      .or('status_operacional.eq.ativo,status_operacional.is.null')
+      .order('criado_em', { ascending: false }).limit(100)
+    if (e2) throw e2
+    return d2 || []
+  }
+  return (data || []).map(d => ({
+    ...d,
+    criador_nome: d.criador?.nome || null,
+    criador: undefined
+  }))
 }
 
 export async function getBancoArquivados() {
@@ -740,4 +767,102 @@ export async function getUsoChamadas({ dias = 30 } = {}) {
       .limit(500)
     return data || []
   } catch { return [] }
+}
+
+// == EXPORTAÇÃO DE ANÁLISE ==
+export function exportarAnaliseJSON(imovel) {
+  const campos = [
+    'codigo_axis','titulo','endereco','cidade','bairro','tipo',
+    'score_total','recomendacao','score_localizacao','score_desconto',
+    'score_juridico','score_ocupacao','score_liquidez','score_mercado',
+    'valor_minimo','valor_avaliacao','desconto_percentual',
+    'valor_mercado_estimado','preco_m2_mercado','preco_m2_imovel',
+    'area_m2','area_privativa_m2','quartos','suites','vagas','andar',
+    'ocupacao','processos_ativos','obs_juridicas',
+    'custo_reforma_calculado','custo_juridico_estimado',
+    'prazo_liberacao_estimado_meses','vara_judicial','tipo_justica',
+    'jurimetria_vara','jurimetria_taxa_embargo',
+    'mao_flip','mao_locacao',
+    'retorno_venda_pct','retorno_locacao_anual_pct',
+    'aluguel_mensal_estimado','mercado_tendencia','mercado_demanda',
+    'positivos','negativos','alertas','justificativa','sintese_executiva',
+    'data_leilao','leiloeiro','fonte_url','criado_em'
+  ]
+  const dados = {}
+  campos.forEach(c => { if (imovel[c] != null) dados[c] = imovel[c] })
+  const blob = new Blob([JSON.stringify(dados, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `AXIS_${imovel.codigo_axis || 'analise'}_${new Date().toISOString().slice(0,10)}.json`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+export function exportarRelatorioHTML(imovel) {
+  const fmtC = v => v ? `R$ ${Math.round(v).toLocaleString('pt-BR')}` : '—'
+  const fmtPct = v => v ? `${v}%` : '—'
+  const esc = s => (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+  const html = `<!DOCTYPE html><html lang="pt-BR">
+<head><meta charset="UTF-8"><title>AXIS — ${esc(imovel.codigo_axis)}</title>
+<style>
+  body{font-family:Arial,sans-serif;max-width:800px;margin:40px auto;padding:20px;color:#1e293b}
+  h1{color:#0f172a;border-bottom:3px solid #14b8a6;padding-bottom:8px}
+  h2{color:#0f172a;margin-top:24px;font-size:15px;text-transform:uppercase;letter-spacing:.5px}
+  .score{font-size:48px;font-weight:700;color:${imovel.score_total>=7?'#10b981':imovel.score_total>=6?'#f59e0b':'#ef4444'}}
+  .rec{display:inline-block;padding:4px 14px;border-radius:20px;font-weight:700;font-size:14px;
+       background:${imovel.recomendacao==='COMPRAR'?'#d1fae5':imovel.recomendacao==='AGUARDAR'?'#fef3c7':'#fee2e2'};
+       color:${imovel.recomendacao==='COMPRAR'?'#065f46':imovel.recomendacao==='AGUARDAR'?'#92400e':'#991b1b'}}
+  table{width:100%;border-collapse:collapse;margin-top:8px}
+  td{padding:6px 10px;border-bottom:1px solid #e2e8f0;font-size:13px}
+  td:first-child{color:#64748b;width:40%}
+  td:last-child{font-weight:500}
+  .dim{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
+  .dim-item{background:#f8fafc;border-radius:8px;padding:10px;text-align:center}
+  .dim-score{font-size:20px;font-weight:700}
+  .alerta{background:#fef3c7;border-left:4px solid #f59e0b;padding:8px 12px;margin:4px 0;border-radius:0 6px 6px 0;font-size:12px}
+  .pos{background:#d1fae5;border-left:4px solid #10b981;padding:8px 12px;margin:4px 0;border-radius:0 6px 6px 0;font-size:12px}
+  footer{margin-top:32px;padding-top:12px;border-top:1px solid #e2e8f0;color:#94a3b8;font-size:11px;text-align:center}
+</style></head><body>
+<h1>AXIS — ${esc(imovel.codigo_axis || 'Análise')}</h1>
+<div style="display:flex;align-items:center;gap:20px;margin:16px 0">
+  <div class="score">${(imovel.score_total||0).toFixed(1)}</div>
+  <div>
+    <div class="rec">${esc(imovel.recomendacao)||'—'}</div>
+    <div style="color:#64748b;font-size:13px;margin-top:4px">${esc(imovel.titulo)}</div>
+    <div style="color:#94a3b8;font-size:12px">${esc(imovel.endereco)} · ${esc(imovel.cidade)}</div>
+  </div>
+</div>
+<h2>Score por dimensão</h2>
+<div class="dim">
+  ${[['Localização',imovel.score_localizacao,'20%'],['Desconto',imovel.score_desconto,'18%'],
+     ['Jurídico',imovel.score_juridico,'18%'],['Ocupação',imovel.score_ocupacao,'15%'],
+     ['Liquidez',imovel.score_liquidez,'15%'],['Mercado',imovel.score_mercado,'14%']]
+    .map(([l,v,p])=>`<div class="dim-item"><div style="font-size:11px;color:#64748b">${l} · ${p}</div>
+      <div class="dim-score" style="color:${(v||0)>=7?'#10b981':(v||0)>=5?'#f59e0b':'#ef4444'}">${(v||0).toFixed(1)}</div></div>`).join('')}
+</div>
+<h2>Dados financeiros</h2>
+<table>
+  <tr><td>Lance mínimo</td><td>${fmtC(imovel.valor_minimo)}</td></tr>
+  <tr><td>Avaliação judicial</td><td>${fmtC(imovel.valor_avaliacao)}</td></tr>
+  <tr><td>Desconto</td><td>${fmtPct(imovel.desconto_percentual)}</td></tr>
+  <tr><td>Valor de mercado est.</td><td>${fmtC(imovel.valor_mercado_estimado)}</td></tr>
+  <tr><td>Lance máximo (MAO Flip)</td><td>${fmtC(imovel.mao_flip)}</td></tr>
+  <tr><td>Custo reforma est.</td><td>${fmtC(imovel.custo_reforma_calculado||imovel.custo_reforma_previsto)}</td></tr>
+  <tr><td>Prazo liberação est.</td><td>${imovel.prazo_liberacao_estimado_meses ? imovel.prazo_liberacao_estimado_meses+' meses' : '—'}</td></tr>
+  ${imovel.jurimetria_vara ? `<tr><td>Vara judicial</td><td>${esc(imovel.vara_judicial)} · ${esc(imovel.jurimetria_vara)}</td></tr>` : ''}
+</table>
+<h2>Síntese</h2>
+<p style="font-size:13px;line-height:1.6;color:#334155">${esc(imovel.sintese_executiva||imovel.justificativa)||'—'}</p>
+${imovel.positivos?.length ? `<h2>Pontos positivos</h2>${imovel.positivos.map(a=>`<div class="pos">${esc(a)}</div>`).join('')}` : ''}
+${imovel.alertas?.length ? `<h2>Alertas</h2>${imovel.alertas.map(a=>`<div class="alerta">${esc(a)}</div>`).join('')}` : ''}
+<footer>Gerado pelo AXIS Inteligência Patrimonial · ${new Date().toLocaleDateString('pt-BR')}</footer>
+</body></html>`
+  const blob = new Blob([html], { type: 'text/html' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `AXIS_${imovel.codigo_axis || 'relatorio'}_${new Date().toISOString().slice(0,10)}.html`
+  a.click()
+  URL.revokeObjectURL(url)
 }
