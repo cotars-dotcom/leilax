@@ -1,13 +1,5 @@
 import { useState } from "react"
-import { C, RED } from "../appConstants.js"
-
-const ESTRATEGIA_CONFIG = {
-  flip_rapido:    { emoji:'🔄', label:'Flip Rápido',    color:C.emerald },
-  renda_passiva:  { emoji:'🏠', label:'Renda Passiva',  color:C.navy   },
-  airbnb:         { emoji:'🌟', label:'Airbnb/Temporada',color:C.mustard},
-  reforma_revenda:{ emoji:'🏗️', label:'Reforma + Venda',color:C.emerald},
-  locacao_longa:  { emoji:'📋', label:'Locação Longa',  color:C.navy   },
-}
+import { C, RED, ESTRATEGIA_CONFIG } from "../appConstants.js"
 
 export default function CalculadoraROI({ imovel }) {
   const [entrada, setEntrada] = useState(30)
@@ -48,7 +40,7 @@ export default function CalculadoraROI({ imovel }) {
     ? valorFinanciado * Math.pow(1 + taxaMensal, prazoVenda)
       - parcela * (Math.pow(1 + taxaMensal, prazoVenda) - 1) / taxaMensal
     : valorFinanciado - parcela * prazoVenda
-  const lucroFinanciado = vmercado - saldoDevedor - entradaValor - reforma - comissao - itbi - doc - advogado - registro - custoJuridico
+  const lucroFinanciado = vmercado - saldoDevedor - entradaValor - reforma - comissao - itbi - doc - advogado - registro - custoJuridico - irpfGanhoCapital - corretagemVenda
   const fmt = n => n ? `R$ ${Math.round(n).toLocaleString('pt-BR')}` : '—'
   const pct = n => n ? `${n.toFixed(1)}%` : '—'
   // MAO — Lance Máximo com todos os custos reais

@@ -4,7 +4,7 @@ import { supabase } from "../lib/supabase.js"
 import { analisarImovelCompleto } from "../lib/dualAI.js"
 import { criarCardImovel } from "../lib/trelloService.js"
 import CalculadoraROI from "./CalculadoraROI.jsx"
-import { calcularCustoReforma, ESCOPOS_REFORMA } from "../data/custos_reforma.js"
+import { calcularCustoReforma } from "../data/custos_reforma.js"
 
 const ESCOPOS_INFO = {
   refresh_giro: {
@@ -746,7 +746,12 @@ export default function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze
         <button onClick={() => { import('../lib/supabase.js').then(({ exportarRelatorioHTML }) => { exportarRelatorioHTML(p) }) }}
           title="Baixar relatório HTML"
           style={{ padding:'6px 12px', borderRadius:7, border:`1px solid ${K.bd}`, background:K.s2, color:K.t2, fontSize:12, cursor:'pointer', display:'flex', alignItems:'center', gap:5 }}>
-          ↓ Exportar
+          ↓ HTML
+        </button>
+        <button onClick={() => { import('../lib/supabase.js').then(({ exportarAnaliseJSON }) => { exportarAnaliseJSON(p) }) }}
+          title="Baixar dados JSON completos"
+          style={{ padding:'6px 12px', borderRadius:7, border:`1px solid ${K.bd}`, background:K.s2, color:K.t2, fontSize:12, cursor:'pointer', display:'flex', alignItems:'center', gap:5 }}>
+          ↓ JSON
         </button>
         {isAdmin&&onArchive&&<button style={{...btn("s"),background:`${C.mustardL}`,color:C.mustard,border:`1px solid ${C.mustard}40`}} onClick={()=>onArchive(p.id)}>📦 Arquivar</button>}
         {isAdmin&&<button style={{...btn("d"),padding:"5px 12px",fontSize:"12px"}} onClick={()=>{if(confirm("Excluir?"))onDelete(p.id)}}>🗑</button>}
