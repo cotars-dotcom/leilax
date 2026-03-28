@@ -579,17 +579,20 @@ export default function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze
     setReanalyzing(true);setMsg("")
     try {
       const openaiKey=localStorage.getItem("axis-openai-key")||""
-      const {data:par}=await supabase.from("parametros_score").select("*")
-      const {data:cri}=await supabase.from("criterios_avaliacao").select("*")
-      const novaAnalise=await analisarImovelCompleto(p.fonte_url,claudeKey,openaiKey,par||[],cri||[],setReStep,[])
+      // parametros_score e criterios_avaliacao podem não existir no banco — usar arrays vazios
+      const novaAnalise=await analisarImovelCompleto(p.fonte_url,claudeKey,openaiKey,[],[],setReStep,[])
       const merged={...p,...novaAnalise,id:p.id,createdAt:p.createdAt,criado_por:p.criado_por}
       if(onUpdateProp) onUpdateProp(p.id,merged)
-      // Salvar no Supabase
-      import('../lib/supabase.js').then(({saveImovelCompleto})=>{
-        const session=JSON.parse(localStorage.getItem('sb-session')||'null')
-        saveImovelCompleto(merged,session?.user?.id).catch(()=>{})
-      }).catch(()=>{})
-      setMsg("✅ Imóvel reanalisado com sucesso!")
+      // Salvar no Supabase — buscar session corretamente
+      try {
+        const { data:{ session:sess } } = await supabase.auth.getSession()
+        const { saveImovelCompleto } = await import('../lib/supabase.js')
+        await saveImovelCompleto(merged, sess?.user?.id)
+        setMsg("✅ Imóvel reanalisado e salvo com sucesso!")
+      } catch(saveErr) {
+        console.warn('[AXIS] Salvar reanálise:', saveErr.message)
+        setMsg("✅ Reanalisado! (sync nuvem falhou — tente novamente)")
+      }
     } catch(e) { setMsg(`⚠️ Erro ao reanalisar: ${e.message}`) }
     setReanalyzing(false);setReStep("")
   }

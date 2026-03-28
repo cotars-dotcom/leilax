@@ -518,6 +518,13 @@ function ApiKeyModal({onClose, session}) {
  <div style={{fontSize:"11px",color:K.t3,marginBottom:"18px"}}>
   Obtenha em: <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" style={{color:K.blue}}>platform.openai.com</a> · Usada na Busca GPT
  </div>
+ <div style={{marginTop:"16px",marginBottom:"8px"}}>
+  <div style={{fontSize:"10px",color:K.t3,textTransform:"uppercase",letterSpacing:"1px",marginBottom:"5px"}}>Gemini API Key — opcional (fotos mais baratas)</div>
+  <input style={inp} type="password" placeholder="AIza..." value={localStorage.getItem('axis-gemini-key')||''} onChange={e=>localStorage.setItem('axis-gemini-key',e.target.value||'')}/>
+ </div>
+ <div style={{fontSize:"11px",color:K.t3,marginBottom:"18px"}}>
+  Obtenha grátis em: <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" style={{color:K.blue}}>aistudio.google.com</a> · Substitui Haiku nas fotos (10x mais barato)
+ </div>
       <div style={{background:`${K.amb}10`,border:`1px solid ${K.amb}30`,borderRadius:"6px",padding:"12px",marginBottom:"16px",fontSize:"11.5px",color:K.amb}}>
  ⚠️ As chaves são salvas no Supabase (por usuário) e sincronizadas entre dispositivos. Nunca enviadas para servidores externos além da Anthropic/OpenAI.
       </div>

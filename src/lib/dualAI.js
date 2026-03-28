@@ -860,6 +860,45 @@ Retorne SOMENTE este JSON (sem texto adicional):
   "fonte_fotos": "como foram encontradas"
 }`
 
+    // Se chave Gemini disponível, usar Gemini Flash-Lite (mais barato que Haiku)
+    const geminiKey = typeof localStorage !== 'undefined' ? localStorage.getItem('axis-gemini-key') : null
+    if (geminiKey) {
+      try {
+        const geminiRes = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${geminiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            signal: AbortSignal.timeout(20000),
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: promptFotos }] }],
+              generationConfig: { temperature: 0.1, maxOutputTokens: 500 }
+            })
+          }
+        )
+        if (geminiRes.ok) {
+          const gData = await geminiRes.json()
+          const gText = gData.candidates?.[0]?.content?.parts?.[0]?.text || '{}'
+          const gMatch = gText.match(/\{[\s\S]*\}/)
+          if (gMatch) {
+            const gResult = JSON.parse(gMatch[0])
+            const fotos = (gResult.fotos || []).filter(f => f && f.startsWith('http')).slice(0, 12)
+            const fotoPrincipal = gResult.foto_principal || fotos[0] || ogFallback || null
+            if (fotos.length > 0 || fotoPrincipal) {
+              try {
+                const { logUsoChamadaAPI } = await import('./supabase')
+                logUsoChamadaAPI({ tipo: 'fotos', modelo: 'gemini-2.0-flash-lite', tokensInput: 0, tokensOutput: 0, modoTeste: localStorage.getItem('axis-modo-teste') === 'true' })
+              } catch(e) { console.warn('[AXIS dualAI] Log uso Gemini:', e.message) }
+              return { fotos, foto_principal: fotoPrincipal }
+            }
+          }
+        }
+      } catch(e) {
+        console.warn('[AXIS] Gemini fotos fallback Haiku:', e.message)
+      }
+    }
+
+    // Fallback: Claude Haiku com web_search
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
