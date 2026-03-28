@@ -19,18 +19,12 @@ export default function CalculadoraROI({ imovel }) {
   const comissao    = lance * 0.05
   const itbi        = lance * ((imovel.itbi_pct || 2) / 100)
   const doc         = lance * 0.005
-  const advogado    = lance * 0.02
-  const registro    = 1500
   const reforma     = imovel.custo_reforma_calculado || imovel.custo_reforma_previsto || 0
-  const custoJuridico = imovel.custo_juridico_estimado || 0
-  const custoTotal  = lance + comissao + itbi + doc + advogado + registro + reforma + custoJuridico
+  const custoTotal  = lance + comissao + itbi + doc + reforma
   const vmercado = imovel.valor_mercado_estimado || imovel.valor_pos_reforma_estimado
     || (imovel.preco_m2_mercado * (imovel.area_privativa_m2 || imovel.area_m2 || 0))
     || lance * 1.4
-  // Custos de venda (flip)
-  const irpfGanhoCapital = Math.max(0, (vmercado - custoTotal) * 0.15)
-  const corretagemVenda  = vmercado * 0.06
-  const lucroFlip    = vmercado - custoTotal - irpfGanhoCapital - corretagemVenda
+  const lucroFlip    = vmercado - custoTotal
   const roiFlip      = custoTotal > 0 ? (lucroFlip / custoTotal) * 100 : 0
   const aluguelMensal = imovel.aluguel_mensal_estimado
     || (vmercado * (imovel.yield_bruto_pct || 6) / 100 / 12)
@@ -48,16 +42,16 @@ export default function CalculadoraROI({ imovel }) {
     ? valorFinanciado * Math.pow(1 + taxaMensal, prazoVenda)
       - parcela * (Math.pow(1 + taxaMensal, prazoVenda) - 1) / taxaMensal
     : valorFinanciado - parcela * prazoVenda
-  const lucroFinanciado = vmercado - saldoDevedor - entradaValor - reforma - comissao - itbi - doc - advogado - registro - custoJuridico
+  const lucroFinanciado = vmercado - saldoDevedor - entradaValor - reforma - comissao - itbi - doc
   const fmt = n => n ? `R$ ${Math.round(n).toLocaleString('pt-BR')}` : '—'
   const pct = n => n ? `${n.toFixed(1)}%` : '—'
-  // MAO — Lance Máximo com todos os custos reais
-  const custosCompletos = comissao + itbi + doc + advogado + registro + reforma + custoJuridico
+  // MAO — Lance Máximo para margem mínima de 20%
+  const custosFixos = comissao + itbi + doc + reforma
   const capRatePct  = imovel.classe_ipead === 'Classe 4 - Luxo' ? 4.0
                     : imovel.classe_ipead === 'Classe 3 - Alto' ? 5.0 : 6.0
-  const maoFlip     = vmercado > 0 ? (vmercado * 0.85) / 1.06 - custosCompletos : 0
+  const maoFlip     = vmercado > 0 ? vmercado * 0.80 - custosFixos : 0
   const maoLocacao  = aluguelMensal > 0
-                    ? (aluguelMensal * 12 * 0.85) / (capRatePct / 100) - custosCompletos
+                    ? (aluguelMensal * 12) / (capRatePct / 100) - custosFixos
                     : 0
   const lanceViavel = lance <= maoFlip
   return (
@@ -76,10 +70,7 @@ export default function CalculadoraROI({ imovel }) {
           ['Comissão leiloeiro (5%)', fmt(comissao)],
           [`ITBI (${imovel.itbi_pct || 2}%)`, fmt(itbi)],
           ['Documentação (0,5%)', fmt(doc)],
-          ['Honorários advogado (2%)', fmt(advogado)],
-          ['Registro cartório (est.)', fmt(registro)],
           reforma > 0 ? ['Reforma estimada', fmt(reforma)] : null,
-          custoJuridico > 0 ? ['Custo jurídico (riscos)', fmt(custoJuridico)] : null,
         ].filter(Boolean).map(([k,v]) => (
           <div key={k} style={{ display:'flex', justifyContent:'space-between',
             padding:'4px 0', borderBottom:`1px solid ${C.borderW}`, fontSize:12 }}>
@@ -112,23 +103,14 @@ export default function CalculadoraROI({ imovel }) {
               <p style={{ margin:0, fontSize:16, fontWeight:800, color:C.navy }}>{fmt(vmercado)}</p>
             </div>
             <div style={{ textAlign:'right' }}>
-              <p style={{ margin:0, fontSize:11, color:C.muted }}>Lucro líquido real</p>
+              <p style={{ margin:0, fontSize:11, color:C.muted }}>Lucro estimado</p>
               <p style={{ margin:0, fontSize:16, fontWeight:800,
                 color: lucroFlip > 0 ? C.emerald : RED }}>{fmt(lucroFlip)}</p>
             </div>
           </div>
-          {[
-            ['IRPF ganho capital (15%)', fmt(irpfGanhoCapital)],
-            ['Corretagem venda (6%)', fmt(corretagemVenda)],
-          ].map(([k,v]) => (
-            <div key={k} style={{ display:'flex', justifyContent:'space-between',
-              padding:'3px 0', fontSize:11, color:C.muted }}>
-              <span>{k}</span><span>{v}</span>
-            </div>
-          ))}
-          <div style={{ background:C.white, borderRadius:8, padding:'8px 12px', marginTop:6,
+          <div style={{ background:C.white, borderRadius:8, padding:'8px 12px',
             display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-            <span style={{ fontSize:12, color:C.muted }}>ROI líquido real</span>
+            <span style={{ fontSize:12, color:C.muted }}>ROI estimado</span>
             <span style={{ fontSize:18, fontWeight:800,
               color: roiFlip > 30 ? C.emerald : roiFlip > 15 ? C.mustard : RED }}>
               {pct(roiFlip)}

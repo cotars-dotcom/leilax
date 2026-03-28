@@ -17,6 +17,48 @@ import { C, K, RED, btn, inp, card, fmtC, fmtD, scoreColor, scoreLabel, recColor
 const LazyDashboard = lazy(() => import("./components/Dashboard.jsx"))
 const LazyDetail = lazy(() => import("./components/Detail.jsx"))
 const LazyPainelAdmin = lazy(() => import("./components/PainelAdmin.jsx"))
+const LazyCalculadoraROI = lazy(() => import("./components/CalculadoraROI.jsx"))
+
+const uid = () => Math.random().toString(36).slice(2,9) + Date.now().toString(36)
+const fmtD = d => d ? new Date(d).toLocaleDateString("pt-BR") : "—"
+const fmtC = v => v ? `R$ ${Number(v).toLocaleString("pt-BR", {minimumFractionDigits:0})}` : "—"
+
+// AXIS Design Tokens
+const C = {
+  // Estrutura (Azul)
+  navy:      "#002B80",
+  navy2:     "#001F66",
+  navyAlfa:  "#002B8014",
+  // Dados / Oportunidade (Verde)
+  emerald:   "#05A86D",
+  emeraldL:  "#E6F6F0",
+  emeraldD:  "#037A50",
+  // Alerta
+  mustard:   "#E1B31A",
+  mustardL:  "#FEF7DA",
+  // Fundo / superfícies
+  bg:        "#EDECEA",
+  surface:   "#F4F3F0",
+  white:     "#FFFFFF",
+  offwhite:  "#EDECEA",
+  // Texto
+  text:      "#0A1628",
+  muted:     "#6B7C90",
+  hint:      "#9EAAB8",
+  border:    "#DDD9CF",
+  borderW:   "#E8E4DC",
+  // Prata
+  silver:    "#C0C0C0",
+}
+
+// Backward-compat aliases (used by existing components)
+const K = {
+  bg:C.offwhite, bg2:C.white, s1:C.white, s2:"#F2F0E6",
+  bd:C.border, bd2:C.borderW, teal:C.emerald, amb:C.mustard,
+  red:"#E5484D", blue:"#4A9EFF", pur:"#A78BFA", grn:C.emerald,
+  gold:"#C68A00", tx:C.text, t2:C.muted, t3:C.hint, wh:C.navy,
+  trello:"#0052CC"
+}
 
 const uid = () => Math.random().toString(36).slice(2,9) + Date.now().toString(36)
 
@@ -846,599 +888,17 @@ function PainelPortfolio({ props: imoveis, isMobile, isPhone }) {
   )
 }
 
-// ── LISTA ─────────────────────────────────────────────────────────────────────
-function Lista({props,onNav,onDelete,trello,onUpdateProp}) {
-  const isPhoneL = useIsMobile(480)
-  const [q,setQ]=useState(""), [filter,setFilter]=useState("todos"), [sort,setSort]=useState("score")
-  const [syncingTrello,setSyncingTrello]=useState(false)
-  const [syncMsg,setSyncMsg]=useState("")
-  let list=[...props]
-  if(q) list=list.filter(p=>`${p.titulo} ${p.cidade} ${p.tipo}`.toLowerCase().includes(q.toLowerCase()))
-  if(filter!=="todos") list=list.filter(p=>p.recomendacao===filter.toUpperCase())
-  list.sort((a,b)=>sort==="score"?(b.score_total||0)-(a.score_total||0):sort==="desconto"?(b.desconto_percentual||0)-(a.desconto_percentual||0):sort==="valor"?(a.valor_minimo||0)-(b.valor_minimo||0):new Date(b.createdAt)-new Date(a.createdAt))
-
-  const syncTrello=async()=>{
-    if(!trello?.listId||!trello?.boardId){setSyncMsg("⚠️ Configure o Trello primeiro (ícone ⚙️)");setTimeout(()=>setSyncMsg(""),4000);return}
-    if(!confirm(`Enviar/atualizar ${list.length} imóvel(is) no Trello?`)) return
-    setSyncingTrello(true);setSyncMsg(`🔄 Enviando ${list.length} imóveis para o Trello...`)
-    let ok=0,fail=0
-    for(const p of list){
-      try{
-        await criarCardImovel(p,trello.listId,trello.boardId,trello.key,trello.token)
-        ok++
-        setSyncMsg(`🔄 Enviando... ${ok}/${list.length}`)
-      }catch{fail++}
-    }
-    setSyncMsg(`✅ ${ok} enviado(s) ao Trello${fail?` · ${fail} erro(s)`:""}`)
-    setSyncingTrello(false)
-    setTimeout(()=>setSyncMsg(""),5000)
-  }
-
-  return <div>
-    <Hdr title="Imóveis" sub={`${props.length} total · ${list.length} filtrado(s)`} actions={<>
-      <button style={{...btn("s"),background:`${K.trello||"#0079BF"}15`,color:K.trello||"#0079BF",border:`1px solid ${K.trello||"#0079BF"}30`}} onClick={syncTrello} disabled={syncingTrello}>{syncingTrello?"⏳ Sincronizando...":"🔷 Atualizar Trello"}</button>
-      <button style={btn()} onClick={()=>onNav("novo")}>+ Novo</button>
-    </>}/>
-    <div style={{padding:isPhoneL?"16px":"20px 28px"}}>
-      {syncMsg&&<div style={{background:`${K.teal}10`,border:`1px solid ${K.teal}30`,borderRadius:"6px",padding:"10px",marginBottom:"14px",fontSize:"12px",color:K.teal}}>{syncMsg}</div>}
-      <div style={{display:"flex",gap:"10px",marginBottom:"16px",flexWrap:"wrap"}}>
-        <input style={{...inp,maxWidth:isPhoneL?"100%":"260px",fontSize:isPhoneL?16:13}} placeholder="🔍 Buscar..." value={q} onChange={e=>setQ(e.target.value)}/>
-        <select style={{...inp,width:"auto",cursor:"pointer"}} value={filter} onChange={e=>setFilter(e.target.value)}>
-          <option value="todos">Todos</option><option value="comprar">Comprar</option><option value="aguardar">Aguardar</option><option value="evitar">Evitar</option>
-        </select>
-        <select style={{...inp,width:"auto",cursor:"pointer"}} value={sort} onChange={e=>setSort(e.target.value)}>
-          <option value="score">Maior Score</option><option value="desconto">Maior Desconto</option><option value="valor">Menor Valor</option><option value="data">Mais Recente</option>
-        </select>
-      </div>
-      {list.length===0?<div style={{textAlign:"center",padding:"40px",color:K.t3}}><div style={{fontSize:"32px",marginBottom:"10px"}}>🔍</div><div>Nenhum imóvel encontrado</div></div>
-      :<div style={{display:"grid",gridTemplateColumns:isPhoneL?"1fr":"repeat(auto-fill,minmax(300px,1fr))",gap:"12px"}}>
-        {list.map(p=><PropCard key={p.id} p={p} onNav={onNav}/>)}
-      </div>}
-    </div>
-  </div>
-}
-
-// ── COMPARATIVO ───────────────────────────────────────────────────────────────
-function Comparativo({props}) {
-  const [sel,setSel]=useState([])
-  const top=[...props].sort((a,b)=>(b.score_total||0)-(a.score_total||0)).slice(0,8)
-  const cmp=props.filter(p=>sel.includes(p.id))
-  const toggle=id=>setSel(s=>s.includes(id)?s.filter(x=>x!==id):s.length<3?[...s,id]:s)
-  const dims=[["Score Total",p=>(p.score_total||0).toFixed(1),p=>scoreColor(p.score_total)],["Recomendação",p=>p.recomendacao,p=>recColor(p.recomendacao)],["Valor Mínimo",p=>fmtC(p.valor_minimo),()=>K.t2],["Desconto",p=>p.desconto_percentual?`${p.desconto_percentual}%`:"—",()=>K.grn],["Área",p=>p.area_m2?`${p.area_m2}m²`:"—",()=>K.t2],["Preço/m²",p=>p.preco_m2_imovel?`R$ ${p.preco_m2_imovel}`:"—",()=>K.t2],["Ocupação",p=>p.ocupacao,p=>p.ocupacao==="Desocupado"?K.grn:K.red],["Processos",p=>p.processos_ativos,p=>p.processos_ativos==="Nenhum"?K.grn:K.red],["Financiável",p=>p.financiavel?"Sim":"Não",p=>p.financiavel?K.grn:K.t3],["Retorno revenda",p=>p.retorno_venda_pct?`+${p.retorno_venda_pct}%`:"—",()=>K.grn]]
-  return <div>
-    <Hdr title="Comparativo" sub="Selecione até 3 imóveis"/>
-    <div style={{padding:"20px 28px"}}>
-      <div style={{display:"flex",flexWrap:"wrap",gap:"8px",marginBottom:"20px"}}>
-        {top.map(p=><div key={p.id} onClick={()=>toggle(p.id)} style={{background:sel.includes(p.id)?`${K.teal}15`:K.s2,border:`1px solid ${sel.includes(p.id)?K.teal:K.bd}`,borderRadius:"6px",padding:"7px 12px",cursor:"pointer",fontSize:"12px",color:K.tx}}>
-          {sel.includes(p.id)?"✓ ":""}{(p.titulo||"Imóvel").slice(0,26)} <span style={{color:scoreColor(p.score_total)}}>({(p.score_total||0).toFixed(1)})</span>
-        </div>)}
-      </div>
-      {cmp.length>=2?<div style={{overflowX:"auto"}}>
-        <table style={{width:"100%",borderCollapse:"collapse",fontSize:"12.5px"}}>
-          <thead><tr>
-            <th style={{padding:"10px 14px",background:K.s2,color:K.t3,textAlign:"left",fontSize:"11px",textTransform:"uppercase",letterSpacing:"1px",borderBottom:`1px solid ${K.bd}`,minWidth:"130px"}}>Dimensão</th>
-            {cmp.map(p=><th key={p.id} style={{padding:"10px 14px",background:K.s2,color:K.wh,textAlign:"center",borderBottom:`1px solid ${K.bd}`,minWidth:"180px"}}>
-              <div style={{fontSize:"11.5px",marginBottom:"6px"}}>{(p.titulo||"Imóvel").slice(0,22)}</div>
-              <ScoreRing score={p.score_total} size={44}/>
-            </th>)}
-          </tr></thead>
-          <tbody>{dims.map(([label,getValue,getColor],i)=>(
-            <tr key={label} style={{background:i%2===0?K.s1:K.bg2}}>
-              <td style={{padding:"8px 14px",color:K.t3,borderBottom:`1px solid ${K.bd}`}}>{label}</td>
-              {cmp.map(p=><td key={p.id} style={{padding:"8px 14px",textAlign:"center",borderBottom:`1px solid ${K.bd}`,color:getColor(p),fontWeight:"600"}}>{getValue(p)||"—"}</td>)}
-            </tr>
-          ))}</tbody>
-        </table>
-      </div>:<div style={{textAlign:"center",padding:"40px",color:K.t3}}><div style={{fontSize:"28px",marginBottom:"10px"}}>⚖️</div><div>Selecione pelo menos 2 imóveis acima</div></div>}
-    </div>
-  </div>
-}
-
-// ── ACESSO NEGADO ────────────────────────────────────────────────────────────
-function AcessoNegado({ mensagem }) {
-  return (
-    <div style={{
-      display: 'flex', flexDirection: 'column',
-      alignItems: 'center', justifyContent: 'center',
-      height: 320, gap: 16, textAlign: 'center', padding: 32,
-    }}>
-      <div style={{ fontSize: 48 }}>🔒</div>
-      <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: C.navy }}>
-        Acesso Restrito
-      </h3>
-      <p style={{ margin: 0, fontSize: 14, color: C.muted, maxWidth: 360, lineHeight: 1.6 }}>
-        {mensagem || 'Esta funcionalidade é restrita ao administrador.'}
-      </p>
-      <p style={{ margin: 0, fontSize: 12, color: C.hint }}>
-        Contate Gabriel (cotars@hotmail.com) para mais informações.
-      </p>
-    </div>
-  )
-}
-
-// ── BANCO DE ARQUIVADOS ──────────────────────────────────────────────────────
-function BancoArquivados({ session, isAdmin, isPhone }) {
-  const [arquivados, setArquivados] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [filtro, setFiltro] = useState('')
-  const [recomFiltro, setRecomFiltro] = useState('todos')
-
-  useEffect(() => { carregar() }, [])
-
-  async function carregar() {
-    setLoading(true)
-    try {
-      const { getBancoArquivados } = await import('./lib/supabase.js')
-      const data = await getBancoArquivados()
-      setArquivados(data)
-    } catch {}
-    setLoading(false)
-  }
-
-  async function desarquivar(id) {
-    if (!isAdmin) return
-    try {
-      const { desarquivarImovel } = await import('./lib/supabase.js')
-      await desarquivarImovel(id)
-      setArquivados(prev => prev.filter(p => p.id !== id))
-    } catch(e) { alert('Erro ao desarquivar: ' + e.message) }
-  }
-
-  const filtrados = arquivados.filter(a => {
-    const matchTexto = !filtro ||
-      (a.titulo||'').toLowerCase().includes(filtro.toLowerCase()) ||
-      (a.endereco||'').toLowerCase().includes(filtro.toLowerCase()) ||
-      (a.cidade||'').toLowerCase().includes(filtro.toLowerCase())
-    const matchRecom = recomFiltro === 'todos' || a.recomendacao === recomFiltro
-    return matchTexto && matchRecom
-  })
-
-  const sColor = s => !s ? C.hint : s >= 7.5 ? C.emerald : s >= 6 ? C.mustard : '#E5484D'
-
-  return (
-    <div style={{ padding: isPhone ? '16px' : '24px 32px' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, flexWrap:'wrap', gap:12 }}>
-        <div>
-          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: C.navy }}>
-            Banco de Arquivados
-          </h2>
-          <p style={{ margin: '4px 0 0', fontSize: 13, color: C.muted }}>
-            {arquivados.length} imóvel(is) arquivado(s) — disponíveis para análise futura
-          </p>
-        </div>
-        <button onClick={carregar} style={{
-          padding: '8px 16px', borderRadius: 8,
-          border: `1px solid ${C.borderW}`, background: C.white,
-          color: C.navy, fontSize: 13, cursor: 'pointer', fontWeight: 500,
-        }}>
-          Atualizar
-        </button>
-      </div>
-
-      {/* Filtros */}
-      <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
-        <input
-          placeholder="Buscar por endereço ou cidade..."
-          value={filtro}
-          onChange={e => setFiltro(e.target.value)}
-          style={{
-            flex: 1, minWidth: 200, padding: '9px 14px', borderRadius: 8,
-            border: `1px solid ${C.borderW}`, fontSize: 13,
-            background: C.white, color: C.navy, outline: 'none',
-          }}
-        />
-        {['todos','COMPRAR','AGUARDAR','EVITAR'].map(r => (
-          <button key={r} onClick={() => setRecomFiltro(r)} style={{
-            padding: '8px 14px', borderRadius: 8, fontSize: 12, fontWeight: 500,
-            cursor: 'pointer',
-            border: `1px solid ${recomFiltro===r ? C.emerald : C.borderW}`,
-            background: recomFiltro===r ? C.emeraldL : C.white,
-            color: recomFiltro===r ? C.emerald : C.muted,
-          }}>
-            {r === 'todos' ? 'Todos' : r}
-          </button>
-        ))}
-      </div>
-
-      {/* Lista */}
-      {loading ? (
-        <p style={{ color: C.muted, textAlign: 'center', padding: 40 }}>Carregando...</p>
-      ) : filtrados.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: 48, color: C.hint }}>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>📦</div>
-          <p style={{ fontSize: 14, fontWeight: 500 }}>Nenhum imóvel arquivado</p>
-          <p style={{ fontSize: 12 }}>
-            Imóveis arquivados aparecem aqui para referência futura.
-          </p>
-        </div>
-      ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: isPhone ? '1fr' : 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
-          {filtrados.map(imovel => (
-            <div key={imovel.id} style={{
-              background: C.white, border: `1px solid ${C.borderW}`,
-              borderRadius: 12, overflow: 'hidden',
-              boxShadow: '0 2px 8px rgba(0,43,128,0.06)',
-              opacity: 0.92,
-            }}>
-              {imovel.foto_principal && (
-                <img src={imovel.foto_principal} alt=""
-                  style={{ width: '100%', height: 140, objectFit: 'cover' }}
-                  onError={e => { e.target.style.display = 'none' }}
-                />
-              )}
-              <div style={{ padding: '14px 16px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                  <div style={{ flex: 1 }}>
-                    <p style={{ margin: 0, fontSize: 13.5, fontWeight: 600, color: C.navy }}>
-                      {imovel.titulo || imovel.endereco || 'Imóvel'}
-                    </p>
-                    <p style={{ margin: '2px 0 0', fontSize: 11.5, color: C.muted }}>
-                      {imovel.cidade}/{imovel.estado} — {imovel.tipo}
-                    </p>
-                  </div>
-                  <div style={{ textAlign: 'center', flexShrink: 0 }}>
-                    <p style={{ margin: 0, fontSize: 18, fontWeight: 800, color: sColor(imovel.score_total) }}>
-                      {imovel.score_total?.toFixed(1) || '—'}
-                    </p>
-                    <p style={{ margin: 0, fontSize: 9, color: C.hint }}>score</p>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: 12, marginBottom: 10 }}>
-                  <div>
-                    <p style={{ margin: 0, fontSize: 10.5, color: C.hint }}>Lance mínimo</p>
-                    <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: C.navy }}>
-                      {imovel.valor_minimo ? `R$ ${Number(imovel.valor_minimo).toLocaleString('pt-BR')}` : '—'}
-                    </p>
-                  </div>
-                  <div>
-                    <p style={{ margin: 0, fontSize: 10.5, color: C.hint }}>Desconto</p>
-                    <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: C.emerald }}>
-                      {imovel.desconto_percentual ? `${imovel.desconto_percentual}%` : '—'}
-                    </p>
-                  </div>
-                  <div>
-                    <p style={{ margin: 0, fontSize: 10.5, color: C.hint }}>Recomendação</p>
-                    <p style={{ margin: 0, fontSize: 12, fontWeight: 700,
-                      color: imovel.recomendacao === 'COMPRAR' ? C.emerald
-                        : imovel.recomendacao === 'EVITAR' ? '#E5484D' : C.mustard }}>
-                      {imovel.recomendacao || '—'}
-                    </p>
-                  </div>
-                </div>
-                {imovel.motivo_arquivamento && (
-                  <div style={{
-                    padding: '6px 10px', borderRadius: 6, marginBottom: 10,
-                    background: '#F5F4F0', fontSize: 11.5, color: C.muted,
-                  }}>
-                    📦 {imovel.motivo_arquivamento}
-                  </div>
-                )}
-                {imovel.arquivado_em && (
-                  <p style={{ margin: '0 0 10px', fontSize: 10.5, color: C.hint }}>
-                    Arquivado em {new Date(imovel.arquivado_em).toLocaleDateString('pt-BR')}
-                  </p>
-                )}
-                {isAdmin && (
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button onClick={() => desarquivar(imovel.id)} style={{
-                      flex: 1, padding: '7px 0', borderRadius: 7,
-                      border: `1px solid ${C.emerald}`,
-                      background: C.emeraldL, color: C.emerald,
-                      fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                    }}>
-                      Reativar
-                    </button>
-                    {imovel.fonte_url && (
-                      <a href={imovel.fonte_url} target="_blank" rel="noreferrer" style={{
-                        padding: '7px 12px', borderRadius: 7,
-                        border: `1px solid ${C.borderW}`,
-                        background: C.white, color: C.muted,
-                        fontSize: 12, textDecoration: 'none',
-                        display: 'flex', alignItems: 'center',
-                      }}>
-                        🔗
-                      </a>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ── APP ROOT ──────────────────────────────────────────────────────────────────
-export default function App() {
-  const { session, profile, loading: authLoading, isAdmin } = useAuth()
-  const isViewer = !isAdmin && profile?.role === 'viewer'
-  const podeEditar = isAdmin
-  const podeSoVer = !isAdmin
-  if (authLoading) return <div style={{display:'flex',flexDirection:'column',height:'100dvh',background:C.offwhite,justifyContent:'center',alignItems:'center',color:C.navy,fontFamily:"'Inter',system-ui,sans-serif",fontSize:'16px',fontWeight:'700'}}>Carregando...</div>
-  if (!session) return <Login />
-  if (profile && !profile.ativo) return <div style={{display:'flex',height:'100dvh',background:C.offwhite,justifyContent:'center',alignItems:'center',color:'#E5484D',fontFamily:"'Inter',system-ui,sans-serif",flexDirection:'column',gap:'12px'}}><div style={{fontSize:'16px',fontWeight:'700'}}>Acesso desativado</div><div style={{fontSize:'13px',color:C.muted}}>Contate o administrador</div></div>
-  const [view,setView]=useState("dashboard")
-  const [vp,setVp]=useState({})
-  const [props,setProps]=useState([])
-  const [loaded,setL]=useState(false)
-  const [toast,setToast]=useState(null)
-  const [trello,setTrello]=useState(null)
-  const [showTrello,setShowTrello]=useState(false)
-  const [showApiKey,setShowApiKey]=useState(false)
-  const [showTrelloModal,setShowTrelloModal]=useState(false)
-const [parametrosBanco,setParametrosBanco]=useState([])
-const [criteriosBanco,setCriteriosBanco]=useState([])
-  const [apiOk,setApiKey]=useState(localStorage.getItem("axis-api-key"))
-  const isMobile = useIsMobile(900)
-  const isPhone  = useIsMobile(480)
-useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("parametros_score").select("*");if(pr)setParametrosBanco(pr);const{data:cr}=await supabase.from("criterios_avaliacao").select("*");if(cr)setCriteriosBanco(cr)}catch(e){console.warn("parametros:",e)}}lp()},[])
-
-  // Garante IDs fixos dos boards AXIS no localStorage
-  useEffect(() => {
-    try {
-      const conf = JSON.parse(localStorage.getItem('axis-trello') || '{}')
-      if (conf.key && conf.token) {
-        localStorage.setItem('axis-trello', JSON.stringify({
-          ...conf,
-          boardId: '69c0ac769abcec1a62851eb4',
-          boardManualId: '69c0ac820802ca9e0ce94ce1',
-        }))
-      }
-    } catch {}
-  }, [])
-
-  // Sync API keys from Supabase por usuário (cross-device)
-  useEffect(()=>{
-    if(!session?.user?.id) return
-    import('./lib/supabase.js').then(({loadApiKeys})=>{
-      loadApiKeys(session.user.id).then(({claudeKey,openaiKey})=>{
-        if(claudeKey&&!localStorage.getItem('axis-api-key')){localStorage.setItem('axis-api-key',claudeKey);setApiKey(claudeKey)}
-        if(openaiKey&&!localStorage.getItem('axis-openai-key')){localStorage.setItem('axis-openai-key',openaiKey)}
-      }).catch(()=>{})
-    }).catch(()=>{})
-  },[session])
-
-  const showToast=(msg,c)=>{setToast({msg,c:c||K.teal});setTimeout(()=>setToast(null),4500)}
-  const nav=(v,p={})=>{setView(v);setVp(p)}
-
-  useEffect(()=>{(async()=>{
-    // Migração: leilax-* → axis-* (preservar dados do rebrand)
-    const MIGRATE = [['leilax-props','axis-props'],['leilax-trello','axis-trello'],['leilax-api-key','axis-api-key'],['leilax-openai-key','axis-openai-key']]
-    for(const [old,nw] of MIGRATE){
-      const v=localStorage.getItem(old)
-      if(v&&!localStorage.getItem(nw)){localStorage.setItem(nw,v);localStorage.removeItem(old)}
-    }
-    const t=await stLoad("axis-trello")
-    if(t)setTrello(t); setL(true)
-    // Mostrar modal de API key se não tiver
-    if(!localStorage.getItem("axis-api-key")) setTimeout(()=>setShowApiKey(true),1000)
-    // Carregar imóveis: Supabase como fonte primária, localStorage como fallback
-    if(session) {
-      try {
-        // Migração única: localStorage → Supabase (usa saveImovelCompleto com payload seguro)
-        if(!localStorage.getItem('axis-migracao-concluida')){
-          const local=JSON.parse(localStorage.getItem('axis-props')||'[]')
-          if(local.length>0){
-            console.log(`[AXIS] Migrando ${local.length} imóveis locais para Supabase...`)
-            const{saveImovelCompleto}=await import('./lib/supabase.js')
-            let ok=0
-            for(const im of local){try{await saveImovelCompleto(im,session.user.id);ok++}catch(e){console.warn('[AXIS] Migração falhou:',im.id,e.message,e)}}
-            console.log(`[AXIS] Migração: ${ok}/${local.length} imóveis salvos no Supabase`)
-            // Só marcar concluída se pelo menos 1 migrou com sucesso
-            if(ok>0) localStorage.setItem('axis-migracao-concluida','true')
-          } else {
-            localStorage.setItem('axis-migracao-concluida','true')
-          }
-        }
-        // Carregar do Supabase
-        const{getImoveisAtivos:gi}=await import('./lib/supabase.js')
-        const data=await gi()
-        if(data&&data.length>0){
-          setProps(data)
-          stSave("axis-props",data) // cache local
-        } else {
-          // Fallback: tentar cache local
-          const cache=JSON.parse(localStorage.getItem('axis-props')||'[]')
-          if(cache.length>0) setProps(cache)
-        }
-      } catch(e) {
-        console.error('[AXIS] Supabase indisponível, usando cache local:',e)
-        const cache=JSON.parse(localStorage.getItem('axis-props')||'[]')
-        if(cache.length>0) setProps(cache)
-      }
-    } else {
-      const cache=await stLoad("axis-props")
-      if(cache) setProps(cache)
-    }
-  })()},[])
-
-  useEffect(()=>{if(loaded&&props.length>0)stSave("axis-props",props)},[props,loaded])
-  useEffect(()=>{if(loaded&&trello)stSave("axis-trello",trello)},[trello,loaded])
-
-  const addProp=async(p)=>{
-    // Garantir ID
-    if(!p.id) p.id=crypto.randomUUID()
-    // Gerar código AXIS único
-    if(!p.codigo_axis) {
-      try {
-        const{gerarAxisId}=await import('./lib/supabase.js')
-        p.codigo_axis=await gerarAxisId(p.cidade)
-      } catch(e) {
-        console.warn('[AXIS] Fallback codigo_axis:',e.message)
-        p.codigo_axis=`MG-${new Date().getFullYear()}-${Date.now().toString().slice(-4)}`
-      }
-    }
-    // 1. Atualizar state imediatamente (UI responsiva)
-    setProps(ps=>{
-      const existe=ps.find(x=>x.id===p.id)
-      if(existe) return ps.map(x=>x.id===p.id?p:x)
-      return [p,...ps]
-    })
-    showToast(`✓ ${p.codigo_axis} · ${p.titulo||"Imóvel"} — Score ${(p.score_total||0).toFixed(1)} · ${p.recomendacao}`)
-    if ((p.score_total||0) >= 7.5) {
-      setTimeout(() => showToast(`OPORTUNIDADE: Score ${p.score_total.toFixed(1)} — ${p.titulo||p.bairro||'Ver imóvel'}`, K.grn), 1500)
-    }
-    nav("detail",{id:p.id})
-    // 2. Salvar no Supabase (fonte primária)
-    if(session) {
-      try {
-        const{saveImovelCompleto}=await import('./lib/supabase.js')
-        const salvo=await saveImovelCompleto(p,session.user.id)
-        // Atualizar state com dados confirmados pelo Supabase
-        setProps(ps=>ps.map(x=>x.id===salvo.id?salvo:x))
-        console.log('[AXIS] Imóvel salvo no Supabase:',salvo.codigo_axis)
-      } catch(e) {
-        console.error('[AXIS] FALHA ao salvar no Supabase:',e.message,e)
-        showToast(`⚠️ Salvo localmente — sync nuvem falhou: ${e.message}`)
-      }
-    }
-  }
-  const delProp=async(id)=>{deleteImovel(id).catch(()=>{});setProps(ps=>ps.filter(p=>p.id!==id));showToast("Excluído",K.red);nav("imoveis")}
-
-  const handleArquivar=async(imovelId)=>{
-    const motivo=prompt('Motivo do arquivamento (opcional):')
-    if(motivo===null) return
-    try {
-      const{arquivarImovel}=await import('./lib/supabase.js')
-      await arquivarImovel(imovelId,motivo||'Arquivado pelo administrador',session?.user?.id)
-      setProps(prev=>prev.filter(p=>p.id!==imovelId))
-      const sel=vp.id===imovelId
-      if(sel){nav('imoveis')}
-      showToast("Imóvel arquivado",C.mustard)
-    } catch(e){alert('Erro ao arquivar: '+e.message)}
-  }
-  const saveTrello=cfg=>{
-    setTrello(cfg);setShowTrello(false);showToast("✓ Trello configurado — "+cfg.boardName,K.trello)
-    if(cfg.boardId&&cfg.key&&cfg.token){
-      setupBoardAxis(AXIS_BOARDS.PIPELINE,cfg.key,cfg.token)
-        .then(()=>console.log('[AXIS] Board Trello configurado'))
-        .catch(e=>console.warn('[AXIS] Setup Trello:',e.message))
-    }
-  }
-
-  const NAV_ITEMS_DEF=[
-    {icon:LayoutDashboard,l:'Dashboard',v:'dashboard'},
-    ...(isAdmin?[{icon:Plus,l:'Analisar',v:'novo'}]:[]),
-    ...(isAdmin?[{icon:MessageSquare,l:'Busca GPT',v:'busca'}]:[]),
-    {icon:Package,l:'Imóveis',v:'imoveis'},
-    {icon:BarChart3,l:'Gráficos',v:'graficos'},
-    {icon:Scale,l:'Comparar',v:'comparar'},
-    {icon:CheckSquare,l:'Tarefas',v:'tarefas'},
-    {icon:FileText,l:'Arquivados',v:'arquivados'},
-    ...(isAdmin?[{icon:TrendingUp,l:'Portfólio',v:'portfolio'}]:[]),
-    ...(isAdmin?[{icon:ShieldCheck,l:'Admin',v:'admin'}]:[]),
-  ]
-  // Keep emoji-based navItems for MobileNav compatibility
-  const navItems=[
-    {i:'🏠',l:'Dashboard',v:'dashboard'},
-    ...(isAdmin?[{i:'🔍',l:'Analisar',v:'novo'}]:[]),
-    ...(isAdmin?[{i:'🤖',l:'Busca GPT',v:'busca'}]:[]),
-    {i:'📋',l:'Imóveis',v:'imoveis'},
-    {i:'📊',l:'Gráficos',v:'graficos'},
-    {i:'⚖️',l:'Comparar',v:'comparar'},
-    {i:'✅',l:'Tarefas',v:'tarefas'},
-    {i:'🏦',l:'Arquivados',v:'arquivados'},
-    ...(isAdmin?[{i:'📊',l:'Portfólio',v:'portfolio'}]:[]),
-    ...(isAdmin?[{i:'🛡️',l:'Admin',v:'admin'}]:[]),
-  ]
-  const isAct=v=>view===v||(v==="imoveis"&&view==="detail")
-  const selP=vp.id?props.find(p=>p.id===vp.id):null
-
-  if(!loaded) return <div style={{display:"flex",height:"100dvh",background:C.offwhite,justifyContent:"center",alignItems:"center",flexDirection:"column",gap:"12px",fontFamily:"'Inter',system-ui,sans-serif"}}>
-    <AxisLogo size="lg" />
-    <div style={{color:C.muted,fontWeight:"500",fontSize:"14px",marginTop:8}}>Carregando...</div>
-  </div>
-
-  return <div style={{display:"flex",minHeight:"100dvh",background:C.offwhite,color:C.text,fontFamily:"'Inter',system-ui,sans-serif",fontSize:"14px",overflow:"hidden"}}>
-    <style>{`*{box-sizing:border-box;}::-webkit-scrollbar{width:4px;}::-webkit-scrollbar-track{background:${C.offwhite};}::-webkit-scrollbar-thumb{background:${C.border};border-radius:2px;}select option{background:${C.white};}@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}a:hover{opacity:.8;}`}</style>
-
-    {showTrello&&<TrelloModal config={trello} onSave={saveTrello} onClose={()=>setShowTrello(false)}/>}
-    {showApiKey&&<ApiKeyModal onClose={()=>setShowApiKey(false)} session={session}/>}
-    {showTrelloModal&&<ModalAuditoriaTrello config={trello||JSON.parse(localStorage.getItem('axis-trello')||'{}')} imoveis={props} onClose={()=>setShowTrelloModal(false)}/>}
-
-{/* SIDEBAR — AXIS expandida 200px */}
-<aside className="axis-sidebar" style={{
-  width:200,minWidth:200,height:'100dvh',position:'sticky',top:0,
-  background:C.navy,display:'flex',flexDirection:'column',
-  borderRight:`1px solid ${C.navy2}`,flexShrink:0,
-}}>
-  {/* Logo */}
-  <div style={{padding:"24px 20px 20px",borderBottom:"1px solid rgba(255,255,255,0.07)"}}>
-    <AxisLogo light />
-  </div>
-  {/* Nav */}
-  <nav style={{flex:1,padding:'12px 10px',display:'flex',flexDirection:'column',gap:2}}>
-    {NAV_ITEMS_DEF.map(item=>{
-      const active=isAct(item.v)
-      return <button key={item.v} onClick={()=>nav(item.v)}
-        style={{
-          width:'100%',display:'flex',alignItems:'center',gap:10,
-          padding:'10px 12px',borderRadius:8,border:'none',cursor:'pointer',
-          background:active?'rgba(5,168,109,0.15)':'transparent',
-          color:active?C.emerald:'rgba(255,255,255,0.55)',
-          fontSize:13.5,fontWeight:active?600:400,
-          transition:'all 0.15s',position:'relative',textAlign:'left',
-        }}
-        onMouseEnter={e=>{if(!active)e.currentTarget.style.background='rgba(255,255,255,0.06)'}}
-        onMouseLeave={e=>{if(!active)e.currentTarget.style.background='transparent'}}
-      >
-        {active&&<span style={{position:'absolute',left:0,top:'18%',bottom:'18%',width:3,borderRadius:'0 3px 3px 0',background:C.emerald}} />}
-        <item.icon size={17} strokeWidth={active?2.2:1.6} />
-        {item.l}
-      </button>
-    })}
-  </nav>
-  {/* Sidebar footer */}
-  <div style={{padding:'10px 10px',borderTop:'1px solid rgba(255,255,255,0.07)',display:'flex',flexDirection:'column',gap:4}}>
-    <button onClick={()=>trello?setShowTrelloModal(true):setShowTrello(true)} style={{
-      width:'100%',display:'flex',alignItems:'center',gap:10,
-      padding:'8px 12px',borderRadius:8,border:'none',cursor:'pointer',
-      background:trello?'rgba(5,168,109,0.12)':'transparent',
-      color:trello?C.emerald:'rgba(255,255,255,0.45)',fontSize:13,fontWeight:400,textAlign:'left',
-    }}>
-      🔷 Trello
-    </button>
-    {isAdmin&&<button onClick={()=>setShowApiKey(true)} style={{
-      width:'100%',display:'flex',alignItems:'center',gap:10,
-      padding:'8px 12px',borderRadius:8,border:'none',cursor:'pointer',
-      background:'transparent',color:'rgba(255,255,255,0.45)',fontSize:13,fontWeight:400,textAlign:'left',
-    }}>
-      <Settings size={15} /> Config
-    </button>}
-    <div onClick={async()=>{if(confirm('Sair?')){const{signOut}=await import('./lib/supabase.js');await signOut()}}}
-      style={{display:'flex',alignItems:'center',gap:8,padding:'8px 12px',cursor:'pointer',borderRadius:8,marginTop:4}}>
-      <div style={{width:30,height:30,borderRadius:'50%',background:`${C.emerald}25`,border:`1px solid ${C.emerald}50`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,fontWeight:700,color:C.emerald}}>
-        {(profile?.nome||'U')[0].toUpperCase()}
-      </div>
-      <div style={{minWidth:0,overflow:"hidden"}}>
-        <p style={{margin:0,fontSize:12,fontWeight:600,color:'rgba(255,255,255,0.8)',whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{profile?.nome||'Usuário'}</p>
-        <p style={{margin:0,fontSize:10,color:'rgba(255,255,255,0.35)',whiteSpace:"nowrap"}}>{profile?.role||'membro'}</p>
-      </div>
-    </div>
-  </div>
-  <div style={{padding:'10px 16px',borderTop:'1px solid rgba(255,255,255,0.07)'}}>
-    <p style={{margin:0,fontSize:10.5,color:'rgba(255,255,255,0.35)',lineHeight:1.5}}>AXIS Inteligência v2.1</p>
-    <p style={{margin:0,fontSize:10,color:'rgba(255,255,255,0.2)'}}>Forma Patrimonial, MG</p>
-  </div>
-</aside>
-{/* FIM SIDEBAR */}
-
-    {/* CONTENT */}
-    <div className="axis-main" style={{flex:1,overflowY:"auto",background:C.offwhite,display:"flex",flexDirection:"column",minWidth:0}}>
-      {view==="dashboard"&&<Suspense fallback={<div style={{padding:40,textAlign:"center",color:C.muted}}>Carregando...</div>}><LazyDashboard props={props} onNav={nav} profile={profile} isMobile={isMobile} isPhone={isPhone}/></Suspense>}
+            {view==="dashboard"&&<Suspense fallback={<div style={{padding:40,textAlign:"center"}}>Carregando...</div>}><LazyDashboard props={props} onNav={nav} profile={profile} isMobile={isMobile} isPhone={isPhone}/></Suspense>}
   {view==="novo"&&(isAdmin?<NovoImovel onSave={addProp} onCancel={()=>nav("imoveis")} onNav={nav} trello={trello} parametrosBanco={parametrosBanco} criteriosBanco={criteriosBanco} isPhone={isPhone} existingProps={props}/>:<AcessoNegado mensagem="Análise de imóveis é restrita ao administrador."/>)}
       {view==="imoveis"&&<Lista props={props} onNav={nav} onDelete={delProp} trello={trello} onUpdateProp={(id,updates)=>setProps(ps=>ps.map(p=>p.id===id?{...p,...updates}:p))}/>}
-      {view==="detail"&&<Suspense fallback={<div style={{padding:40,textAlign:"center",color:C.muted}}>Carregando...</div>}><LazyDetail p={selP} onDelete={delProp} onNav={nav} trello={trello} onUpdateProp={(id,updates)=>setProps(ps=>ps.map(p=>p.id===id?{...p,...updates}:p))} isAdmin={isAdmin} onArchive={handleArquivar} isMobile={isMobile} isPhone={isPhone}/></Suspense>}
+            {view==="detail"&&<Suspense fallback={<div style={{padding:40,textAlign:"center"}}>Carregando...</div>}><LazyDetail p={selP} onDelete={delProp} onNav={nav} trello={trello} onUpdateProp={(id,updates)=>setProps(ps=>ps.map(p=>p.id===id?{...p,...updates}:p))} isAdmin={isAdmin} onArchive={handleArquivar} isMobile={isMobile} isPhone={isPhone}/></Suspense>}
       {view==="comparar"&&<Comparativo props={props}/>}
     {view==="busca"&&(isAdmin?<BuscaGPT onAnalisar={(link)=>{nav("novo");setTimeout(()=>{},100)}}/>:<AcessoNegado mensagem="Busca com IA é restrita ao administrador."/>)}
     {view==="graficos"&&<div><div style={{padding:isPhone?"16px":"22px 28px 16px",borderBottom:`1px solid ${C.borderW}`,background:C.white}}><div style={{fontWeight:700,fontSize:19,color:C.text}}>Gráficos</div></div><div style={{padding:isPhone?"16px":"20px 28px"}}><Charts properties={props}/></div></div>}
     {view==="tarefas"&&<Tarefas/>}
     {view==="arquivados"&&<BancoArquivados session={session} isAdmin={isAdmin} isPhone={isPhone}/>}
     {view==="portfolio"&&isAdmin&&<PainelPortfolio props={props} isMobile={isMobile} isPhone={isPhone}/>}
-    {view==="admin"&&isAdmin&&<Suspense fallback={<div style={{padding:40,textAlign:"center",color:C.muted}}>Carregando...</div>}><LazyPainelAdmin session={session} imoveis={props} isPhone={isPhone}/></Suspense>}
+            {view==="admin"&&isAdmin&&<Suspense fallback={<div style={{padding:40,textAlign:"center"}}>Carregando...</div>}><LazyPainelAdmin session={session} imoveis={props} isPhone={isPhone}/></Suspense>}
     </div>
 
     {toast&&<div style={{position:"fixed",bottom:"16px",right:"16px",background:C.white,color:C.text,padding:"12px 20px",borderRadius:"10px",fontSize:"13px",fontWeight:"600",zIndex:9999,boxShadow:"0 8px 32px rgba(0,33,128,0.15)",maxWidth:"340px",border:`1px solid ${C.borderW}`}}>{toast.msg}</div>}

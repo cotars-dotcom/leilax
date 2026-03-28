@@ -4,120 +4,6 @@ import { supabase } from "../lib/supabase.js"
 import { analisarImovelCompleto } from "../lib/dualAI.js"
 import { criarCardImovel } from "../lib/trelloService.js"
 import CalculadoraROI from "./CalculadoraROI.jsx"
-import { calcularCustoReforma, ESCOPOS_REFORMA } from "../data/custos_reforma.js"
-
-const ESCOPOS_INFO = {
-  refresh_giro: {
-    nome: 'Refresh Rápido',
-    descricao: 'Pintura + reparos + revisão pontual — ideal para flip rápido',
-    itens: ['Pintura geral interna', 'Correção de trincas e infiltrações', 'Limpeza e higienização profunda', 'Revisão elétrica pontual', 'Revisão hidráulica pontual'],
-    prazo: '3–5 semanas'
-  },
-  leve_funcional: {
-    nome: 'Leve Funcional',
-    descricao: 'Refresh + piso + troca funcional — valorização 10–18%',
-    itens: ['Tudo do Refresh', 'Troca de piso sala e quartos', 'Reforma banheiro social', 'Modernização de torneiras e metais', 'Iluminação LED'],
-    prazo: '6–10 semanas'
-  },
-  leve_reforcada_1_molhado: {
-    nome: 'Leve Reforçada (1 molhado)',
-    descricao: 'Leve + 1 banheiro ou cozinha completa — valorização 18–28%',
-    itens: ['Tudo do Leve Funcional', 'Reforma completa 1 banheiro OU cozinha', 'Revestimento novo no molhado', 'Louças e metais novos'],
-    prazo: '10–16 semanas'
-  },
-  media: {
-    nome: 'Reforma Média',
-    descricao: 'Todos os molhados + elétrica/hidráulica — valorização 25–40%',
-    itens: ['Reforma todos os banheiros', 'Reforma cozinha completa', 'Troca de toda a parte elétrica', 'Troca de toda a parte hidráulica', 'Pisos e revestimentos novos'],
-    prazo: '16–24 semanas'
-  },
-  pesada: {
-    nome: 'Reforma Pesada',
-    descricao: 'Estrutural + layout — alto investimento, alto retorno potencial',
-    itens: ['Tudo da Média', 'Alteração de layout (demolição/construção)', 'Forro de gesso novo', 'Esquadrias novas', 'Fachada (se aplicável)'],
-    prazo: '24–36 semanas'
-  }
-}
-
-function PainelReforma({ imovel }) {
-  const escopo = imovel.escopo_reforma || 'refresh_giro'
-  const area = imovel.area_usada_calculo_m2 || imovel.area_privativa_m2 || imovel.area_m2 || 0
-  const precoM2 = imovel.preco_m2_mercado || 0
-
-  const resultado = area > 0 ? calcularCustoReforma({
-    area_m2: area,
-    escopo,
-    preco_m2_atual: precoM2
-  }) : null
-
-  const info = ESCOPOS_INFO[escopo] || ESCOPOS_INFO['refresh_giro']
-  const fmtV = v => v ? `R$ ${Math.round(v).toLocaleString('pt-BR')}` : '—'
-
-  return (
-    <div style={{ marginTop: 16 }}>
-      <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10 }}>
-        <span style={{ fontSize:16 }}>🔧</span>
-        <h4 style={{ margin:0, fontSize:14, fontWeight:700, color:C.navy }}>
-          Plano de Reforma — {info.nome}
-        </h4>
-      </div>
-      <div style={{ background:C.surface, borderRadius:8, padding:'10px 14px', marginBottom:10 }}>
-        <p style={{ margin:0, fontSize:12, color:C.muted, lineHeight:1.5 }}>{info.descricao}</p>
-        {resultado?.classe_label && (
-          <p style={{ margin:'4px 0 0', fontSize:11, color:C.navy, fontWeight:500 }}>
-            Classe: {resultado.classe_label}
-          </p>
-        )}
-      </div>
-      <div style={{ background:C.surface, borderRadius:8, padding:'10px 14px', marginBottom:10 }}>
-        <p style={{ margin:'0 0 6px', fontSize:11, fontWeight:600, color:C.muted, textTransform:'uppercase', letterSpacing:'0.5px' }}>
-          Itens incluídos
-        </p>
-        {info.itens.map((item, i) => (
-          <div key={i} style={{ display:'flex', gap:8, padding:'3px 0', fontSize:12, color:C.text }}>
-            <span style={{ color:C.emerald, flexShrink:0 }}>✓</span>
-            {item}
-          </div>
-        ))}
-      </div>
-      {resultado && (
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:10 }}>
-          <div style={{ background:C.surface, borderRadius:8, padding:'10px 14px' }}>
-            <p style={{ margin:0, fontSize:11, color:C.muted }}>Custo estimado</p>
-            <p style={{ margin:'4px 0 0', fontSize:16, fontWeight:800, color:C.navy }}>
-              {fmtV(resultado.custo_total_final)}
-            </p>
-            <p style={{ margin:'2px 0 0', fontSize:10, color:C.muted }}>
-              {fmtV(resultado.custo_m2_usado)}/m² · {area}m²
-              {resultado.reserva_contingencia > 0 && ` · incl. 12% reserva`}
-            </p>
-          </div>
-          <div style={{ background:C.surface, borderRadius:8, padding:'10px 14px' }}>
-            <p style={{ margin:0, fontSize:11, color:C.muted }}>Prazo estimado</p>
-            <p style={{ margin:'4px 0 0', fontSize:16, fontWeight:800, color:C.navy }}>
-              {info.prazo}
-            </p>
-            <p style={{ margin:'2px 0 0', fontSize:10, color:C.muted }}>obra + contratações</p>
-          </div>
-        </div>
-      )}
-      {imovel.alerta_sobrecap && imovel.alerta_sobrecap !== 'verde' && (
-        <div style={{
-          background: imovel.alerta_sobrecap === 'vermelho' ? '#FEE2E2' : '#FEF3C7',
-          border: `1px solid ${imovel.alerta_sobrecap === 'vermelho' ? '#FCA5A5' : '#FCD34D'}`,
-          borderRadius:8, padding:'10px 14px', fontSize:12,
-          color: imovel.alerta_sobrecap === 'vermelho' ? '#991B1B' : '#92400E'
-        }}>
-          {imovel.alerta_sobrecap === 'vermelho' ? '⚠️ ATENÇÃO CRÍTICA' : '⚡ ATENÇÃO'}: Custo de reforma pode exceder o teto para este bairro. Revisar escopo antes de executar.
-        </div>
-      )}
-      <p style={{ fontSize:10, color:C.muted, marginTop:8, fontStyle:'italic' }}>
-        Base: SINAPI MG jun/2025 + Preço da Obra BH 2026 · Custo direto (MO + materiais).
-        Não inclui: projeto, ART, mobiliário, eletrodomésticos.
-      </p>
-    </div>
-  )
-}
 
 const Bdg = ({c,ch}) => <span style={{display:"inline-block",fontSize:"10px",fontWeight:"700",padding:"2px 8px",borderRadius:"5px",textTransform:"uppercase",letterSpacing:".5px",background:`${c}12`,color:c}}>{ch}</span>
 
@@ -739,11 +625,6 @@ export default function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze
             background:'#fff', display:'inline-block',
             animation:'pulse 1s infinite' }} />
           Ao Vivo
-        </button>
-        <button onClick={() => { import('../lib/supabase.js').then(({ exportarRelatorioHTML }) => { exportarRelatorioHTML(p) }) }}
-          title="Baixar relatório HTML"
-          style={{ padding:'6px 12px', borderRadius:7, border:`1px solid ${K.bd}`, background:K.s2, color:K.t2, fontSize:12, cursor:'pointer', display:'flex', alignItems:'center', gap:5 }}>
-          ↓ Exportar
         </button>
         {isAdmin&&onArchive&&<button style={{...btn("s"),background:`${C.mustardL}`,color:C.mustard,border:`1px solid ${C.mustard}40`}} onClick={()=>onArchive(p.id)}>📦 Arquivar</button>}
         {isAdmin&&<button style={{...btn("d"),padding:"5px 12px",fontSize:"12px"}} onClick={()=>{if(confirm("Excluir?"))onDelete(p.id)}}>🗑</button>}

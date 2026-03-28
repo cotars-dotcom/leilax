@@ -103,24 +103,7 @@ function AxisHeader({profile:prof, imoveis=[], onNav}) {
         </p>
       </div>
       <div style={{display:"flex",alignItems:"center",gap:14}}>
-        <button onClick={() => {
-          const dados = {
-            exportado_em: new Date().toISOString(),
-            total: imoveis.length,
-            imoveis: imoveis.map(p => ({
-              codigo_axis: p.codigo_axis, titulo: p.titulo, cidade: p.cidade,
-              score_total: p.score_total, recomendacao: p.recomendacao,
-              valor_minimo: p.valor_minimo, desconto_percentual: p.desconto_percentual,
-            }))
-          }
-          const blob = new Blob([JSON.stringify(dados, null, 2)], { type: 'application/json' })
-          const url = URL.createObjectURL(blob)
-          const a = document.createElement('a')
-          a.href = url
-          a.download = `AXIS_Carteira_${new Date().toISOString().slice(0,10)}.json`
-          a.click()
-          URL.revokeObjectURL(url)
-        }} style={{
+        <button style={{
           display:"flex",alignItems:"center",gap:7,whiteSpace:"nowrap",
           padding:"8px 16px",borderRadius:8,
           border:`1px solid ${C.borderW}`,background:C.white,color:C.navy,
