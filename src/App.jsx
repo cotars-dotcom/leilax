@@ -17,7 +17,6 @@ import { C, K, RED, btn, inp, card, fmtC, fmtD, scoreColor, scoreLabel, recColor
 const LazyDashboard = lazy(() => import("./components/Dashboard.jsx"))
 const LazyDetail = lazy(() => import("./components/Detail.jsx"))
 const LazyPainelAdmin = lazy(() => import("./components/PainelAdmin.jsx"))
-const LazyCalculadoraROI = lazy(() => import("./components/CalculadoraROI.jsx"))
 
 const uid = () => Math.random().toString(36).slice(2,9) + Date.now().toString(36)
 
