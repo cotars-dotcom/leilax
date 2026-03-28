@@ -4,7 +4,7 @@ import { supabase } from "../lib/supabase.js"
 import { analisarImovelCompleto } from "../lib/dualAI.js"
 import { criarCardImovel } from "../lib/trelloService.js"
 import CalculadoraROI from "./CalculadoraROI.jsx"
-import { calcularCustoReforma } from "../data/custos_reforma.js"
+import { CLASSES_MERCADO_REFORMA, calcularCustoReforma, detectarClasseMercado } from "../data/custos_reforma.js"
 
 const ESCOPOS_INFO = {
   refresh_giro: {
@@ -896,10 +896,37 @@ export default function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze
       <div style={{...card(),marginBottom:"14px"}}>
         <CalculadoraROI imovel={p} />
       </div>
-      {/* Plano de Reforma */}
-      <div style={{...card(),marginBottom:"14px"}}>
-        <div style={{padding:16,color:'#888',fontSize:13,textAlign:'center'}}>Plano de reforma — em breve</div>
-      </div>
+      {/* Plano de Reforma — SINAPI Real */}
+      {(() => {
+        const area = p.area_m2 || p.area_privativa || 60
+        const preco_m2 = p.preco_m2_mercado || (p.valor_mercado && area ? p.valor_mercado / area : 0)
+        const classe = detectarClasseMercado(p.regiao_mercado, preco_m2)
+        const escopos = ['refresh_giro','leve_funcional','leve_reforcada_1_molhado']
+        return (
+          <div style={{...card(),marginBottom:"14px"}}>
+            <div style={{fontWeight:"600",color:K.wh,marginBottom:"12px",fontSize:"13px"}}>🏗️ Plano de Reforma — Custos SINAPI</div>
+            <div style={{fontSize:11,color:K.t2,marginBottom:10}}>Classe: <strong style={{color:K.tx}}>{classe.label}</strong> · Área: {area} m²</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+              {escopos.map(esc => {
+                const r = calcularCustoReforma({area_m2:area, escopo:esc, regiao_mercado:p.regiao_mercado, preco_m2_atual:preco_m2})
+                if(!r) return null
+                const isRefresh = esc === 'refresh_giro'
+                return (
+                  <div key={esc} style={{background:isRefresh?K.s2:C.white,borderRadius:10,padding:12,border:`1px solid ${isRefresh?K.teal+'30':C.borderW}`}}>
+                    <div style={{fontSize:11,fontWeight:600,color:isRefresh?K.teal:K.tx,marginBottom:6}}>{r.classe_label?.split(' — ')[1] || esc.replace(/_/g,' ')}</div>
+                    <div style={{fontSize:10,color:K.t2,marginBottom:4}}>R$ {r.custo_m2_min}–{r.custo_m2_max}/m²</div>
+                    <div style={{fontSize:16,fontWeight:700,color:K.tx}}>{fmtC(r.custo_total_final)}</div>
+                    <div style={{fontSize:9,color:K.t3,marginTop:4}}>+contingência 12% · +logística 15%</div>
+                    <div style={{fontSize:9,color:K.teal,marginTop:2}}>Valorização: +{((r.fator_valorizacao-1)*100).toFixed(0)}%</div>
+                  </div>
+                )
+              })}
+            </div>
+            {classe.observacao && <div style={{fontSize:10,color:K.t3,marginTop:8,fontStyle:"italic"}}>💡 {classe.observacao}</div>}
+            <div style={{fontSize:9,color:K.t3,marginTop:6,borderTop:`1px solid ${C.borderW}`,paddingTop:6}}>Fonte: SINAPI MG jun/2025 · Lar Pontual SP 2026 ajustado MG · Preço da Obra</div>
+          </div>
+        )
+      })()}
       <div style={{display:"grid",gridTemplateColumns:isPhone?"1fr":"1fr 1fr",gap:"14px",marginBottom:"14px"}}>
         <div style={card()}>
           <div style={{fontWeight:"600",color:K.wh,marginBottom:"12px",fontSize:"13px"}}>⚖️ Jurídico</div>
