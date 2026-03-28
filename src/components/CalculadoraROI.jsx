@@ -24,11 +24,11 @@ export default function CalculadoraROI({ imovel }) {
   const registro      = 1500
   const custoJuridico = imovel.custo_juridico_estimado || 0
   const custoTotal    = lance + comissao + itbi + doc + advogado + registro + reforma + custoJuridico
-  const irpfGanho     = Math.max(0, (vmercado - custoTotal) * 0.15)
-  const corretagemVenda = vmercado * 0.06
   const vmercado = imovel.valor_mercado_estimado || imovel.valor_pos_reforma_estimado
     || (imovel.preco_m2_mercado * (imovel.area_privativa_m2 || imovel.area_m2 || 0))
     || lance * 1.4
+  const irpfGanho     = Math.max(0, (vmercado - custoTotal) * 0.15)
+  const corretagemVenda = vmercado * 0.06
   const lucroFlip    = vmercado - custoTotal - irpfGanho - corretagemVenda
   const roiFlip      = custoTotal > 0 ? (lucroFlip / custoTotal) * 100 : 0
   const aluguelMensal = imovel.aluguel_mensal_estimado
