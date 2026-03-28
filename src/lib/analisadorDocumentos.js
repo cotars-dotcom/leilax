@@ -85,33 +85,19 @@ Formato: {"data_leilao":"","data_2o_leilao":"","valor_avaliacao":0,"lance_minimo
 export async function analisarRGI(url, apiKey) {
   const pdfBase64 = await fetchPdfBase64(url)
   if (!pdfBase64) throw new Error('Não foi possível baixar o PDF da matrícula/RGI')
-  return chamarClaude(apiKey, pdfBase64, `<instrucao>
-Você é um analista jurídico imobiliário.
-Extraia os campos abaixo da matrícula/RGI e retorne APENAS o JSON.
-Se não encontrar um campo, use null.
-Ônus incluem: hipoteca, penhora, alienação fiduciária, usufruto, servidão, indisponibilidade.
-Averbações camufladas são registros que parecem inofensivos mas alteram direitos reais (ex: cessão de direitos hereditários, doação com reserva de usufruto, compromisso de compra e venda não quitado).
+  const prompt = `<instrucao>
+Você é um analista jurídico imobiliário especializado em matrículas brasileiras de cartório.
+Extraia os campos abaixo da matrícula/RGI anexada e retorne APENAS o JSON válido, sem markdown.
+Se um campo não existir no documento, use null ou array vazio [].
+Atenção especial:
+- Procure penhoras em matrículas predecessoras mencionadas (ex: "destacado da matrícula nº X")
+- Identifique averbações camufladas que não usam termos óbvios como "ação" ou "processo"
+- Detecte frações ideais (ex: "1/4 do imóvel", "25%", "parte ideal")
 </instrucao>
-
-<documento>
-O documento PDF anexado é a matrícula/RGI do imóvel.
-</documento>
-
 <formato_saida>
-{
-  "proprietario": "nome do proprietário atual",
-  "onus": ["descrição de cada ônus encontrado"],
-  "area_m2": 0,
-  "matricula": "número da matrícula",
-  "cartorio": "nome do cartório de registro",
-  "indisponibilidade": false,
-  "penhoras": ["descrição de cada penhora com vara e processo"],
-  "fracao_ideal": null,
-  "matriculas_predecessoras": ["números de matrículas anteriores mencionadas"],
-  "averbacoes_camufladas": ["descrição de cada averbação que altera direitos reais"],
-  "vara_judicial": "vara judicial se mencionada em penhora/indisponibilidade"
-}
-</formato_saida>`, 1200)
+{"proprietario":"","matricula":"","cartorio":"","area_m2":0,"indisponibilidade":false,"penhoras":[{"grau":1,"valor":0,"processo":"","credor":""}],"hipotecas":[],"usufruto":null,"fracao_ideal":null,"matriculas_predecessoras":[],"averbacoes_camufladas":[],"vara_judicial":null,"onus":[]}
+</formato_saida>`
+  return chamarClaude(apiKey, pdfBase64, prompt, 1200)
 }
 
 export async function analisarDebitos(url, apiKey) {

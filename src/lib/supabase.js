@@ -62,7 +62,7 @@ export async function getProfile(userId) {
 
 export async function getAllProfiles() {
   const { data, error } = await supabase
-    .from('profiles').select('*').order('criado_em')
+    .from('profiles').select('id, nome, email, role, ativo, pode_usar_api, criado_em').order('criado_em')
   if (error) throw error
   return data || []
 }
@@ -144,6 +144,7 @@ const IMOVEIS_COLS = new Set([
   'analise_dupla_ia','comparaveis','sintese_executiva',
   'edital_dados','rgi_dados','debitos_dados',
   'vara_judicial','tipo_justica',
+  'jurimetria_vara','jurimetria_taxa_embargo',
 ])
 
 export async function saveImovelCompleto(imovel, userId) {

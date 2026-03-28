@@ -3,6 +3,7 @@
 // Extracted from App.jsx to enable code-splitting
 // ═══════════════════════════════════════════════════════════════
 
+
 // AXIS Design Tokens
 export const C = {
   navy:"#002B80", navyAlfa:"#002B8010", text:"#1A1A2E", muted:"#666680",
@@ -10,6 +11,7 @@ export const C = {
   bg:"#F8F7F4", border:"#D4D4D8", borderW:"#E8E6DF",
   emerald:"#05A86D", emeraldL:"#E6F7F0", mustard:"#D4A017", mustardL:"#FFF8E1",
 }
+
 
 export const K = {
   bg:C.offwhite, bg2:C.white, s1:C.white, s2:"#F2F0E6",
@@ -19,7 +21,9 @@ export const K = {
   trello:"#0052CC"
 }
 
+
 export const RED = "#E5484D"
+
 
 export const DISPLAY_MAP = {
   estavel:'Estável', Estavel:'Estável', media:'Média', Media:'Média',
@@ -27,6 +31,7 @@ export const DISPLAY_MAP = {
   queda:'Queda', crescimento:'Crescimento',
 }
 export function mapDisplay(v) { return (v && DISPLAY_MAP[v]) || v }
+
 
 export function normalizarTextoAlerta(texto) {
   if (!texto) return ''
@@ -50,13 +55,14 @@ export function normalizarTextoAlerta(texto) {
     .replace(/Ã[ÂĈ][^\s]{2,8}/g, '')
     .replace(/[\uFFFD\uFFFE\uFFFF]/g, '')
     .replace(/[\uD800-\uDFFF](?![\uD800-\uDFFF])/g, '')
-    .replace(/\[CRITICO\]/gi, '🔴')
-    .replace(/\[ATENCAO\]/gi, '⚠️')
-    .replace(/\[OK\]/gi, '✅')
-    .replace(/\[INFO\]/gi, '💡')
+    .replace(/\[CRITICO\]/gi, '[CRÍTICO]')
+    .replace(/\[ATENCAO\]/gi, '[ATENÇÃO]')
+    .replace(/\[OK\]/gi, '[OK]')
+    .replace(/\[INFO\]/gi, '[INFO]')
     .trim()
   return s
 }
+
 
 export const scoreColor = s => s >= 7.5 ? C.emerald : s >= 6 ? C.emerald : s >= 4.5 ? C.mustard : RED
 export const scoreLabel = s => s >= 7.5 ? "FORTE" : s >= 6 ? "BOM" : s >= 4.5 ? "MÉDIO" : "FRACO"
@@ -64,22 +70,11 @@ export const recColor = r => ({ COMPRAR: C.emerald, AGUARDAR: C.mustard, EVITAR:
 export const ESTRUTURA_MAP = { cpf_unico: 'Pessoa Física (CPF único)', cpf_multiplo: 'Múltiplos CPFs', pj: 'Pessoa Jurídica', judicial: 'Bloqueio Judicial', espolio: 'Espólio', 'espólio': 'Espólio' }
 export const LIQUIDEZ_MAP = { alta: 'Alta', media: 'Média', baixa: 'Baixa' }
 export const TENDENCIA_MAP = { alta: 'Alta', estavel: 'Estável', queda: 'Queda' }
+
+  export const fmtC = v => v ? 'R$ ' + Number(v).toLocaleString('pt-BR', {minimumFractionDigits:0}) : '—'
+export const fmtD = d => d ? new Date(d).toLocaleDateString('pt-BR') : '—'
+export const btn = (size='m') => ({ padding: size==='s' ? '6px 12px' : '8px 18px', borderRadius: 8, border: '1px solid #E8E4DC', background: '#FFFFFF', color: '#0A1628', fontSize: size==='s' ? 12 : 13, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' })
+export const inp = () => ({ padding: '8px 12px', borderRadius: 8, border: '1px solid #E8E4DC', background: '#FFFFFF', color: '#0A1628', fontSize: 13, outline: 'none', width: '100%' })
+export const card = () => ({ background: '#FFFFFF', borderRadius: 12, padding: '16px', border: '1px solid #E8E4DC' })
+export const ESTRATEGIA_CONFIG = { flip_rapido: { emoji: '🔄', label: 'Flip Rápido', color: '#05A86D' }, renda_passiva: { emoji: '🏠', label: 'Renda Passiva', color: '#002B80' }, airbnb: { emoji: '🌟', label: 'Airbnb', color: '#E1B31A' }, reforma_revenda: { emoji: '🏗️', label: 'Reforma + Venda', color: '#05A86D' }, locacao_longa: { emoji: '📋', label: 'Locação Longa', color: '#002B80' } }
 export const DEMANDA_MAP = { alta: 'Alta', media: 'Média', baixa: 'Baixa' }
-
-export const fmtD = d => d ? new Date(d).toLocaleDateString("pt-BR") : "—"
-export const fmtC = v => v ? `R$ ${Number(v).toLocaleString("pt-BR", {minimumFractionDigits:0})}` : "—"
-
-export const btn = (v="p") => ({
-  padding:"6px 16px",borderRadius:"8px",fontWeight:"600",fontSize:"12.5px",cursor:"pointer",border:"none",
-  ...(v==="p"?{background:C.emerald,color:"#fff"}:v==="s"?{background:C.surface,color:C.text,border:`1px solid ${C.borderW}`}:v==="d"?{background:"#E5484D15",color:"#E5484D",border:"1px solid #E5484D30"}:v==="trello"?{background:"#0052CC15",color:"#0052CC",border:"1px solid #0052CC30"}:{background:C.surface,color:C.text})
-})
-export const inp = { background:C.offwhite, border:`1px solid ${C.border}`, borderRadius:"8px", padding:"10px 14px", color:C.text, fontSize:"13px", width:"100%", outline:"none" }
-export const card = (ac) => ({ background:C.white, border:`1px solid ${ac||C.borderW}`, borderRadius:"12px", padding:"18px" })
-
-export const ESTRATEGIA_CONFIG = {
-  flip_rapido:    { emoji:'🔄', label:'Flip Rápido',    color:C.emerald },
-  renda_passiva:  { emoji:'🏠', label:'Renda Passiva',  color:C.navy   },
-  airbnb:         { emoji:'🌟', label:'Airbnb/Temporada',color:C.mustard},
-  reforma_revenda:{ emoji:'🏗️', label:'Reforma + Venda',color:C.emerald},
-  locacao_longa:  { emoji:'📋', label:'Locação Longa',  color:C.navy   },
-}

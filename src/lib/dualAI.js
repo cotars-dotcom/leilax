@@ -18,8 +18,8 @@ import { calcularCustoReforma, verificarSobrecapitalizacao } from '../data/custo
 import { calcularCustoJuridico } from '../data/riscos_juridicos.js'
 
 const CLAUDE_MODEL = 'claude-sonnet-4-20250514'
-const GPT_MODEL_MARKET  = 'gpt-4o-mini'  // comparáveis e mercado (custo -87%)
-const GPT_MODEL_COMPLEX = 'gpt-4o'       // fallback se mini retornar vazio/inválido
+const GPT_MODEL_MARKET  = 'gpt-4o-mini'   // comparáveis e pesquisa de mercado (~16x mais barato)
+const GPT_MODEL_COMPLEX = 'gpt-4o'        // fallback se mini falhar ou retornar sem dados
 
 const REGRAS_MODALIDADE_TEXTO = `
 REGRAS CRÍTICAS POR MODALIDADE (APLIQUE SEMPRE):
@@ -317,7 +317,8 @@ Retorne APENAS JSON válido (sem markdown):
   "observacoes_mercado": "string detalhada"
 }`
 
-  async function fetchMercado(model) {
+  // Função interna de fetch com model paramétrico
+  const fetchMercado = async (model) => {
     const res = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
       headers: {
@@ -332,12 +333,10 @@ Retorne APENAS JSON válido (sem markdown):
       }),
       signal: AbortSignal.timeout(45000)
     })
-
     if (!res.ok) {
       const err = await res.json()
       throw new Error(err.error?.message || `OpenAI erro ${res.status}`)
     }
-
     const data = await res.json()
     const txt = (data.output || [])
       .filter(o => o.type === 'message')
@@ -346,38 +345,47 @@ Retorne APENAS JSON válido (sem markdown):
       .map(c => c.text)
       .join('') || ''
     const resultado = JSON.parse(txt.replace(/```json|```/g, '').trim())
+    return { resultado, data, model }
+  }
+
+  try {
+    let modeloUsado = GPT_MODEL_MARKET
+    let resultado, data
+
+    // Cascade: tenta mini primeiro, fallback para full se falhar ou sem dados de mercado
+    try {
+      ;({ resultado, data } = await fetchMercado(GPT_MODEL_MARKET))
+      if (!resultado?.valor_mercado_m2) {
+        console.warn('[AXIS] GPT-mini sem valor_mercado_m2, escalando para GPT-4o')
+        ;({ resultado, data, model: modeloUsado } = await fetchMercado(GPT_MODEL_COMPLEX))
+      }
+    } catch(e) {
+      console.warn('[AXIS] GPT-mini falhou, escalando para GPT-4o:', e.message)
+      ;({ resultado, data, model: modeloUsado } = await fetchMercado(GPT_MODEL_COMPLEX))
+    }
     // Log de uso ChatGPT
     try {
       const { logUsoChamadaAPI } = await import('./supabase')
       logUsoChamadaAPI({
-        tipo: 'mercado_chatgpt', modelo: model,
+        tipo: 'mercado_chatgpt', modelo: modeloUsado,
         tokensInput: data.usage?.input_tokens || data.usage?.prompt_tokens || 0,
         tokensOutput: data.usage?.output_tokens || data.usage?.completion_tokens || 0,
         modoTeste: localStorage.getItem('axis-modo-teste') === 'true',
       })
     } catch(e) { console.warn('[AXIS dualAI] Log uso GPT:', e.message) }
-    return resultado
-  }
-
-  try {
-    // Tentar gpt-4o-mini primeiro (custo -87%)
-    let resultado = null
-    try {
-      resultado = await fetchMercado(GPT_MODEL_MARKET)
-    } catch(e) {
-      console.warn('[AXIS] gpt-4o-mini falhou, tentando gpt-4o:', e.message)
-    }
-    // Cascade: se mini falhou ou retornou inválido, usar gpt-4o
-    if (!resultado || !resultado.valor_mercado_m2) {
-      resultado = await fetchMercado(GPT_MODEL_COMPLEX)
-    }
-    // Salvar no cache
+    // Salvar no cache com TTL variável por bairro
     try {
       const { supabase } = await import('./supabase')
+      const bairroCache = resultado?.bairro || ''
+      const bairrosNobres = ['Savassi','Lourdes','Belvedere','Serra','Funcionários',
+        'Buritis','Gutierrez','Mangabeiras','Santo Antônio','Jardim América']
+      const ttlHoras = bairrosNobres.includes(bairroCache) ? 168 : 72
+      const expiraEm = new Date(Date.now() + ttlHoras * 3600 * 1000).toISOString()
       await supabase.from('cache_mercado').upsert({
         chave: cacheKey,
         dados: resultado,
-        atualizado_em: new Date().toISOString()
+        atualizado_em: new Date().toISOString(),
+        expira_em: expiraEm
       }, { onConflict: 'chave' })
     } catch(e) { console.warn('[AXIS Cache] Falha ao salvar cache:', e.message) }
     return resultado
@@ -1144,6 +1152,27 @@ DADOS DE BAIRRO (parcial):
     if (cidadeLower.includes('belo horizonte') || cidadeLower.includes('bh'))
       analiseValidada.itbi_pct = 3
   } catch(e) { console.warn('[AXIS] Cálculo jurídico:', e.message) }
+
+    // Jurimetria: calibrar prazo com dados reais da vara
+    try {
+      const varaJudicial = analiseValidada.vara_judicial || ''
+      const tipoJustica = analiseValidada.tipo_justica || ''
+      if (varaJudicial || tipoJustica) {
+        const { supabase } = await import('./supabase')
+        const { data: juri } = await supabase
+          .from('jurimetria_varas')
+          .select('tempo_total_ciclo_dias, taxa_embargo_pct, vara_nome')
+          .or(`vara_nome.ilike.%${varaJudicial.split(' ').slice(0,3).join(' ')}%,tipo_justica.eq.${tipoJustica}`)
+          .order('vara_nome', { ascending: false })
+          .limit(1)
+          .single()
+        if (juri?.tempo_total_ciclo_dias) {
+          analiseValidada.prazo_liberacao_estimado_meses = Math.round(juri.tempo_total_ciclo_dias / 30)
+          analiseValidada.jurimetria_vara = juri.vara_nome
+          analiseValidada.jurimetria_taxa_embargo = juri.taxa_embargo_pct
+        }
+      }
+    } catch(e) { console.warn('[AXIS] Jurimetria vara:', e.message) }
 
   // Recalcular score se a validação corrigiu algo
   const scoreFinal = (analiseValidada._erros_validacao?.length || analiseValidada._avisos_validacao?.length)
