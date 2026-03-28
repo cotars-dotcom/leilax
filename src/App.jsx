@@ -18,6 +18,11 @@ const LazyDashboard = lazy(() => import("./components/Dashboard.jsx"))
 const LazyDetail = lazy(() => import("./components/Detail.jsx"))
 const LazyPainelAdmin = lazy(() => import("./components/PainelAdmin.jsx"))
 
+// Badge pill component
+function Bdg({c, ch}) {
+  return <span style={{background:c,color:'#fff',padding:'2px 8px',borderRadius:12,fontSize:11,fontWeight:600,whiteSpace:'nowrap'}}>{ch}</span>
+}
+
 const uid = () => Math.random().toString(36).slice(2,9) + Date.now().toString(36)
 
 // Design tokens, utilities, shared components imported from appConstants.js
