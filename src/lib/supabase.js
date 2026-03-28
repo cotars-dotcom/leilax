@@ -74,15 +74,18 @@ export async function updateProfile(id, updates) {
 }
 
 // == IMOVEIS ==
+const IMOVEIS_LIST_COLS = `id,codigo_axis,titulo,cidade,estado,bairro,tipo,tipologia,score_total,recomendacao,status,valor_minimo,valor_avaliacao,desconto_percentual,area_m2,area_privativa_m2,ocupacao,processos_ativos,foto_principal,fotos,fonte_url,criado_em,criado_por,num_leilao,data_leilao,modalidade_leilao,score_localizacao,score_desconto,score_juridico,score_ocupacao,score_liquidez,score_mercado,jurimetria_vara,prazo_liberacao_estimado_meses,aluguel_mensal_estimado,valor_mercado_estimado,custo_reforma_calculado,mao_flip,financiavel,analise_dupla_ia`
+
 export async function getImoveis() {
   const { data, error } = await supabase
     .from('imoveis')
-    .select('*, criador:profiles!imoveis_criado_por_fkey(nome)')
+    .select(`${IMOVEIS_LIST_COLS},criador:profiles!imoveis_criado_por_fkey(nome)`)
     .order('criado_em', { ascending: false })
+    .limit(100)
   if (error) {
-    // Fallback sem join se FK não existir
     const { data: d2, error: e2 } = await supabase
-      .from('imoveis').select('*').order('criado_em', { ascending: false })
+      .from('imoveis').select(IMOVEIS_LIST_COLS)
+      .order('criado_em', { ascending: false }).limit(100)
     if (e2) throw e2
     return d2 || []
   }
@@ -600,16 +603,15 @@ export async function desarquivarImovel(imovelId) {
 export async function getImoveisAtivos() {
   const { data, error } = await supabase
     .from('imoveis')
-    .select('*, criador:profiles!imoveis_criado_por_fkey(nome)')
+    .select(`${IMOVEIS_LIST_COLS},criador:profiles!imoveis_criado_por_fkey(nome)`)
     .or('status_operacional.eq.ativo,status_operacional.is.null')
     .order('criado_em', { ascending: false })
+    .limit(100)
   if (error) {
-    // Fallback sem join se a FK não existir
     const { data: d2, error: e2 } = await supabase
-      .from('imoveis')
-      .select('*')
+      .from('imoveis').select(IMOVEIS_LIST_COLS)
       .or('status_operacional.eq.ativo,status_operacional.is.null')
-      .order('criado_em', { ascending: false })
+      .order('criado_em', { ascending: false }).limit(100)
     if (e2) throw e2
     return d2 || []
   }

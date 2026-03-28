@@ -715,6 +715,9 @@ function PropCard({p,onNav}) {
         <img src={p.foto_principal} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}} onError={e=>{e.target.parentElement.style.display="none"}} />
       </div>
     )}
+    {(p.score_total||0) >= 7.5 && (
+      <div style={{display:"inline-block",background:"#10B981",color:"#fff",fontSize:9,fontWeight:700,padding:"2px 8px",borderRadius:4,letterSpacing:0.3,marginBottom:6}}>OPORTUNIDADE</div>
+    )}
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:"10px"}}>
       <div style={{flex:1,minWidth:0}}>
         <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:"4px"}}>
@@ -1275,6 +1278,9 @@ useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("param
       return [p,...ps]
     })
     showToast(`✓ ${p.codigo_axis} · ${p.titulo||"Imóvel"} — Score ${(p.score_total||0).toFixed(1)} · ${p.recomendacao}`)
+    if ((p.score_total||0) >= 7.5) {
+      setTimeout(() => showToast(`OPORTUNIDADE: Score ${p.score_total.toFixed(1)} — ${p.titulo||p.bairro||'Ver imóvel'}`, K.grn), 1500)
+    }
     nav("detail",{id:p.id})
     // 2. Salvar no Supabase (fonte primária)
     if(session) {
