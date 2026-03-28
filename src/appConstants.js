@@ -70,3 +70,11 @@ export const recColor = r => ({ COMPRAR: C.emerald, AGUARDAR: C.mustard, EVITAR:
 export const ESTRUTURA_MAP = { cpf_unico: 'Pessoa Física (CPF único)', cpf_multiplo: 'Múltiplos CPFs', pj: 'Pessoa Jurídica', judicial: 'Bloqueio Judicial', espolio: 'Espólio', 'espólio': 'Espólio' }
 export const LIQUIDEZ_MAP = { alta: 'Alta', media: 'Média', baixa: 'Baixa' }
 export const TENDENCIA_MAP = { alta: 'Alta', estavel: 'Estável', queda: 'Queda' }
+
+  export const fmtC = v => v ? 'R$ ' + Number(v).toLocaleString('pt-BR', {minimumFractionDigits:0}) : '—'
+export const fmtD = d => d ? new Date(d).toLocaleDateString('pt-BR') : '—'
+export const btn = (size='m') => ({ padding: size==='s' ? '6px 12px' : '8px 18px', borderRadius: 8, border: '1px solid #E8E4DC', background: '#FFFFFF', color: '#0A1628', fontSize: size==='s' ? 12 : 13, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' })
+export const inp = () => ({ padding: '8px 12px', borderRadius: 8, border: '1px solid #E8E4DC', background: '#FFFFFF', color: '#0A1628', fontSize: 13, outline: 'none', width: '100%' })
+export const card = () => ({ background: '#FFFFFF', borderRadius: 12, padding: '16px', border: '1px solid #E8E4DC' })
+export const ESTRATEGIA_CONFIG = { flip_rapido: { emoji: '🔄', label: 'Flip Rápido', color: '#05A86D' }, renda_passiva: { emoji: '🏠', label: 'Renda Passiva', color: '#002B80' }, airbnb: { emoji: '🌟', label: 'Airbnb', color: '#E1B31A' }, reforma_revenda: { emoji: '🏗️', label: 'Reforma + Venda', color: '#05A86D' }, locacao_longa: { emoji: '📋', label: 'Locação Longa', color: '#002B80' } }
+export const DEMANDA_MAP = { alta: 'Alta', media: 'Média', baixa: 'Baixa' }
