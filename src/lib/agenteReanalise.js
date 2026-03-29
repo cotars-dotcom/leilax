@@ -227,12 +227,16 @@ Retorne APENAS JSON com os campos atualizados:
   const PRESERVAR_SE_ZERO = ['desconto_percentual','preco_m2_mercado','preco_m2_imovel',
     'aluguel_mensal_estimado','valor_mercado_estimado','num_leilao']
   for (const campo of PRESERVAR_SE_ZERO) {
-    const novoVal = delta[campo]
-    const valAnterior = imovelAtual[campo]
-    const novoEhZeroOuVazio = novoVal === 0 || novoVal === null || novoVal === undefined || novoVal === ''
-    const anteriorEhValido = valAnterior != null && valAnterior !== 0 && valAnterior !== ''
-    if (novoEhZeroOuVazio && anteriorEhValido) {
-      delete delta[campo] // remover do delta — imovelAtual prevalece no spread abaixo
+    const novoVal = parseFloat(delta[campo]) || 0
+    const valAnterior = parseFloat(imovelAtual[campo]) || 0
+    const novoEhZeroOuVazio = !delta[campo] || novoVal === 0
+    const anteriorEhValido = valAnterior > 0
+    // Proteger também contra variações extremas (>30%) em preços de mercado
+    const camposPreco = ['preco_m2_mercado','preco_m2_imovel','valor_mercado_estimado']
+    const variacaoExtrema = camposPreco.includes(campo) && anteriorEhValido && novoVal > 0
+      && Math.abs(novoVal - valAnterior) / valAnterior > 0.30
+    if ((novoEhZeroOuVazio && anteriorEhValido) || variacaoExtrema) {
+      delete delta[campo]
     }
   }
 

@@ -347,7 +347,10 @@ export default function AbaJuridicaAgente({ imovel, isAdmin, onReclassificado })
           analise_estruturada:a||null, conteudo_texto:res.conteudo_texto||null,
           processado:!!a, reclassificado:false,
           analisado_em:new Date().toISOString(), user_id:session?.user?.id
-        }).catch(e=>console.warn('[AXIS save doc]',e.message))
+        }).catch(e=>{
+          console.error('[AXIS save doc] FALHA:', e.message)
+          setProgresso(`⚠️ Erro ao salvar ${res.nome}: ${e.message.substring(0,80)}`)
+        })
       }
       // PASSO 4: Recalcular score jurídico com base nos documentos
       const analises = resultsFull.filter(r=>r.analise||r.analise_estruturada).map(r=>r.analise||r.analise_estruturada)

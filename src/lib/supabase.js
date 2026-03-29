@@ -634,26 +634,33 @@ export async function getDocumentosJuridicos(imovelId) {
 }
 
 export async function salvarDocumentoJuridico(doc) {
-  // Evitar duplicata: verificar se já existe doc com mesma URL ou nome para este imóvel
-  if (doc.imovel_id && (doc.url || doc.url_origem || doc.nome)) {
-    const urlChave = doc.url_origem || doc.url
-    let q = supabase.from('documentos_juridicos').select('id').eq('imovel_id', doc.imovel_id)
-    if (urlChave) q = q.eq('url', urlChave)
-    else q = q.eq('nome', doc.nome)
-    const { data: ex } = await q.maybeSingle()
-    if (ex) {
-      const { data, error } = await supabase.from('documentos_juridicos')
-        .update({ ...doc, analisado_em: new Date().toISOString() })
-        .eq('id', ex.id).select().single()
-      if (error) throw error
-      return data
+  // Evitar duplicata: verificar se já existe doc com mesma URL ou nome
+  try {
+    if (doc.imovel_id && (doc.url || doc.url_origem || doc.nome)) {
+      const urlChave = doc.url_origem || doc.url
+      let q = supabase.from('documentos_juridicos').select('id').eq('imovel_id', doc.imovel_id)
+      if (urlChave) q = q.eq('url', urlChave)
+      else q = q.eq('nome', doc.nome)
+      const { data: ex, error: qErr } = await q.maybeSingle()
+      if (!qErr && ex) {
+        // Atualizar existente
+        const { data, error } = await supabase.from('documentos_juridicos')
+          .update({ ...doc, analisado_em: new Date().toISOString() })
+          .eq('id', ex.id).select().single()
+        if (error) { console.error('[AXIS doc update]', error.message); throw error }
+        return data
+      }
     }
+    // Inserir novo
+    const payload = { ...doc, url: doc.url_origem || doc.url || null }
+    const { data, error } = await supabase.from('documentos_juridicos')
+      .insert(payload).select().single()
+    if (error) { console.error('[AXIS doc insert]', error.message, JSON.stringify(payload).substring(0,200)); throw error }
+    return data
+  } catch(e) {
+    console.error('[AXIS salvarDocumentoJuridico] ERRO:', e.message)
+    throw e
   }
-  const { data, error } = await supabase.from('documentos_juridicos')
-    .insert({ ...doc, url: doc.url_origem || doc.url || null })
-    .select().single()
-  if (error) throw error
-  return data
 }
 
 export async function reclassificarImovel(imovelId, novaAnalise, documentoId) {
