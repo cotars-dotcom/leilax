@@ -635,7 +635,8 @@ function NovoImovel({onSave,onCancel,onNav,trello,parametrosBanco,criteriosBanco
     try {
       setStep("🧠 IA analisando: score, risco jurídico, mercado...")
       const openaiKey = localStorage.getItem("axis-openai-key") || ""
-        const data = await analisarImovelCompleto(url.trim(), hasKey, openaiKey, parametrosBanco, criteriosBanco, (msg) => setStep(msg), anexos, null, null)
+      const claudeKeyReal = localStorage.getItem("axis-api-key") || ""
+        const data = await analisarImovelCompleto(url.trim(), claudeKeyReal, openaiKey, parametrosBanco, criteriosBanco, (msg) => setStep(msg), anexos, null, null)
       data.fonte_url = url.trim()
       // Analisar documentos (edital, RGI, débitos) se fornecidos
       const docUrls = urlsDocumentos.split('\n').map(u=>u.trim()).filter(Boolean)
@@ -801,9 +802,7 @@ function PropCard({p,onNav}) {
         OPORTUNIDADE
       </div>
     )}
-    {(p.score_total||0) >= 7.5 && (
-      <div style={{display:"inline-block",background:"#10B981",color:"#fff",fontSize:9,fontWeight:700,padding:"2px 8px",borderRadius:4,letterSpacing:0.3,marginBottom:6}}>OPORTUNIDADE</div>
-    )}
+    
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:"10px"}}>
       <div style={{flex:1,minWidth:0}}>
         <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:"4px"}}>

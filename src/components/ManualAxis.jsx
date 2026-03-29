@@ -1,11 +1,11 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { C, K, card, btn } from '../appConstants.js'
 
 const DADOS_BANCO = [
-  { nome:'mercado_regional', registros:16, atualizado:'29/03/2026', fonte:'FipeZAP fev/2026 + QuintoAndar 3T2025 + Secovi-MG', descricao:'Preço médio m², yield bruto, tendência, demanda e tempo de venda por região. Cobre BH (11 zonas), Nova Lima, Contagem e Juiz de Fora (4 zonas).', campos:['preco_m2_medio','variacao_12m','demanda','tendencia','yield_bruto_pct'] },
-  { nome:'metricas_bairros', registros:29, atualizado:'29/03/2026', fonte:'FipeZAP fev/2026 + QuintoAndar 3T2025 + IPEAD/UFMG', descricao:'29 bairros de BH com preço de anúncio e contrato separados, yield bruto, tendência 12m e classificação IPEAD 1-4 (Popular→Luxo).', campos:['bairro','preco_anuncio_m2','preco_contrato_m2','yield_bruto','classe_ipead'] },
+  { nome:'mercado_regional', registros: contagens['mercado_regional'] ?? 16, atualizado:'29/03/2026', fonte:'FipeZAP fev/2026 + QuintoAndar 3T2025 + Secovi-MG', descricao:'Preço médio m², yield bruto, tendência, demanda e tempo de venda por região. Cobre BH (11 zonas), Nova Lima, Contagem e Juiz de Fora (4 zonas).', campos:['preco_m2_medio','variacao_12m','demanda','tendencia','yield_bruto_pct'] },
+  { nome:'metricas_bairros', registros: contagens['metricas_bairros'] ?? 29, atualizado:'29/03/2026', fonte:'FipeZAP fev/2026 + QuintoAndar 3T2025 + IPEAD/UFMG', descricao:'29 bairros de BH com preço de anúncio e contrato separados, yield bruto, tendência 12m e classificação IPEAD 1-4 (Popular→Luxo).', campos:['bairro','preco_anuncio_m2','preco_contrato_m2','yield_bruto','classe_ipead'] },
   { nome:'parametros_score', registros:6, atualizado:'Fixo — definido pelo grupo', fonte:'Calibrado pelo grupo AXIS', descricao:'Pesos das 6 dimensões do score AXIS. Localização (20%), Desconto (18%), Jurídico (18%), Ocupação (15%), Liquidez (15%), Mercado (14%). Soma = 100%.', campos:['peso_localizacao','peso_desconto','peso_juridico','peso_ocupacao','peso_liquidez','peso_mercado'] },
-  { nome:'riscos_juridicos', registros:15, atualizado:'29/03/2026', fonte:'TJMG 2025 + TRT-MG + Lei 9.514/97 + CPC/2015', descricao:'15 tipos de risco com custo processual real (TJMG), prazo prático meses, nota de risco 1-10 e penalização de score.', campos:['risco_id','custo_min','custo_max','prazo_meses','risco_nota','score_penalizacao'] },
+  { nome:'riscos_juridicos', registros: contagens['riscos_juridicos'] ?? 15, atualizado:'29/03/2026', fonte:'TJMG 2025 + TRT-MG + Lei 9.514/97 + CPC/2015', descricao:'15 tipos de risco com custo processual real (TJMG), prazo prático meses, nota de risco 1-10 e penalização de score.', campos:['risco_id','custo_min','custo_max','prazo_meses','risco_nota','score_penalizacao'] },
   { nome:'parametros_reforma', registros:4, atualizado:'29/03/2026', fonte:'SINAPI-MG dez/2025', descricao:'4 classes de mercado (A_prime, B_medio_alto, C_intermediario, D_popular) com faixa de preço/m² e teto de reforma em % do imóvel.', campos:['classe','faixa_venda_m2_min','faixa_venda_m2_max','teto_pct_imovel'] },
   { nome:'jurimetria_varas', registros:6, atualizado:'29/03/2026', fonte:'CNJ DataJud + ABRAIM 2024', descricao:'Tempo real de ciclo por vara — TRT-3 (240 dias), TJMG Cível (180 dias). Usado para calcular prazo de liberação estimado.', campos:['vara_nome','tempo_total_ciclo_dias','taxa_embargo_pct','taxa_sucesso_posse_pct'] },
   { nome:'modelos_analise', registros:5, atualizado:'29/03/2026', fonte:'AXIS interno', descricao:'Regras arquivadas do agente interno: regras_leilao_trt_mg, regras_mercado_bh, prompt_agente_leilao_v1, motor_gemini_analise_v1, agente_reanalise_v1.', campos:['nome','categoria','versao','conteudo'] },
@@ -53,6 +53,20 @@ const DIRETRIZES = [
 ]
 
 export default function ManualAxis({ isMobile }) {
+  const [contagens, setContagens] = useState({})
+  useEffect(() => {
+    import('../lib/supabase.js').then(({ supabase }) => {
+      const tabelas = ['imoveis','mercado_regional','metricas_bairros','riscos_juridicos','jurimetria_varas','modelos_analise']
+      Promise.all(tabelas.map(t => 
+        supabase.from(t).select('*', {count:'exact', head:true})
+          .then(({count}) => [t, count])
+      )).then(results => {
+        const c = {}
+        results.forEach(([t, n]) => { c[t] = n })
+        setContagens(c)
+      }).catch(() => {})
+    })
+  }, [])
   const [aba, setAba] = useState('guia')
   const [busca, setBusca] = useState('')
 
