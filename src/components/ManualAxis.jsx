@@ -1,270 +1,719 @@
+/**
+ * AXIS — Manual Interativo v2
+ * Didático · Esquemático · Com dados reais de amostragem
+ */
 import { useState, useEffect } from 'react'
-import { C, K, card, btn } from '../appConstants.js'
+import { C, card } from '../appConstants.js'
 
-const DADOS_BANCO = [
-  { nome:'mercado_regional', registros: contagens['mercado_regional'] ?? 16, atualizado:'29/03/2026', fonte:'FipeZAP fev/2026 + QuintoAndar 3T2025 + Secovi-MG', descricao:'Preço médio m², yield bruto, tendência, demanda e tempo de venda por região. Cobre BH (11 zonas), Nova Lima, Contagem e Juiz de Fora (4 zonas).', campos:['preco_m2_medio','variacao_12m','demanda','tendencia','yield_bruto_pct'] },
-  { nome:'metricas_bairros', registros: contagens['metricas_bairros'] ?? 29, atualizado:'29/03/2026', fonte:'FipeZAP fev/2026 + QuintoAndar 3T2025 + IPEAD/UFMG', descricao:'29 bairros de BH com preço de anúncio e contrato separados, yield bruto, tendência 12m e classificação IPEAD 1-4 (Popular→Luxo).', campos:['bairro','preco_anuncio_m2','preco_contrato_m2','yield_bruto','classe_ipead'] },
-  { nome:'parametros_score', registros:6, atualizado:'Fixo — definido pelo grupo', fonte:'Calibrado pelo grupo AXIS', descricao:'Pesos das 6 dimensões do score AXIS. Localização (20%), Desconto (18%), Jurídico (18%), Ocupação (15%), Liquidez (15%), Mercado (14%). Soma = 100%.', campos:['peso_localizacao','peso_desconto','peso_juridico','peso_ocupacao','peso_liquidez','peso_mercado'] },
-  { nome:'riscos_juridicos', registros: contagens['riscos_juridicos'] ?? 15, atualizado:'29/03/2026', fonte:'TJMG 2025 + TRT-MG + Lei 9.514/97 + CPC/2015', descricao:'15 tipos de risco com custo processual real (TJMG), prazo prático meses, nota de risco 1-10 e penalização de score.', campos:['risco_id','custo_min','custo_max','prazo_meses','risco_nota','score_penalizacao'] },
-  { nome:'parametros_reforma', registros:4, atualizado:'29/03/2026', fonte:'SINAPI-MG dez/2025', descricao:'4 classes de mercado (A_prime, B_medio_alto, C_intermediario, D_popular) com faixa de preço/m² e teto de reforma em % do imóvel.', campos:['classe','faixa_venda_m2_min','faixa_venda_m2_max','teto_pct_imovel'] },
-  { nome:'jurimetria_varas', registros:6, atualizado:'29/03/2026', fonte:'CNJ DataJud + ABRAIM 2024', descricao:'Tempo real de ciclo por vara — TRT-3 (240 dias), TJMG Cível (180 dias). Usado para calcular prazo de liberação estimado.', campos:['vara_nome','tempo_total_ciclo_dias','taxa_embargo_pct','taxa_sucesso_posse_pct'] },
-  { nome:'modelos_analise', registros:5, atualizado:'29/03/2026', fonte:'AXIS interno', descricao:'Regras arquivadas do agente interno: regras_leilao_trt_mg, regras_mercado_bh, prompt_agente_leilao_v1, motor_gemini_analise_v1, agente_reanalise_v1.', campos:['nome','categoria','versao','conteudo'] },
-  { nome:'analises_leilao', registros:'variável', atualizado:'Auto-gerado', fonte:'Agente AXIS interno', descricao:'Estudo completo de leilão por imóvel: projeção 2º leilão, 4 cenários ROI, redução de custo, probabilidade de venda, MAO e síntese estratégica. Custo: R$ 0,00.', campos:['cenarios','mao_flip','roi_1_pct','estrategia','reducoes_disponiveis'] }
+// ─── PALETA ──────────────────────────────────────────────────────────────────
+const P = {
+  navy:'#002B80', navyL:'#E8EEF8',
+  emerald:'#05A86D', emeraldL:'#E6F7F0',
+  mustard:'#D4A017', mustardL:'#FFF8E1',
+  red:'#E5484D', redL:'#FCEBEB',
+  blue:'#4A9EFF', blueL:'#EBF4FF',
+  purple:'#7C3AED', purpleL:'#F0EBFF',
+  gray:'#8E8EA0', border:'#E8E6DF',
+  surface:'#F4F3EF', white:'#FFFFFF', text:'#1A1A2E',
+}
+
+// ─── DADOS DAS DIMENSÕES ──────────────────────────────────────────────────────
+const DIMS = [
+  { id:'loc', label:'Localização', peso:20, cor:P.blue, icon:'📍',
+    desc:'Infraestrutura do bairro, acessibilidade, oferta de serviços, potencial de valorização e qualidade de vida.',
+    exemplos:['Bairro consolidado BH com comércio e transporte → 9/10','Subúrbio sem infraestrutura → 4/10'] },
+  { id:'des', label:'Desconto',    peso:18, cor:P.emerald, icon:'💰',
+    desc:'% de desconto sobre a avaliação judicial E sobre o valor de mercado real estimado pelo motor.',
+    exemplos:['Lance 60% da avaliação = desconto 40% → 9/10','Lance 90% da avaliação = desconto 10% → 4/10'] },
+  { id:'jur', label:'Jurídico',    peso:18, cor:P.purple, icon:'⚖️',
+    desc:'Processos ativos, status da matrícula, riscos presentes (penhoras, alienação fiduciária), modalidade do leilão.',
+    exemplos:['Matrícula limpa + extrajudicial CAIXA → 9/10','Embargos + penhora extra → 2/10'] },
+  { id:'ocu', label:'Ocupação',    peso:15, cor:P.mustard, icon:'🏠',
+    desc:'Situação de quem está no imóvel. Desocupado = pronto. Ocupado = custo R$5–50k + 4–24 meses.',
+    exemplos:['Desocupado confirmado in loco → 10/10','Ocupado por ex-mutuário CAIXA → 3/10'] },
+  { id:'liq', label:'Liquidez',    peso:15, cor:P.blue, icon:'📊',
+    desc:'Facilidade de revender ou alugar. Baseado no tempo médio de venda no bairro e demanda local.',
+    exemplos:['Savassi: tempo venda 45 dias, demanda alta → 9/10','Subúrbio: 180+ dias → 4/10'] },
+  { id:'mer', label:'Mercado',     peso:14, cor:P.emerald, icon:'📈',
+    desc:'Tendência de preços nos últimos 12 meses, yield de locação e expectativa de valorização.',
+    exemplos:['Bairro +12% em 12m, yield 6.5% → 8/10','Bairro estável sem valorização → 5/10'] },
 ]
 
-const GLOSSARIO = [
-  { termo:'ROI', cat:'Financeiro', def:'Return on Investment — Retorno sobre Investimento. Mede o lucro líquido como percentual do capital total investido. ROI = (Lucro Líquido ÷ Custo Total) × 100. No AXIS, inclui todos os custos: lance + comissão leiloeiro + ITBI + documentação + advogado + registro + reforma + jurídico.' },
-  { termo:'MAO', cat:'Financeiro', def:'Maximum Allowable Offer — Lance Máximo Aceitável. Valor máximo que você pode pagar sem comprometer a margem mínima de lucro. MAO = (Valor de Mercado × 0,80) − Custos. Pagar acima do MAO significa ROI abaixo de 20%.' },
-  { termo:'Flip', cat:'Estratégia', def:'Estratégia de comprar, reformar (se necessário) e vender com lucro no curto prazo (6-24 meses). O AXIS calcula ROI de flip considerando IRPF de 15% sobre ganho de capital e corretagem de 6% na venda.' },
-  { termo:'ITBI', cat:'Custo', def:'Imposto sobre Transmissão de Bens Imóveis. Cobrado na transferência de propriedade. Em BH: 3% do valor do lance (ou do valor venal, o maior). Pago uma vez na escrituração.' },
-  { termo:'Sobrecapitalização', cat:'Risco', def:'Quando o custo da reforma supera o teto recomendado para aquela classe de imóvel. Classe C: máx 5% do valor. Classe B: máx 6%. Classe A: máx 7%. Acima disso, o mercado não absorve o valor investido na reforma e o ROI cai.' },
-  { termo:'Score AXIS', cat:'Análise', def:'Nota de 0 a 10 calculada pelo motor de IA com 6 dimensões ponderadas. ≥8.0 = sinal de compra imediato. ≥7.0 = comprar. 6.0-6.9 = aguardar mais informações. <6.0 = evitar. As dimensões e pesos são configuráveis pelo admin.' },
-  { termo:'Score por Dimensão', cat:'Análise', def:'Cada dimensão é uma nota de 0 a 10: Localização (infra, bairro, demanda), Desconto (% sobre avaliação e mercado), Jurídico (processos, matrícula, riscos), Ocupação (desocupado/ocupado/incerto), Liquidez (tempo de venda, demanda bairro), Mercado (tendência, yield, valorização 12m).' },
-  { termo:'Sub-rogação de Débitos', cat:'Jurídico', def:'Em leilões judiciais (CPC/2015), os débitos anteriores de IPTU e condomínio se "sub-rogam no preço" — ou seja, são pagos com o dinheiro do lance e não viram obrigação do arrematante. Proteção legal importante em leilões do TJMG e TRT.' },
-  { termo:'2º Leilão', cat:'Leilão', def:'Quando o 1º leilão não atinge o lance mínimo (geralmente 100% da avaliação), realiza-se o 2º leilão com lance mínimo de 50% da avaliação judicial. Historicamente no TRT-MG, o 2º leilão fecha entre 57-65% da avaliação.' },
-  { termo:'Yield Bruto', cat:'Financeiro', def:'Rendimento anual do aluguel em relação ao valor do imóvel. Yield = (Aluguel mensal × 12) ÷ Valor de mercado × 100. BH média: 5,8%. Acima de 6%: bom para locação. Abaixo de 4,5%: favorece flip.' },
-  { termo:'IPEAD', cat:'Mercado', def:'Instituto de Pesquisa Econômica Aplicada e Desenvolvimento — classifica imóveis de BH em 4 faixas: 1-Popular (<R$4.500/m²), 2-Médio (R$4.500-8.000/m²), 3-Alto (R$8.000-12.000/m²), 4-Luxo (>R$12.000/m²).' },
-  { termo:'Jurimetria', cat:'Jurídico', def:'Ciência que aplica estatística ao Direito. No AXIS, usamos dados reais de varas para estimar o prazo de liberação de um imóvel ocupado. Ex: TRT-MG tem ciclo médio de 240 dias para reintegração de posse.' },
-  { termo:'Agente AXIS Interno', cat:'IA', def:'Motor de análise sem chamadas de API externas: usa regras arquivadas no banco (modelos_analise) para calcular cenários de ROI, projeção de 2º leilão e redução de custos. Custo: R$ 0,00 por análise.' },
-  { termo:'Gemini Flash-Lite', cat:'IA', def:'Modelo de linguagem da Google usado para análises com custo ~R$ 0,01/análise (vs R$ 3,00 do Claude Sonnet). Acessa a URL do imóvel via Jina.ai (gratuito), extrai campos com regex e usa Gemini para scores + síntese.' },
-  { termo:'FipeZAP', cat:'Fonte', def:'Índice de preços imobiliários calculado pela Fipe com dados do ZAP Imóveis. Base de dados de preço/m² de anúncio por bairro/cidade. No AXIS: atualizado mensalmente para BH.' },
+// ─── TABELAS DO BANCO ─────────────────────────────────────────────────────────
+const TABELAS = [
+  { nome:'mercado_regional', icone:'🗺️', cor:P.blue, titulo:'Mercado Regional',
+    descricao:'Preço/m², yield, demanda e tendência por região de BH, Nova Lima, Contagem e Juiz de Fora.',
+    fontes:['FipeZAP fev/2026 — preços de anúncio por cidade','QuintoAndar 3T2025 — preços de contrato','Secovi-MG jul/2025 — tempo médio de venda'],
+    amostragem:'16 regiões · 11 zonas BH + Grande BH + Juiz de Fora (4 zonas)',
+    campos:['preco_m2_medio','variacao_12m','demanda','tendencia','yield_bruto_pct','tempo_venda_dias'],
+    exemplo:{regiao:'BH Centro-Sul', preco_m2:'R$ 10.500/m²', variacao_12m:'+12%', demanda:'Alta'} },
+  { nome:'metricas_bairros', icone:'🏘️', cor:P.emerald, titulo:'Métricas por Bairro',
+    descricao:'Preço de ANÚNCIO (o que pedem) vs preço de CONTRATO (o que fecham) separados — dado raro e valioso para calcular MAO real.',
+    fontes:['FipeZAP fev/2026 — preço anúncio/m² por bairro','QuintoAndar 3T2025 — preço contrato/m²','IPEAD/UFMG — classificação 1-4 (Popular→Luxo)'],
+    amostragem:'29 bairros BH · Gap médio anúncio→contrato: ~18% · Yield: 5.3–6.6%',
+    campos:['bairro','preco_anuncio_m2','preco_contrato_m2','yield_bruto','classe_ipead'],
+    exemplo:{bairro:'Savassi', anuncio:'R$ 16.310/m²', contrato:'R$ 9.302/m²', gap:'43%', classe:'4-Luxo'} },
+  { nome:'riscos_juridicos', icone:'⚖️', cor:P.red, titulo:'Riscos Jurídicos',
+    descricao:'15 tipos de risco com custo processual real do TJMG, prazo prático em meses e impacto direto no score.',
+    fontes:['Tabela de Custas TJMG 2025','TRT-3 MG — tabela de diligências','Lei 9.514/97 + CPC art. 908'],
+    amostragem:'15 tipos · Custo: R$ 0 a R$ 30.000 · Prazo: 0 a 24 meses',
+    campos:['risco_id','custo_min','custo_max','prazo_meses','risco_nota','score_penalizacao'],
+    exemplo:{risco:'Ocupação ex-mutuário', custo_min:'R$ 5.000', custo_max:'R$ 30.000', prazo:'4–24 meses', penalizacao:'-35 pts'} },
+  { nome:'jurimetria_varas', icone:'🏛️', cor:P.purple, titulo:'Jurimetria das Varas',
+    descricao:'Tempo real de ciclo por vara judicial — quanto leva de fato para liberar um imóvel ocupado. Dado coletado de histórico real de processos.',
+    fontes:['CNJ DataJud 2024 — processos encerrados','ABRAIM — Associação Brasileira de Leilões Imobiliários','TRT-3 Relatório Anual 2024'],
+    amostragem:'6 varas · 142–450 amostras por vara · Confiança ~85%',
+    campos:['vara_nome','tempo_total_ciclo_dias','taxa_embargo_pct','taxa_sucesso_posse_pct','amostras_n'],
+    exemplo:{vara:'TRT-3 BH', ciclo:'240 dias', taxa_sucesso:'88%', taxa_embargo:'8%', amostras:'198'} },
+  { nome:'parametros_reforma', icone:'🔨', cor:P.mustard, titulo:'Parâmetros de Reforma',
+    descricao:'Custo/m² de reforma por escopo e TETO máximo de investimento por classe de imóvel — baseado em SINAPI-MG.',
+    fontes:['SINAPI-MG dez/2025 — custo unitário de insumos e serviços por município'],
+    amostragem:'4 classes de mercado · 6 escopos · BH e Região Metropolitana',
+    campos:['classe','escopo','custo_m2_min','custo_m2_max','teto_pct_imovel'],
+    exemplo:{classe:'B médio-alto', escopo:'Reforma média', custo:'R$ 1.450–2.400/m²', teto:'6% do valor do imóvel'} },
 ]
 
-const FLUXO_ANALISE = [
-  { etapa:'1', titulo:'URL do Edital', desc:'Cole o link do edital (Marco Antônio, Superbid, Caixa, etc.)', custo:'R$ 0,00' },
-  { etapa:'2', titulo:'Scrape (Jina.ai)', desc:'Jina.ai lê o edital gratuitamente e extrai o texto', custo:'R$ 0,00' },
-  { etapa:'3', titulo:'Extração Regex', desc:'25 campos extraídos automaticamente: preço, área, quartos, modalidade...', custo:'R$ 0,00' },
-  { etapa:'4', titulo:'Mercado do Banco', desc:'Busca preço/m², yield e tendência do bairro nas tabelas internas', custo:'R$ 0,00' },
-  { etapa:'5', titulo:'Gemini Flash-Lite', desc:'IA analisa scores, comparáveis, riscos, síntese e estratégia', custo:'~R$ 0,01' },
-  { etapa:'6', titulo:'Score AXIS', desc:'Calcula nota 0-10 com os 6 pesos configurados pelo grupo', custo:'R$ 0,00' },
-  { etapa:'7', titulo:'Agente Leilão', desc:'Projeta 2º leilão, MAO, ROI de 4 cenários e redução de custo', custo:'R$ 0,00' },
-  { etapa:'8', titulo:'Salvar no Banco', desc:'Todos os dados ficam no Supabase — sincronizados entre dispositivos', custo:'R$ 0,00' },
+// ─── GLOSSÁRIO ────────────────────────────────────────────────────────────────
+const GLOSS = [
+  { t:'Score AXIS', cat:'Análise', icon:'🎯', cor:P.navy,
+    def:'Nota de 0 a 10 com 6 dimensões ponderadas pela IA. Threshold: ≥8.0 compra imediata · ≥7.0 comprar · 6-6.9 aguardar · <6.0 evitar.',
+    formula:'Score = Σ (nota_dimensão × peso_dimensão)',
+    ex:'Dona Clara: 8.5×20%+7.8×18%+7.0×18%+5.5×15%+6.5×15%+7.0×14% = 7.14 → COMPRAR' },
+  { t:'MAO', cat:'Financeiro', icon:'💡', cor:P.emerald,
+    def:'Maximum Allowable Offer — Lance Máximo Aceitável. Valor máximo que garante margem mínima de 20% no flip.',
+    formula:'MAO = (Valor de Mercado × 0,80) − Custos Totais',
+    ex:'Mercado R$600k · Custos R$60k → MAO = (600×0,80)−60 = R$420.000' },
+  { t:'ROI Flip', cat:'Financeiro', icon:'📈', cor:P.blue,
+    def:'Retorno sobre investimento na estratégia de comprar + reformar + vender. Inclui IRPF e corretagem.',
+    formula:'ROI = (Venda − IRPF − Corretagem − Custo Total) ÷ Custo Total × 100',
+    ex:'Custo R$450k · Venda R$700k · IRPF R$37.5k · Corretagem R$42k → ROI = 38%' },
+  { t:'Yield Bruto', cat:'Financeiro', icon:'🏦', cor:P.emerald,
+    def:'Rendimento anual do aluguel sobre o valor do imóvel. Acima de 6%: boa locação. Abaixo de 4,5%: favorece flip.',
+    formula:'Yield = (Aluguel mensal × 12) ÷ Valor de mercado × 100',
+    ex:'Aluguel R$3.500 · Imóvel R$600k → Yield = (3.500×12)÷600k = 7,0% a.a.' },
+  { t:'Sub-rogação', cat:'Jurídico', icon:'⚖️', cor:P.purple,
+    def:'Em leilões judiciais (CPC/2015 art.908), débitos anteriores de IPTU e condomínio são pagos com o produto da arrematação — não viram obrigação do comprador.',
+    formula:'Proteção legal — não requer cálculo',
+    ex:'IPTU atrasado R$20k + condomínio R$15k em TJMG → ambos sub-rogados no preço' },
+  { t:'2º Leilão', cat:'Leilão', icon:'🔨', cor:P.mustard,
+    def:'Quando o 1º leilão não recebe lances, realiza-se o 2º com mínimo de 50% da avaliação. Oportunidade histórica de BH: fecha entre 57–65% da avaliação.',
+    formula:'Mínimo 2º leilão = Avaliação × 50%',
+    ex:'Avaliação R$800k → 1º mínimo R$800k · 2º mínimo R$400k (historicamente fecha em ~R$460k)' },
+  { t:'IRPF 15%', cat:'Financeiro', icon:'🧾', cor:P.red,
+    def:'Imposto de Renda sobre ganho de capital na venda. ISENÇÃO total para imóvel único PF com venda ≤ R$440k (Lei 11.196/2005).',
+    formula:'IRPF = Ganho de Capital × 15% (apenas se venda > R$440k)',
+    ex:'Custo R$450k · Venda R$700k → Ganho R$250k → IRPF R$37.500. Venda ≤ R$440k → R$0' },
+  { t:'IPEAD Classes', cat:'Mercado', icon:'🏷️', cor:P.blue,
+    def:'Instituto de Pesquisa Econômica de BH — classifica imóveis em 4 faixas que determinam o cap rate de locação e teto de reforma.',
+    formula:'1-Popular <R$4.5k/m² · 2-Médio R$4.5–8k · 3-Alto R$8–12k · 4-Luxo >R$12k',
+    ex:'Dona Clara preço ~R$6.9k/m² → Classe 2-Médio → cap rate 5% · teto reforma 5% do imóvel' },
+  { t:'Jurimetria', cat:'Jurídico', icon:'📊', cor:P.purple,
+    def:'Aplicação de estatística ao Direito. O AXIS usa dados históricos de varas do TJMG e TRT-3 para estimar o prazo real de liberação de imóvel ocupado.',
+    formula:'Prazo estimado = Mediana do ciclo histórico por vara × fator de risco',
+    ex:'TRT-3 BH: mediana 240 dias · sucesso 88% · embargo 8% (n=198 processos)' },
+  { t:'Gemini Flash', cat:'IA', icon:'🤖', cor:P.navy,
+    def:'Modelo de IA da Google usado como motor principal. Lê o edital via Jina.ai, extrai dados e gera a análise estruturada com score, síntese e estratégia.',
+    formula:'Custo: $0.075/M tokens input + $0.30/M output',
+    ex:'Análise típica: ~5.500 tokens total → US$0,0005 ≈ R$0,003 por análise' },
 ]
 
-const DIRETRIZES = [
-  { titulo:'Imóvel de qualidade', texto:'Foco em apartamentos 2-4 quartos com 1+ suíte e 2+ vagas em bairros consolidados de BH. Evitar terrenos e imóveis comerciais sem análise específica.' },
-  { titulo:'Score mínimo para ação', texto:'Score ≥ 7.0: avaliar compra. Score ≥ 8.0: sinal de compra imediata. Score < 6.0: evitar, salvo situação excepcional documentada pelo grupo.' },
-  { titulo:'Margem de segurança (MAO)', texto:'Nunca pagar acima do MAO (80% do valor de mercado menos custos). O MAO garante margem mínima de 20% mesmo no cenário mais pessimista.' },
-  { titulo:'Reforma dentro do teto', texto:'Reforma máxima: 5% do valor do imóvel para Classe C, 6% para Classe B, 7% para Classe A. Acima disso, risco de sobrecapitalização.' },
-  { titulo:'Verificação jurídica obrigatória', texto:'Toda análise passa pela equipe jurídica antes do lance. Documentos da matrícula devem ser anexados na aba Jurídico para reclassificação automática do score.' },
-  { titulo:'Estrutura de aquisição', texto:'CPF único para imóveis simples. Consórcio voluntário para múltiplos investidores. Holding/LTDA para operações recorrentes — consultar Pedro.' },
-  { titulo:'Presença no leilão', texto:'Verificar ocupação pessoalmente antes de fazer lance. Nunca basear ocupação apenas no edital — informação frequentemente imprecisa.' },
-  { titulo:'Custo de oportunidade', texto:'Imóveis com prazo de liberação > 12 meses: considerar custo de oportunidade do capital imobilizado (~12% CDI a.a.) no cálculo do ROI efetivo.' },
+// ─── FLUXO ────────────────────────────────────────────────────────────────────
+const FLUXO = [
+  { n:1, titulo:'URL do edital',   icon:'🔗', cor:P.blue,   custo:'grátis',  tempo:'<1s',
+    desc:'Cole o link do portal de leilão — Marco Antônio, Superbid, Caixa, TJMG, TRT...' },
+  { n:2, titulo:'Scrape Jina.ai',  icon:'🕷️', cor:'#555',   custo:'grátis',  tempo:'2–5s',
+    desc:'Jina.ai converte o edital em texto limpo sem custo. Suporta qualquer portal.' },
+  { n:3, titulo:'Extração Regex',  icon:'⚙️', cor:'#888',   custo:'grátis',  tempo:'<1s',
+    desc:'25 campos extraídos automaticamente: preço, área, quartos, vagas, processo...' },
+  { n:4, titulo:'Banco de Dados',  icon:'🗄️', cor:P.emerald, custo:'grátis', tempo:'<1s',
+    desc:'Preço/m², yield e tendência do bairro consultados nas tabelas internas — sem API externa.' },
+  { n:5, titulo:'Gemini 1.5-Flash',icon:'🤖', cor:P.purple, custo:'~R$0,01', tempo:'15–25s',
+    desc:'IA analisa scores 6D, comparáveis de mercado, riscos jurídicos, síntese e estratégia.' },
+  { n:6, titulo:'Score AXIS',      icon:'🎯', cor:P.navy,   custo:'grátis',  tempo:'<1s',
+    desc:'Calcula nota 0–10 com os 6 pesos. Classifica automaticamente: COMPRAR / AGUARDAR / EVITAR.' },
+  { n:7, titulo:'Agente Leilão',   icon:'🔨', cor:P.mustard, custo:'grátis', tempo:'<1s',
+    desc:'Motor interno (sem API) projeta 2º leilão, MAO e ROI em 4 cenários de reforma.' },
+  { n:8, titulo:'Salvar no Banco', icon:'💾', cor:P.emerald, custo:'grátis', tempo:'<1s',
+    desc:'Todos os dados ficam no Supabase — sincronizados entre todos os dispositivos do grupo.' },
 ]
 
+// ─── DIRETRIZES ───────────────────────────────────────────────────────────────
+const DIR = [
+  { n:1, e:'🏆', t:'Imóvel de qualidade',
+    txt:'Foco em apartamentos 2–4 quartos com 1+ suíte e 2+ vagas em bairros consolidados de BH. Evitar terrenos e imóveis comerciais sem análise específica.' },
+  { n:2, e:'🎯', t:'Score mínimo para ação',
+    txt:'Score ≥ 7.0: avaliar compra. Score ≥ 8.0: sinal de compra imediata. Score < 6.0: evitar, salvo situação excepcional documentada pelo grupo.' },
+  { n:3, e:'💡', t:'Margem de segurança (MAO)',
+    txt:'Nunca pagar acima do MAO. Garante margem mínima de 20% mesmo no cenário mais pessimista — custo zero de reforma e valor de mercado estável.' },
+  { n:4, e:'🔨', t:'Reforma dentro do teto',
+    txt:'Máximo: 5% do valor do imóvel para Classe Popular/Médio, 6% para Alto, 7% para Luxo. Acima disso: risco real de sobrecapitalização.' },
+  { n:5, e:'⚖️', t:'Verificação jurídica obrigatória',
+    txt:'Toda análise passa pela equipe jurídica antes do lance. Documentos da matrícula devem ser anexados na aba Jurídico para reclassificação automática.' },
+  { n:6, e:'👁️', t:'Presença física obrigatória',
+    txt:'Verificar ocupação pessoalmente antes de fazer lance. O edital frequentemente indica ocupação errada ou desatualizada.' },
+  { n:7, e:'⏱️', t:'Custo de oportunidade',
+    txt:'Imóveis com prazo de liberação > 12 meses: calcular custo do capital imobilizado (~12% CDI a.a.) no ROI efetivo.' },
+  { n:8, e:'🏢', t:'Estrutura de aquisição',
+    txt:'CPF único para imóveis simples. Consórcio voluntário para múltiplos investidores. Holding/LTDA para operações recorrentes — consultar Pedro (jurídico).' },
+]
+
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+const Tag = ({ text, cor }) => (
+  <span style={{ fontSize:9, fontWeight:700, padding:'2px 8px', borderRadius:10,
+    background:`${cor}18`, color:cor, border:`1px solid ${cor}30`, whiteSpace:'nowrap' }}>{text}</span>
+)
+const Box = ({ children, style }) => (
+  <div style={{ background:P.white, border:`1px solid ${P.border}`,
+    borderRadius:10, padding:'12px 14px', ...style }}>{children}</div>
+)
+
+// ─── SVG: SCORE ───────────────────────────────────────────────────────────────
+function SvgScore() {
+  return (
+    <svg viewBox="0 0 460 195" style={{width:'100%',maxWidth:460,height:'auto'}} xmlns="http://www.w3.org/2000/svg">
+      <rect width="460" height="195" rx="10" fill={P.surface}/>
+      <text x="230" y="20" textAnchor="middle" fill={P.navy} fontSize="11" fontWeight="700">
+        Composição do Score AXIS
+      </text>
+      {DIMS.map((d,i) => {
+        const y = 35 + i*25, bw = d.peso * 4.5
+        return (
+          <g key={d.id}>
+            <text x="88" y={y+10} textAnchor="end" fill={P.text} fontSize="9.5" fontWeight="600">{d.label}</text>
+            <rect x="94" y={y} width={bw} height="16" rx="4" fill={d.cor} opacity="0.85"/>
+            <text x={94+bw+5} y={y+11} fill={d.cor} fontSize="9" fontWeight="700">{d.peso}%</text>
+          </g>
+        )
+      })}
+      <line x1="215" y1="95" x2="280" y2="95" stroke={P.navy} strokeWidth="1.5" strokeDasharray="4"/>
+      <polygon points="280,91 288,95 280,99" fill={P.navy}/>
+      <text x="248" y="88" textAnchor="middle" fill={P.navy} fontSize="8" opacity="0.5">ponderada</text>
+      <rect x="292" y="74" width="76" height="42" rx="10" fill={P.navy}/>
+      <text x="330" y="92" textAnchor="middle" fill="#fff" fontSize="9.5" fontWeight="600">Score</text>
+      <text x="330" y="107" textAnchor="middle" fill="#fff" fontSize="17" fontWeight="800">0–10</text>
+      {[
+        [P.emerald, '≥ 8.0  COMPRAR imediato', 28],
+        [P.mustard, '≥ 7.0  COMPRAR', 50],
+        ['#E06A00','  6.0  AGUARDAR', 72],
+        [P.red,    '< 6.0  EVITAR',   94],
+      ].map(([c,l,y]) => (
+        <g key={l}>
+          <rect x="376" y={y+27} width="80" height="16" rx="5" fill={c} opacity="0.9"/>
+          <text x="416" y={y+38} textAnchor="middle" fill="#fff" fontSize="7.5" fontWeight="700">{l}</text>
+          <line x1="368" y1={y+35} x2="376" y2={y+35} stroke={c} strokeWidth="1" opacity="0.5"/>
+        </g>
+      ))}
+      <line x1="368" y1="95" x2="376" y2="95" stroke={P.navy} strokeWidth="1" opacity="0.3"/>
+      <line x1="368" y1="45" x2="368" y2="130" stroke={P.navy} strokeWidth="0.5" opacity="0.2"/>
+      <text x="230" y="188" textAnchor="middle" fill={P.gray} fontSize="7.5">
+        Pesos configuráveis: Admin → Config → Parâmetros Score
+      </text>
+    </svg>
+  )
+}
+
+// ─── SVG: FLUXO ───────────────────────────────────────────────────────────────
+function SvgFluxo() {
+  const items = FLUXO.map(f => ({...f, label:f.titulo.split(' ')[0]}))
+  const W=460, step=W/items.length
+  return (
+    <svg viewBox={`0 0 ${W} 95`} style={{width:'100%',maxWidth:W,height:'auto'}} xmlns="http://www.w3.org/2000/svg">
+      <rect width={W} height="95" rx="10" fill={P.surface}/>
+      {items.map((e,i) => {
+        const cx = step*i + step/2
+        return (
+          <g key={i}>
+            {i>0 && <>
+              <line x1={cx-step+18} y1={36} x2={cx-18} y2={36} stroke={P.border} strokeWidth="1.5"/>
+              <polygon points={`${cx-18},32 ${cx-12},36 ${cx-18},40`} fill={P.border}/>
+            </>}
+            <circle cx={cx} cy={36} r={15} fill={e.cor} opacity="0.88"/>
+            <text x={cx} y={41} textAnchor="middle" fontSize="12">{e.icon}</text>
+            <text x={cx} y={62} textAnchor="middle" fill={P.text} fontSize="8" fontWeight="700">{e.label}</text>
+            <text x={cx} y={72} textAnchor="middle" fill={P.gray} fontSize="7">{e.tempo}</text>
+            <text x={cx} y={83} textAnchor="middle"
+              fill={e.custo==='grátis' ? P.emerald : P.mustard} fontSize="7" fontWeight="600">
+              {e.custo}
+            </text>
+          </g>
+        )
+      })}
+    </svg>
+  )
+}
+
+// ─── SVG: MAO ─────────────────────────────────────────────────────────────────
+function SvgMAO() {
+  return (
+    <svg viewBox="0 0 400 135" style={{width:'100%',maxWidth:400,height:'auto'}} xmlns="http://www.w3.org/2000/svg">
+      <rect width="400" height="135" rx="10" fill={P.surface}/>
+      <text x="200" y="18" textAnchor="middle" fill={P.navy} fontSize="10" fontWeight="700">
+        Como o MAO é calculado
+      </text>
+      <rect x="16" y="28" width="270" height="18" rx="5" fill={P.blue} opacity="0.12" stroke={P.blue} strokeWidth="1"/>
+      <text x="151" y="41" textAnchor="middle" fill={P.blue} fontSize="9" fontWeight="600">Valor de Mercado (ex: R$ 700.000)</text>
+      <rect x="16" y="52" width="216" height="18" rx="5" fill={P.navy} opacity="0.10" stroke={P.navy} strokeWidth="1"/>
+      <text x="124" y="65" textAnchor="middle" fill={P.navy} fontSize="9" fontWeight="600">× 0,80 = R$ 560.000</text>
+      <text x="236" y="64" fill={P.navy} fontSize="8" opacity="0.5">← margem 20%</text>
+      <rect x="16" y="76" width="58" height="18" rx="5" fill={P.red} opacity="0.12" stroke={P.red} strokeWidth="1"/>
+      <text x="45" y="89" textAnchor="middle" fill={P.red} fontSize="8.5" fontWeight="600">− R$ 60k</text>
+      <text x="80" y="88" fill={P.gray} fontSize="8">custos totais (ITBI+docs+reforma+adv)</text>
+      <rect x="16" y="100" width="155" height="18" rx="5" fill={P.emerald} opacity="0.88"/>
+      <text x="93" y="113" textAnchor="middle" fill="#fff" fontSize="9" fontWeight="700">MAO = R$ 500.000 ✓</text>
+      <text x="177" y="112" fill={P.gray} fontSize="8">lance acima → ROI &lt; 20%</text>
+      <line x1="346" y1="28" x2="346" y2="118" stroke={P.border} strokeWidth="1"/>
+      <text x="356" y="44" fill={P.gray} fontSize="8.5">R$ 700k</text>
+      <text x="356" y="68" fill={P.navy} fontSize="8.5">R$ 560k</text>
+      <text x="356" y="92" fill={P.red} fontSize="8.5">R$ 500k</text>
+      <text x="356" y="116" fill={P.emerald} fontSize="8" fontWeight="700">MAO</text>
+      <line x1="344" y1="40" x2="348" y2="40" stroke={P.gray} strokeWidth="1"/>
+      <line x1="344" y1="64" x2="348" y2="64" stroke={P.navy} strokeWidth="1"/>
+      <line x1="344" y1="88" x2="348" y2="88" stroke={P.red} strokeWidth="1"/>
+      <line x1="344" y1="109" x2="348" y2="109" stroke={P.emerald} strokeWidth="1.5"/>
+    </svg>
+  )
+}
+
+// ─── SVG: CASCATA IA ──────────────────────────────────────────────────────────
+function SvgCascata() {
+  const modelos = [
+    { label:'Gemini 1.5-Flash', sub:'Motor principal', custo:'~R$0,01', cor:P.blue,    p:90 },
+    { label:'DeepSeek V3',      sub:'Fallback 1',      custo:'~R$0,08', cor:P.purple,  p:8  },
+    { label:'Claude Sonnet',    sub:'Último recurso',  custo:'~R$2,20', cor:'#E07B54', p:2  },
+  ]
+  return (
+    <svg viewBox="0 0 380 90" style={{width:'100%',maxWidth:380,height:'auto'}} xmlns="http://www.w3.org/2000/svg">
+      <rect width="380" height="90" rx="10" fill={P.surface}/>
+      <text x="190" y="16" textAnchor="middle" fill={P.navy} fontSize="10" fontWeight="700">
+        Cascata de Modelos de IA
+      </text>
+      {modelos.map((m,i) => {
+        const x = 12 + i*124
+        return (
+          <g key={m.label}>
+            {i>0 && <>
+              <line x1={x-4} y1={50} x2={x+4} y2={50} stroke={P.border} strokeWidth="1.5"/>
+              <text x={x-2} y={44} textAnchor="middle" fill={P.gray} fontSize="7">falha</text>
+            </>}
+            <rect x={x+4} y={24} width={116} height={50} rx="8" fill={P.white}
+              stroke={m.cor} strokeWidth="1.5"/>
+            <circle cx={x+24} cy={49} r={10} fill={m.cor} opacity="0.9"/>
+            <text x={x+24} y={53} textAnchor="middle" fill="#fff" fontSize="8" fontWeight="700">{i+1}</text>
+            <text x={x+36} y={40} fill={m.cor} fontSize="9" fontWeight="700">{m.label}</text>
+            <text x={x+36} y={52} fill={P.gray} fontSize="7.5">{m.sub}</text>
+            <text x={x+36} y={64} fill={m.cor} fontSize="8" fontWeight="600">{m.custo}</text>
+            <text x={x+110} y={32} textAnchor="end" fill={P.gray} fontSize="8">{m.p}%</text>
+          </g>
+        )
+      })}
+    </svg>
+  )
+}
+
+// ─── COMPONENTE PRINCIPAL ────────────────────────────────────────────────────
 export default function ManualAxis({ isMobile }) {
-  const [contagens, setContagens] = useState({})
+  const [cnts, setCnts] = useState({})
+  const [aba, setAba] = useState('guia')
+  const [busca, setBusca] = useState('')
+  const [tabIdx, setTabIdx] = useState(0)
+  const [dimSel, setDimSel] = useState(null)
+
   useEffect(() => {
     import('../lib/supabase.js').then(({ supabase }) => {
-      const tabelas = ['imoveis','mercado_regional','metricas_bairros','riscos_juridicos','jurimetria_varas','modelos_analise']
-      Promise.all(tabelas.map(t => 
-        supabase.from(t).select('*', {count:'exact', head:true})
-          .then(({count}) => [t, count])
-      )).then(results => {
-        const c = {}
-        results.forEach(([t, n]) => { c[t] = n })
-        setContagens(c)
+      const ts = ['imoveis','mercado_regional','metricas_bairros','riscos_juridicos','jurimetria_varas','modelos_analise']
+      Promise.all(ts.map(t =>
+        supabase.from(t).select('*',{count:'exact',head:true}).then(({count}) => [t,count])
+      )).then(res => {
+        const c = {}; res.forEach(([t,n]) => { c[t]=n }); setCnts(c)
       }).catch(() => {})
     })
   }, [])
-  const [aba, setAba] = useState('guia')
-  const [busca, setBusca] = useState('')
 
-  const abas = [
-    ['guia','📖 Guia AXIS'],
-    ['glossario','📚 Glossário'],
-    ['banco','🗄️ Banco de Dados'],
-    ['fluxo','⚙️ Como Analisa'],
-    ['diretrizes','📋 Diretrizes'],
+  const ABAS = [
+    ['guia','📖 O AXIS'],['score','🎯 Score'],['fluxo','⚙️ Fluxo'],
+    ['banco','🗄️ Base de Dados'],['glossario','📚 Glossário'],['diretrizes','📋 Diretrizes'],
   ]
+  const glossFilt = GLOSS.filter(g =>
+    !busca || g.t.toLowerCase().includes(busca.toLowerCase()) || g.def.toLowerCase().includes(busca.toLowerCase())
+  )
+  const tb = TABELAS[tabIdx]
+  const nums = {
+    mercado_regional: cnts['mercado_regional']??16,
+    metricas_bairros: cnts['metricas_bairros']??29,
+    riscos_juridicos: cnts['riscos_juridicos']??15,
+    jurimetria_varas: cnts['jurimetria_varas']??6,
+    imoveis: cnts['imoveis']??'—',
+    modelos_analise: cnts['modelos_analise']??5,
+  }
 
-  const glossFiltrado = GLOSSARIO.filter(g =>
-    !busca || g.termo.toLowerCase().includes(busca.toLowerCase()) || g.def.toLowerCase().includes(busca.toLowerCase())
+  const tabBtn = (k,l) => (
+    <button key={k} onClick={() => setAba(k)} style={{
+      padding:'7px 12px', borderRadius:8, fontSize:11.5, cursor:'pointer',
+      fontWeight: aba===k ? 700 : 400,
+      border:`1px solid ${aba===k ? C.navy : C.borderW}`,
+      background: aba===k ? C.navy : C.white,
+      color: aba===k ? '#fff' : C.muted
+    }}>{l}</button>
   )
 
   return (
-    <div style={{padding: isMobile ? 16 : '20px 28px', maxWidth:900}}>
-      {/* Header */}
-      <div style={{marginBottom:20}}>
-        <div style={{fontSize:22, fontWeight:700, color:C.navy, marginBottom:4}}>Manual AXIS</div>
-        <div style={{fontSize:13, color:C.muted}}>Diretrizes, glossário, bases de dados e fluxo de análise</div>
+    <div style={{ padding: isMobile ? '14px 12px' : '20px 28px', maxWidth:880 }}>
+      <div style={{ marginBottom:18 }}>
+        <div style={{ fontSize:22, fontWeight:800, color:C.navy, marginBottom:4 }}>📖 Manual AXIS</div>
+        <div style={{ fontSize:12, color:C.muted }}>Guia completo · Base de dados · Glossário · Diretrizes</div>
       </div>
 
-      {/* Abas */}
-      <div style={{display:'flex', gap:4, marginBottom:20, flexWrap:'wrap'}}>
-        {abas.map(([k,l]) => (
-          <button key={k} onClick={() => setAba(k)} style={{
-            padding:'7px 14px', borderRadius:8, fontSize:12, cursor:'pointer', fontWeight: aba===k ? 600 : 400,
-            border:`1px solid ${aba===k ? C.navy : C.borderW}`,
-            background: aba===k ? C.navy : C.white, color: aba===k ? '#fff' : C.muted
-          }}>{l}</button>
-        ))}
+      <div style={{ display:'flex', gap:4, marginBottom:20, flexWrap:'wrap' }}>
+        {ABAS.map(([k,l]) => tabBtn(k,l))}
       </div>
 
-      {/* ABA: GUIA */}
+      {/* ─── ABA: O AXIS ─────────────────────────────────────────────── */}
       {aba === 'guia' && (
         <div>
-          <div style={{...card(), padding:20, marginBottom:16}}>
-            <div style={{fontSize:15, fontWeight:600, color:C.navy, marginBottom:8}}>O que é o AXIS?</div>
-            <div style={{fontSize:13, color:C.text, lineHeight:1.7}}>
-              AXIS Inteligência Patrimonial é uma plataforma SaaS para análise de imóveis em leilão judicial no Brasil. 
-              Combina um motor de IA dual (Claude Sonnet + Gemini) com bases de dados proprietárias de mercado BH/JF 
-              para gerar análises completas: score multidimensional, ROI, MAO, jurimetria e estudo de leilão — 
-              em menos de 60 segundos por imóvel.
+          <Box style={{ marginBottom:14 }}>
+            <div style={{ fontSize:14, fontWeight:700, color:P.navy, marginBottom:8 }}>O que é o AXIS?</div>
+            <div style={{ fontSize:12.5, color:P.text, lineHeight:1.8 }}>
+              O AXIS é uma plataforma SaaS para análise de imóveis em <strong>leilão judicial</strong>.
+              Cole um link de edital e em <strong>menos de 60 segundos</strong> você recebe:
+              score multidimensional, MAO automático, ROI por cenário, análise jurídica e
+              estudo completo de leilão — com base em dados reais de BH e região.
             </div>
-          </div>
+            <div style={{ display:'flex', gap:6, marginTop:10, flexWrap:'wrap' }}>
+              {['Score 6D','Gemini + Claude','SINAPI reforma','MAO automático','Jurimetria real','Custo ~R$0,01'].map(f => (
+                <Tag key={f} text={f} cor={P.navy}/>
+              ))}
+            </div>
+          </Box>
 
-          <div style={{display:'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap:12, marginBottom:16}}>
+          <div style={{ display:'grid', gridTemplateColumns: isMobile?'1fr':'1fr 1fr', gap:10, marginBottom:14 }}>
             {[
-              ['🏆','Diferencial único','Único sistema que combina: Score 6D + IA dual + SINAPI reforma + MAO automático + jurimetria real de varas'],
-              ['💰','Custo por análise','~R$ 0,01 com Gemini Flash-Lite. Fallback para Claude Sonnet (~R$ 3,00) apenas se necessário'],
-              ['🔒','Segurança','Dados no Supabase com RLS. Chaves de API sincronizadas entre dispositivos via banco criptografado'],
-              ['👥','Multi-usuário','Admin cria convites com link. Membros veem todos os imóveis. Cada usuário tem acesso conforme seu papel (admin/membro/viewer)'],
-            ].map(([icon, titulo, texto]) => (
-              <div key={titulo} style={{...card(), padding:14}}>
-                <div style={{fontSize:16, marginBottom:4}}>{icon}</div>
-                <div style={{fontSize:12, fontWeight:600, color:C.navy, marginBottom:4}}>{titulo}</div>
-                <div style={{fontSize:11, color:C.muted, lineHeight:1.5}}>{texto}</div>
-              </div>
+              {icon:'🏆',t:'Diferencial',cor:P.navy,txt:'Único sistema que combina Score 6D + IA dual + SINAPI + MAO automático + jurimetria real de varas TJMG/TRT-3.'},
+              {icon:'💰',t:'Custo ~R$0,01',cor:P.emerald,txt:'Gemini Flash como motor principal. Fallback automático para DeepSeek V3 ou Claude Sonnet se necessário.'},
+              {icon:'🔄',t:'Cascata de IA',cor:P.purple,txt:'Gemini 1.5-Flash → DeepSeek V3 → Claude Sonnet. Modelo mais barato que funciona assume automaticamente.'},
+              {icon:'👥',t:'Multi-usuário',cor:P.blue,txt:'Dados no Supabase — acessíveis em qualquer dispositivo. Admin cria convites. Cada imóvel visível para o grupo.'},
+            ].map(({icon,t,cor,txt}) => (
+              <Box key={t} style={{ borderLeft:`3px solid ${cor}` }}>
+                <div style={{ fontSize:18, marginBottom:4 }}>{icon}</div>
+                <div style={{ fontSize:12, fontWeight:700, color:cor, marginBottom:4 }}>{t}</div>
+                <div style={{ fontSize:11, color:P.gray, lineHeight:1.5 }}>{txt}</div>
+              </Box>
             ))}
           </div>
 
-          <div style={{...card(), padding:16}}>
-            <div style={{fontSize:13, fontWeight:600, color:C.navy, marginBottom:10}}>Score AXIS — 6 dimensões</div>
-            {[
-              ['Localização','20%','Infraestrutura do bairro, acessibilidade, qualidade de vida, potencial de valorização'],
-              ['Desconto','18%','% de desconto sobre avaliação judicial e sobre valor de mercado estimado'],
-              ['Jurídico','18%','Processos ativos, status da matrícula, riscos identificados, modalidade do leilão'],
-              ['Ocupação','15%','Situação de ocupação — desocupado (melhor), incerto, ocupado (pior)'],
-              ['Liquidez','15%','Tempo médio de venda no bairro, demanda e facilidade de revenda'],
-              ['Mercado','14%','Tendência de preços 12m, yield bruto, valorização histórica da região'],
-            ].map(([dim, peso, desc]) => (
-              <div key={dim} style={{display:'flex', gap:10, alignItems:'flex-start', padding:'6px 0', borderBottom:`1px solid ${C.borderW}`}}>
-                <div style={{minWidth:90, fontSize:12, fontWeight:600, color:C.navy}}>{dim}</div>
-                <div style={{minWidth:36, fontSize:12, fontWeight:700, color:C.emerald}}>{peso}</div>
-                <div style={{fontSize:11, color:C.muted, lineHeight:1.4}}>{desc}</div>
-              </div>
-            ))}
-            <div style={{marginTop:8, fontSize:11, color:C.hint}}>
-              Thresholds: ≥8.0 compra imediata · ≥7.0 comprar · 6.0-6.9 aguardar · &lt;6.0 evitar
+          <Box style={{ marginBottom:14 }}>
+            <div style={{ fontSize:12, fontWeight:700, color:P.navy, marginBottom:10 }}>📊 Estado atual do banco</div>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8 }}>
+              {[['🗺️',nums.mercado_regional,'regiões'],['🏘️',nums.metricas_bairros,'bairros BH'],['⚖️',nums.riscos_juridicos,'tipos risco'],
+                ['🏛️',nums.jurimetria_varas,'varas judiciais'],['🏠',nums.imoveis,'imóveis grupo'],['🤖',nums.modelos_analise,'modelos IA']].map(([i,n,l]) => (
+                <div key={l} style={{ textAlign:'center', padding:'8px 4px', background:P.surface, borderRadius:8 }}>
+                  <div style={{ fontSize:18 }}>{i}</div>
+                  <div style={{ fontSize:18, fontWeight:800, color:P.navy }}>{n}</div>
+                  <div style={{ fontSize:9, color:P.gray }}>{l}</div>
+                </div>
+              ))}
             </div>
-          </div>
+          </Box>
+
+          <Box>
+            <div style={{ fontSize:12, fontWeight:700, color:P.navy, marginBottom:8 }}>Cascata de modelos de IA</div>
+            <SvgCascata/>
+            <div style={{ marginTop:8, fontSize:11, color:P.gray, lineHeight:1.5 }}>
+              Na prática 90%+ das análises rodam com Gemini Flash (~R$0,01). DeepSeek e Claude são backups automáticos.
+            </div>
+          </Box>
         </div>
       )}
 
-      {/* ABA: GLOSSÁRIO */}
-      {aba === 'glossario' && (
+      {/* ─── ABA: SCORE ──────────────────────────────────────────────── */}
+      {aba === 'score' && (
         <div>
-          <input
-            value={busca} onChange={e => setBusca(e.target.value)}
-            placeholder="Buscar termo..."
-            style={{width:'100%', padding:'8px 12px', borderRadius:8, border:`1px solid ${C.borderW}`,
-              fontSize:13, marginBottom:12, background:C.white, color:C.text}}
-          />
-          <div style={{display:'flex', flexDirection:'column', gap:8}}>
-            {glossFiltrado.map(g => (
-              <div key={g.termo} style={{...card(), padding:14}}>
-                <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6}}>
-                  <span style={{fontSize:14, fontWeight:600, color:C.navy}}>{g.termo}</span>
-                  <span style={{fontSize:10, padding:'2px 8px', borderRadius:10, background:C.surface, color:C.muted}}>{g.cat}</span>
+          <Box style={{ marginBottom:14 }}>
+            <div style={{ fontSize:13, fontWeight:700, color:P.navy, marginBottom:8 }}>Como o score é calculado?</div>
+            <div style={{ fontSize:12, color:P.text, lineHeight:1.7, marginBottom:12 }}>
+              O score é uma <strong>média ponderada de 6 dimensões</strong>, cada uma avaliada de 0 a 10 pela IA.
+              Os pesos refletem o que o grupo definiu como prioritário em leilões de BH.
+            </div>
+            <SvgScore/>
+            <div style={{ marginTop:10, padding:'8px 12px', background:P.navyL, borderRadius:8,
+              fontSize:11, color:P.navy, lineHeight:1.6 }}>
+              <strong>Exemplo real — Dona Clara (BH-2026-0002):</strong> 8.5×20% + 7.8×18% + 7.0×18% +
+              5.5×15% + 6.5×15% + 7.0×14% = <strong>7.14 → COMPRAR ✓</strong>
+            </div>
+          </Box>
+
+          <div style={{ fontSize:12, fontWeight:600, color:P.navy, marginBottom:8 }}>
+            Clique em uma dimensão para ver detalhes e exemplos de notas:
+          </div>
+          <div style={{ display:'grid', gridTemplateColumns: isMobile?'1fr 1fr':'repeat(3,1fr)', gap:8, marginBottom:14 }}>
+            {DIMS.map(d => (
+              <div key={d.id} onClick={() => setDimSel(dimSel?.id===d.id ? null : d)}
+                style={{ padding:'10px 12px', borderRadius:10, cursor:'pointer',
+                  border:`1.5px solid ${dimSel?.id===d.id ? d.cor : P.border}`,
+                  background: dimSel?.id===d.id ? `${d.cor}10` : P.white,
+                  transition:'all .15s' }}>
+                <div style={{ display:'flex', justifyContent:'space-between' }}>
+                  <span style={{ fontSize:14 }}>{d.icon}</span>
+                  <Tag text={`${d.peso}%`} cor={d.cor}/>
                 </div>
-                <div style={{fontSize:12, color:C.text, lineHeight:1.6}}>{g.def}</div>
+                <div style={{ fontSize:11.5, fontWeight:600, color:P.navy, marginTop:4 }}>{d.label}</div>
               </div>
             ))}
           </div>
-        </div>
-      )}
 
-      {/* ABA: BANCO DE DADOS */}
-      {aba === 'banco' && (
-        <div>
-          <div style={{fontSize:13, color:C.muted, marginBottom:12}}>
-            Todas as tabelas usadas pelo AXIS. Dados sincronizados no Supabase — acessíveis em qualquer dispositivo.
-          </div>
-          {DADOS_BANCO.map(d => (
-            <div key={d.nome} style={{...card(), padding:14, marginBottom:10}}>
-              <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:8, flexWrap:'wrap', gap:6}}>
-                <div>
-                  <span style={{fontSize:12, fontWeight:700, color:C.navy, fontFamily:'monospace'}}>{d.nome}</span>
-                  <span style={{marginLeft:8, fontSize:11, color:C.muted}}>{d.registros} registros</span>
-                </div>
-                <div style={{display:'flex', gap:8}}>
-                  <span style={{fontSize:10, color:C.hint}}>Atualizado: {d.atualizado}</span>
-                </div>
+          {dimSel && (
+            <Box style={{ borderLeft:`3px solid ${dimSel.cor}`, marginBottom:14 }}>
+              <div style={{ fontSize:13, fontWeight:700, color:dimSel.cor, marginBottom:6 }}>
+                {dimSel.icon} {dimSel.label} · peso {dimSel.peso}%
               </div>
-              <div style={{fontSize:11, color:C.text, marginBottom:6, lineHeight:1.5}}>{d.descricao}</div>
-              <div style={{fontSize:10, color:C.hint}}>
-                Fonte: {d.fonte}
-              </div>
-              <div style={{display:'flex', gap:6, marginTop:6, flexWrap:'wrap'}}>
-                {d.campos.map(c => (
-                  <span key={c} style={{fontSize:10, padding:'2px 6px', borderRadius:4, background:C.surface, color:C.muted, fontFamily:'monospace'}}>{c}</span>
-                ))}
-              </div>
+              <div style={{ fontSize:12, color:P.text, lineHeight:1.7, marginBottom:8 }}>{dimSel.desc}</div>
+              <div style={{ fontSize:11, fontWeight:600, color:P.navy, marginBottom:6 }}>Exemplos de notas:</div>
+              {dimSel.exemplos.map((e,i) => (
+                <div key={i} style={{ fontSize:11, color:P.text, padding:'5px 10px',
+                  marginBottom:5, background:P.surface, borderRadius:6 }}>• {e}</div>
+              ))}
+            </Box>
+          )}
+
+          <Box>
+            <div style={{ fontSize:12, fontWeight:700, color:P.navy, marginBottom:8 }}>Calculando o MAO</div>
+            <SvgMAO/>
+            <div style={{ marginTop:8, fontSize:11, color:P.gray, lineHeight:1.6 }}>
+              O MAO é calculado automaticamente pelo motor AXIS para cada imóvel.
+              Lance acima do MAO = ROI abaixo de 20% antes de custos adicionais.
             </div>
-          ))}
+          </Box>
         </div>
       )}
 
-      {/* ABA: FLUXO */}
+      {/* ─── ABA: FLUXO ──────────────────────────────────────────────── */}
       {aba === 'fluxo' && (
         <div>
-          <div style={{fontSize:13, color:C.muted, marginBottom:16}}>
-            Como o AXIS analisa um imóvel — do link ao relatório completo.
-          </div>
-          <div style={{position:'relative'}}>
-            {FLUXO_ANALISE.map((f, i) => (
-              <div key={f.etapa} style={{display:'flex', gap:12, marginBottom:16}}>
-                <div style={{display:'flex', flexDirection:'column', alignItems:'center'}}>
-                  <div style={{width:32, height:32, borderRadius:'50%', background:C.navy, color:'#fff',
-                    display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:700, flexShrink:0}}>
-                    {f.etapa}
-                  </div>
-                  {i < FLUXO_ANALISE.length - 1 && (
-                    <div style={{width:2, flex:1, background:C.borderW, margin:'4px 0'}}/>
+          <Box style={{ marginBottom:14 }}>
+            <div style={{ fontSize:13, fontWeight:700, color:P.navy, marginBottom:6 }}>
+              Do link ao relatório — 8 etapas automáticas
+            </div>
+            <div style={{ fontSize:11, color:P.gray, marginBottom:10 }}>
+              Tempo total: <strong>30–60 segundos</strong> · Custo total: <strong>~R$ 0,01</strong>
+            </div>
+            <SvgFluxo/>
+          </Box>
+
+          <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+            {FLUXO.map((f,i) => (
+              <div key={f.n} style={{ display:'flex', gap:12 }}>
+                <div style={{ display:'flex', flexDirection:'column', alignItems:'center' }}>
+                  <div style={{ width:34, height:34, borderRadius:'50%', background:f.cor,
+                    color:'#fff', display:'flex', alignItems:'center', justifyContent:'center',
+                    fontSize:16, flexShrink:0 }}>{f.icon}</div>
+                  {i < FLUXO.length-1 && (
+                    <div style={{ width:2, flex:1, background:P.border, margin:'4px 0', minHeight:10 }}/>
                   )}
                 </div>
-                <div style={{...card(), padding:'10px 14px', flex:1, marginBottom:0}}>
-                  <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4}}>
-                    <span style={{fontSize:12, fontWeight:600, color:C.navy}}>{f.titulo}</span>
-                    <span style={{fontSize:11, fontWeight:700, color: f.custo === 'R$ 0,00' ? C.emerald : C.mustard}}>{f.custo}</span>
+                <Box style={{ flex:1, padding:'10px 14px' }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
+                    <span style={{ fontSize:12, fontWeight:700, color:P.navy }}>{f.n}. {f.titulo}</span>
+                    <div style={{ display:'flex', gap:6 }}>
+                      <Tag text={f.tempo} cor={P.gray}/>
+                      <Tag text={f.custo} cor={f.custo==='grátis' ? P.emerald : P.mustard}/>
+                    </div>
                   </div>
-                  <div style={{fontSize:11, color:C.muted}}>{f.desc}</div>
-                </div>
+                  <div style={{ fontSize:11, color:P.gray, lineHeight:1.5 }}>{f.desc}</div>
+                </Box>
               </div>
             ))}
           </div>
-          <div style={{...card(), padding:14, background:`${C.emerald}08`, border:`1px solid ${C.emerald}20`}}>
-            <div style={{fontSize:12, fontWeight:600, color:C.emerald, marginBottom:4}}>Custo total por análise</div>
-            <div style={{fontSize:13, color:C.text}}>
-              ~<strong>R$ 0,01</strong> com Gemini Flash-Lite &nbsp;·&nbsp;
-              <span style={{color:C.muted}}>vs R$ 3,00 com Claude Sonnet (99,7% de redução)</span>
+
+          <Box style={{ marginTop:14, background:P.emeraldL, border:`1px solid ${P.emerald}30` }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:8 }}>
+              <div>
+                <div style={{ fontSize:12, fontWeight:700, color:P.emerald, marginBottom:2 }}>Custo total por análise</div>
+                <div style={{ fontSize:11, color:P.text }}>
+                  Gemini Flash: <strong>~R$ 0,01</strong> · Claude Sonnet: ~R$ 2,20 · <span style={{color:P.gray}}>Redução de 99,5%</span>
+                </div>
+              </div>
+              <div style={{ fontSize:24, fontWeight:800, color:P.emerald }}>~R$ 0,01</div>
             </div>
+          </Box>
+        </div>
+      )}
+
+      {/* ─── ABA: BASE DE DADOS ──────────────────────────────────────── */}
+      {aba === 'banco' && (
+        <div>
+          <div style={{ fontSize:12, color:P.gray, marginBottom:12, lineHeight:1.6 }}>
+            O AXIS usa <strong>bases de dados proprietárias</strong> para análise — sem consultas externas em tempo real.
+            Cada tabela tem fonte auditável, data de atualização e amostragem documentada.
+          </div>
+
+          <div style={{ display:'flex', gap:4, marginBottom:14, flexWrap:'wrap' }}>
+            {TABELAS.map((t,i) => (
+              <button key={t.nome} onClick={() => setTabIdx(i)} style={{
+                padding:'5px 10px', borderRadius:7, fontSize:11, cursor:'pointer',
+                fontWeight: tabIdx===i ? 700 : 400,
+                border:`1px solid ${tabIdx===i ? t.cor : P.border}`,
+                background: tabIdx===i ? `${t.cor}12` : P.white,
+                color: tabIdx===i ? t.cor : P.gray,
+              }}>{t.icone} {t.titulo}</button>
+            ))}
+          </div>
+
+          {tb && (
+            <div>
+              <Box style={{ marginBottom:10, borderLeft:`3px solid ${tb.cor}` }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:8, flexWrap:'wrap', gap:8 }}>
+                  <div>
+                    <div style={{ fontSize:14, fontWeight:700, color:tb.cor, marginBottom:4 }}>
+                      {tb.icone} {tb.titulo}
+                    </div>
+                    <span style={{ fontSize:10, fontFamily:'monospace', color:P.gray,
+                      background:P.surface, padding:'1px 6px', borderRadius:4, border:`1px solid ${P.border}` }}>
+                      {tb.nome}
+                    </span>
+                  </div>
+                  <div style={{ textAlign:'right' }}>
+                    <div style={{ fontSize:22, fontWeight:800, color:tb.cor }}>
+                      {nums[tb.nome] ?? '—'}
+                    </div>
+                    <div style={{ fontSize:9, color:P.gray }}>registros ativos</div>
+                  </div>
+                </div>
+
+                <div style={{ fontSize:12, color:P.text, lineHeight:1.7, marginBottom:10 }}>
+                  {tb.descricao}
+                </div>
+
+                <div style={{ padding:'8px 12px', background:`${tb.cor}0D`, border:`1px solid ${tb.cor}25`,
+                  borderRadius:8, marginBottom:10, fontSize:11, color:tb.cor, fontWeight:600 }}>
+                  📊 Amostragem: {tb.amostragem}
+                </div>
+
+                <div style={{ marginBottom:10 }}>
+                  <div style={{ fontSize:11, fontWeight:600, color:P.navy, marginBottom:6 }}>Fontes de dados:</div>
+                  {tb.fontes.map(f => (
+                    <div key={f} style={{ fontSize:11, color:P.gray, padding:'4px 0',
+                      borderBottom:`1px solid ${P.border}`, display:'flex', gap:6 }}>
+                      <span style={{ color:tb.cor }}>•</span>{f}
+                    </div>
+                  ))}
+                </div>
+
+                <div>
+                  <div style={{ fontSize:11, fontWeight:600, color:P.navy, marginBottom:6 }}>Campos principais:</div>
+                  <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                    {tb.campos.map(c => (
+                      <span key={c} style={{ fontSize:9.5, padding:'2px 7px', borderRadius:4,
+                        background:P.surface, color:P.gray, fontFamily:'monospace',
+                        border:`1px solid ${P.border}` }}>{c}</span>
+                    ))}
+                  </div>
+                </div>
+              </Box>
+
+              <Box style={{ background:P.navyL, border:`1px solid ${P.navy}20` }}>
+                <div style={{ fontSize:11, fontWeight:700, color:P.navy, marginBottom:8 }}>
+                  📋 Exemplo de registro real desta tabela:
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'auto 1fr', gap:'5px 16px' }}>
+                  {Object.entries(tb.exemplo).map(([k,v]) => (
+                    <div key={k} style={{ display:'contents' }}>
+                      <span style={{ fontSize:10.5, fontFamily:'monospace', color:P.gray, fontWeight:600 }}>{k}:</span>
+                      <span style={{ fontSize:10.5, fontFamily:'monospace', color:P.navy, fontWeight:700 }}>{v}</span>
+                    </div>
+                  ))}
+                </div>
+              </Box>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ─── ABA: GLOSSÁRIO ──────────────────────────────────────────── */}
+      {aba === 'glossario' && (
+        <div>
+          <input value={busca} onChange={e => setBusca(e.target.value)}
+            placeholder="🔍 Buscar termo, sigla, conceito..."
+            style={{ width:'100%', padding:'9px 14px', borderRadius:9,
+              border:`1px solid ${P.border}`, fontSize:13, marginBottom:10,
+              background:P.white, color:P.text, outline:'none', boxSizing:'border-box' }}/>
+
+          <div style={{ display:'flex', gap:5, flexWrap:'wrap', marginBottom:12 }}>
+            {['Todos','Financeiro','Jurídico','Mercado','IA','Leilão','Análise'].map(c => (
+              <button key={c} onClick={() => setBusca(c==='Todos' ? '' : c)}
+                style={{ padding:'3px 10px', borderRadius:6, fontSize:10.5, cursor:'pointer',
+                  border:`1px solid ${P.border}`, background:P.surface, color:P.gray }}>
+                {c}
+              </button>
+            ))}
+          </div>
+
+          <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+            {glossFilt.map(g => (
+              <Box key={g.t} style={{ borderLeft:`3px solid ${g.cor}` }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:6 }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:7 }}>
+                    <span style={{ fontSize:17 }}>{g.icon}</span>
+                    <span style={{ fontSize:14, fontWeight:700, color:g.cor }}>{g.t}</span>
+                  </div>
+                  <Tag text={g.cat} cor={g.cor}/>
+                </div>
+                <div style={{ fontSize:12, color:P.text, lineHeight:1.7, marginBottom:8 }}>{g.def}</div>
+                <div style={{ padding:'6px 10px', background:P.surface, borderRadius:7,
+                  fontSize:10.5, color:P.navy, fontFamily:'monospace', marginBottom:6 }}>
+                  <strong>Fórmula:</strong> {g.formula}
+                </div>
+                <div style={{ padding:'6px 10px', background:`${g.cor}08`, border:`1px solid ${g.cor}20`,
+                  borderRadius:7, fontSize:10.5, color:P.text, lineHeight:1.5 }}>
+                  <strong style={{ color:g.cor }}>Exemplo:</strong> {g.ex}
+                </div>
+              </Box>
+            ))}
+            {glossFilt.length===0 && (
+              <div style={{ textAlign:'center', padding:30, color:P.gray, fontSize:12 }}>
+                Nenhum termo encontrado para "{busca}"
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* ABA: DIRETRIZES */}
+      {/* ─── ABA: DIRETRIZES ─────────────────────────────────────────── */}
       {aba === 'diretrizes' && (
         <div>
-          <div style={{fontSize:13, color:C.muted, marginBottom:16}}>
-            Princípios operacionais definidos pelo grupo AXIS para análise e decisão de investimento.
-          </div>
-          {DIRETRIZES.map((d, i) => (
-            <div key={i} style={{...card(), padding:14, marginBottom:10, borderLeft:`3px solid ${C.navy}`}}>
-              <div style={{fontSize:12, fontWeight:600, color:C.navy, marginBottom:6}}>{i+1}. {d.titulo}</div>
-              <div style={{fontSize:12, color:C.text, lineHeight:1.6}}>{d.texto}</div>
+          <Box style={{ marginBottom:14, background:P.navyL, border:`1px solid ${P.navy}20` }}>
+            <div style={{ fontSize:12, color:P.navy, lineHeight:1.7 }}>
+              Princípios operacionais definidos pelo grupo AXIS. Regras práticas destiladas
+              de experiência real em leilões de BH — seguir reduz risco de erros custosos.
             </div>
-          ))}
-          <div style={{...card(), padding:14, marginTop:8, background:`${C.mustard}08`, border:`1px solid ${C.mustard}20`}}>
-            <div style={{fontSize:12, fontWeight:600, color:C.mustard, marginBottom:4}}>⚠️ Aviso importante</div>
-            <div style={{fontSize:11, color:C.text, lineHeight:1.6}}>
-              O AXIS é uma ferramenta de apoio à decisão. Nenhuma análise substitui a due diligence presencial, 
-              a consulta jurídica com Pedro e a verificação da matrícula atualizada no cartório. 
-              Investimentos em leilões envolvem riscos reais — use o AXIS para filtrar e priorizar, 
-              não como única fonte de decisão.
-            </div>
+          </Box>
+
+          <div style={{ display:'flex', flexDirection:'column', gap:10, marginBottom:14 }}>
+            {DIR.map(d => (
+              <Box key={d.n} style={{ borderLeft:`3px solid ${P.navy}` }}>
+                <div style={{ display:'flex', gap:10, alignItems:'flex-start' }}>
+                  <div style={{ width:32, height:32, borderRadius:'50%', background:P.navy,
+                    color:'#fff', display:'flex', alignItems:'center', justifyContent:'center',
+                    fontSize:16, flexShrink:0 }}>{d.e}</div>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontSize:12, fontWeight:700, color:P.navy, marginBottom:4 }}>
+                      {d.n}. {d.t}
+                    </div>
+                    <div style={{ fontSize:11.5, color:P.text, lineHeight:1.65 }}>{d.txt}</div>
+                  </div>
+                </div>
+              </Box>
+            ))}
           </div>
+
+          <Box style={{ background:`${P.mustard}0A`, border:`1px solid ${P.mustard}30` }}>
+            <div style={{ fontSize:12, fontWeight:700, color:P.mustard, marginBottom:6 }}>
+              ⚠️ Aviso importante
+            </div>
+            <div style={{ fontSize:11.5, color:P.text, lineHeight:1.7 }}>
+              O AXIS é uma ferramenta de <strong>apoio à decisão</strong> — não a substitui.
+              Nenhuma análise substitui due diligence presencial, consulta jurídica com Pedro
+              e verificação da matrícula no cartório. Investimentos em leilão envolvem riscos reais.
+            </div>
+          </Box>
         </div>
       )}
     </div>
