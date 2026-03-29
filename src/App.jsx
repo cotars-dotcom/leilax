@@ -783,45 +783,36 @@ function NovoImovel({onSave,onCancel,onNav,trello,parametrosBanco,criteriosBanco
 
 // ── PROPERTY CARD ─────────────────────────────────────────────────────────────
 function PropCard({p,onNav}) {
+  const isPhone = useIsMobile(480)
   const sc=p.score_total||0, rc=recColor(p.recomendacao)
   return <div onClick={()=>onNav("detail",{id:p.id})}
     style={{...card(),cursor:"pointer",transition:"all .15s"}}
     onMouseEnter={e=>{e.currentTarget.style.borderColor=K.teal;e.currentTarget.style.transform="translateY(-2px)"}}
     onMouseLeave={e=>{e.currentTarget.style.borderColor=K.bd;e.currentTarget.style.transform="none"}}>
     {p.foto_principal && (
-      <div style={{marginBottom:10,borderRadius:8,overflow:"hidden",height:140,background:C.offwhite,position:"relative"}}>
+      <div style={{marginBottom:10,borderRadius:8,overflow:"hidden",height:isPhone?120:140,background:C.offwhite,position:"relative"}}>
         <img src={p.foto_principal} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}} onError={e=>{e.target.parentElement.style.display="none"}} />
         {(p.score_total||0) >= 7.5 && (
-          <div style={{
-            position:'absolute', top:8, right:8,
-            background:'#10B981', color:'#fff',
-            fontSize:9, fontWeight:700,
-            padding:'2px 6px', borderRadius:4,
-            letterSpacing:0.3
-          }}>
+          <div style={{position:'absolute',top:8,right:8,background:'#10B981',color:'#fff',fontSize:9,fontWeight:700,padding:'2px 6px',borderRadius:4,letterSpacing:0.3}}>
             OPORTUNIDADE
           </div>
         )}
       </div>
     )}
     {!p.foto_principal && (p.score_total||0) >= 7.5 && (
-      <div style={{
-        background:'#10B981', color:'#fff',
-        fontSize:9, fontWeight:700,
-        padding:'2px 6px', borderRadius:4,
-        letterSpacing:0.3, display:'inline-block', marginBottom:6
-      }}>
+      <div style={{background:'#10B981',color:'#fff',fontSize:9,fontWeight:700,padding:'2px 6px',borderRadius:4,letterSpacing:0.3,display:'inline-block',marginBottom:6}}>
         OPORTUNIDADE
       </div>
     )}
-    
-    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:"10px"}}>
-      <div style={{flex:1,minWidth:0,overflow:"hidden"}}>
-        <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:"4px"}}>
-          <div style={{fontWeight:"600",fontSize:"13px",color:K.wh,overflow:"hidden",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",flex:1}}>{p.titulo||"Imóvel sem título"}</div>
-          {p.codigo_axis&&<span style={{fontSize:"9px",fontWeight:700,padding:"1px 6px",borderRadius:3,background:"#002B8010",color:"#002B80",fontFamily:"monospace",flexShrink:0}}>{p.codigo_axis}</span>}
+
+    {/* Mobile: coluna vertical. Desktop: linha com ScoreRing ao lado */}
+    <div style={{display:"flex",flexDirection:isPhone?"column":"row",justifyContent:"space-between",alignItems:isPhone?"stretch":"flex-start",gap:"10px"}}>
+      <div style={{flex:1,minWidth:0}}>
+        <div style={{display:"flex",alignItems:"flex-start",gap:6,marginBottom:"4px",flexWrap:"wrap"}}>
+          <div style={{fontWeight:"600",fontSize:"13px",color:K.wh,flex:1,minWidth:0,wordBreak:"break-word"}}>{p.titulo||"Imóvel sem título"}</div>
+          {p.codigo_axis&&<span style={{fontSize:"9px",fontWeight:700,padding:"1px 6px",borderRadius:3,background:"#002B8010",color:"#002B80",fontFamily:"monospace",flexShrink:0,whiteSpace:"nowrap"}}>{p.codigo_axis}</span>}
         </div>
-        <div style={{fontSize:"10.5px",color:K.t3,marginBottom:"8px"}}>📍 {p.cidade}/{p.estado} · {(()=>{const t=p.tipologia||p.tipo||'—';return t.replace('_padrao','').replace('_',' ').replace(/\b\w/g,c=>c.toUpperCase())})() } · {(p.area_privativa_m2||p.area_m2)?`${p.area_privativa_m2||p.area_m2}m²`:"—"}</div>
+        <div style={{fontSize:"10.5px",color:K.t3,marginBottom:"8px"}}>📍 {p.cidade}/{p.estado} · {(()=>{const t=p.tipologia||p.tipo||'—';return t.replace('_padrao','').replace('_',' ').replace(/\w/g,c=>c.toUpperCase())})() } · {(p.area_privativa_m2||p.area_m2)?`${p.area_privativa_m2||p.area_m2}m²`:"—"}</div>
         <div style={{display:"flex",gap:"5px",flexWrap:"wrap",marginBottom:"10px"}}>
           <Bdg c={rc} ch={p.recomendacao||"—"}/>
           <Bdg c={p.ocupacao==="Desocupado"?K.grn:p.ocupacao==="Ocupado"?K.red:K.t3} ch={p.ocupacao||"—"}/>
@@ -840,7 +831,10 @@ function PropCard({p,onNav}) {
           </div>
         </div>
       </div>
-      <div style={{flexShrink:0}}><ScoreRing score={sc} size={70}/></div>
+      {/* ScoreRing: ao lado no desktop, centralizado embaixo no mobile */}
+      <div style={{flexShrink:0,display:"flex",justifyContent:isPhone?"flex-end":"flex-start",alignItems:isPhone?"center":"flex-start",marginTop:isPhone?8:0}}>
+        <ScoreRing score={sc} size={isPhone?60:70}/>
+      </div>
     </div>
     <div style={{fontSize:"10px",color:K.t3,marginTop:"10px",borderTop:`1px solid ${K.bd}`,paddingTop:"8px"}}>{fmtD(p.createdAt)} · {p.modalidade||"—"}</div>
   </div>
