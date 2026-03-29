@@ -134,9 +134,9 @@ CALIBRAÇÃO DE SCORES (escala 0-10):
 }
 
 // ─── CHAMADA GEMINI FLASH-LITE ───────────────────────────────────────────────
-async function chamarGemini(prompt, geminiKey) {
+async function chamarGeminiModelo(prompt, geminiKey, modelo) {
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${geminiKey}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -147,13 +147,37 @@ async function chamarGemini(prompt, geminiKey) {
       signal: AbortSignal.timeout(45000)
     }
   )
-  if (!res.ok) throw new Error(`Gemini ${res.status}: ${await res.text()}`)
+  if (!res.ok) {
+    const body = await res.text()
+    console.error('[AXIS Gemini]', modelo, 'HTTP', res.status, body.substring(0, 300))
+    throw new Error(`Gemini ${res.status}: ${body.substring(0, 200)}`)
+  }
   const data = await res.json()
   const txt = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
   const clean = txt.replace(/```json|```/g, '').trim()
   const jsonMatch = clean.match(/\{[\s\S]*\}/)
   if (!jsonMatch) throw new Error('Gemini não retornou JSON válido')
   return JSON.parse(jsonMatch[0])
+}
+
+// Cascata de modelos Gemini: 2.0-flash → 1.5-flash → 1.5-pro
+async function chamarGemini(prompt, geminiKey) {
+  const MODELOS = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro']
+  let ultimoErro = null
+  for (const modelo of MODELOS) {
+    try {
+      console.log('[AXIS Gemini] Tentando modelo:', modelo)
+      const resultado = await chamarGeminiModelo(prompt, geminiKey, modelo)
+      console.log('[AXIS Gemini] Sucesso com:', modelo)
+      return resultado
+    } catch(e) {
+      console.warn('[AXIS Gemini] Falhou com', modelo, ':', e.message.substring(0, 100))
+      ultimoErro = e
+      // Se for erro de chave inválida (401/403 sem ser quota), não tentar outros modelos
+      if (e.message.includes('400') && e.message.includes('API_KEY_INVALID')) break
+    }
+  }
+  throw ultimoErro || new Error('Todos os modelos Gemini falharam')
 }
 
 // ─── MOTOR PRINCIPAL ─────────────────────────────────────────────────────────
@@ -197,7 +221,10 @@ export async function analisarComGemini(url, geminiKey, parametros, onProgress, 
     const prompt = buildPromptGemini(camposBasicos, textoScrapeado, contextoMercado, imovelContexto)
     analiseGemini = await chamarGemini(prompt, geminiKey)
   } catch(e) {
-    erros.push(`Gemini falhou: ${e.message}`)
+    const errMsg = e.message || 'erro desconhecido'
+    console.error('[AXIS Gemini] Erro detalhado:', errMsg)
+    onProgress?.(`⚠️ Gemini erro: ${errMsg.substring(0, 120)}`)
+    erros.push(`Gemini falhou: ${errMsg}`)
     // Fallback inteligente: se temos contexto do imóvel, preservar dados existentes
     if (imovelContexto && imovelContexto.score_total > 0) {
       // Usar dados do imóvel já analisado — não degradar scores existentes
