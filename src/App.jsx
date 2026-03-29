@@ -838,7 +838,7 @@ function PropCard({p,onNav}) {
 }
 
 // ── PAINEL PORTFÓLIO ─────────────────────────────────────────────────────────
-function PainelPortfolio({ props: imoveis, isMobile, isPhone }) {
+function PainelPortfolio({ props: imoveis, isMobile, isPhone, onNav }) {
   const STATUS = {
     analisado:   { label:'Em análise',  color:C.mustard, emoji:'🔍' },
     aprovado:    { label:'Aprovado',    color:C.emerald, emoji:'✅' },
@@ -902,8 +902,10 @@ function PainelPortfolio({ props: imoveis, isMobile, isPhone }) {
               </span>
             </div>
             {grupo.items.map(item => (
-              <div key={item.id} style={{ background:C.white, border:`1px solid ${C.borderW}`,
-                borderTop:'none', padding:'10px 12px', fontSize:12 }}>
+              <div key={item.id} onClick={() => onNav?.('detail', {id: item.id})}
+                style={{ background:C.white, border:`1px solid ${C.borderW}`,
+                borderTop:'none', padding:'10px 12px', fontSize:12,
+                cursor: onNav ? 'pointer' : 'default' }}>
                 <p style={{ margin:'0 0 2px', fontWeight:600, color:C.navy,
                   overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
                   {item.titulo || item.endereco || 'Imóvel'}
@@ -1534,7 +1536,7 @@ useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("param
     {view==="graficos"&&<div><div style={{padding:isPhone?"16px":"22px 28px 16px",borderBottom:`1px solid ${C.borderW}`,background:C.white}}><div style={{fontWeight:700,fontSize:19,color:C.text}}>Gráficos</div></div><div style={{padding:isPhone?"16px":"20px 28px"}}><Charts properties={props}/></div></div>}
     {view==="tarefas"&&<Tarefas/>}
     {view==="arquivados"&&<BancoArquivados session={session} isAdmin={isAdmin} isPhone={isPhone}/>}
-    {view==="portfolio"&&isAdmin&&<PainelPortfolio props={props} isMobile={isMobile} isPhone={isPhone}/>}
+    {view==="portfolio"&&isAdmin&&<PainelPortfolio props={props} isMobile={isMobile} isPhone={isPhone} onNav={nav}/>}
     {view==="manual"&&<Suspense fallback={<div style={{padding:40,textAlign:"center",color:C.muted}}>Carregando...</div>}><LazyManualAxis isMobile={isMobile}/></Suspense>}
     {view==="admin"&&isAdmin&&<Suspense fallback={<div style={{padding:40,textAlign:"center",color:C.muted}}>Carregando...</div>}><LazyPainelAdmin session={session} imoveis={props} isPhone={isPhone}/></Suspense>}
     </div>

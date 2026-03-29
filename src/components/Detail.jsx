@@ -841,10 +841,12 @@ export default function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze
     })
   }, [p?.id])
 
-  // Auto-buscar fotos se o imóvel não tiver fotos e tiver URL
+  // Auto-buscar fotos — roda só 1x por imóvel (ref previne loop quando onUpdateProp re-renderiza)
+  const autoFotosBuscado = useRef(new Set())
   useEffect(() => {
     if (!p?.fonte_url || (p?.fotos?.length > 0)) return
-    // Aguardar 2s para não travar o carregamento inicial
+    if (autoFotosBuscado.current.has(p.id)) return
+    autoFotosBuscado.current.add(p.id)
     const timer = setTimeout(async () => {
       try {
         const { buscarFotosImovel } = await import('../lib/buscadorFotos.js')
@@ -852,15 +854,14 @@ export default function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze
         const resultado = await buscarFotosImovel({ fonte_url: p.fonte_url, id: p.id }, geminiKey)
         if (resultado.fotos?.length > 0 || resultado.foto_principal) {
           if (onUpdateProp) onUpdateProp(p.id, { ...p, fotos: resultado.fotos, foto_principal: resultado.foto_principal })
-          // Salvar no banco silenciosamente
           const { saveImovelCompleto } = await import('../lib/supabase.js')
           const { data: { session } } = await supabase.auth.getSession()
           saveImovelCompleto({ ...p, fotos: resultado.fotos, foto_principal: resultado.foto_principal }, session?.user?.id).catch(() => {})
         }
-      } catch(e) { /* silencioso — fotos são melhorias opcionais */ }
+      } catch(e) { /* silencioso */ }
     }, 2000)
     return () => clearTimeout(timer)
-  }, [p?.id, p?.fonte_url])
+  }, [p?.id])
 
   const salvarObs = async () => {
     if (!novaObs.trim()) return
