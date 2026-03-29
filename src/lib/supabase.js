@@ -180,7 +180,7 @@ export async function saveImovelCompleto(imovel, userId) {
           const novoGenerico = campo === 'titulo' && ['Imóvel de Teste','Lote - Marco Antônio Leiloeiro'].includes(payload[campo])
           if ((novoVazio || novoGenerico) && atual[campo] != null && atual[campo] !== 0 && atual[campo] !== '') {
             payload[campo] = atual[campo]
-            console.log('[AXIS Supabase] Campo protegido:', campo, '=', atual[campo])
+            console.debug('[AXIS Supabase] Campo protegido:', campo, '=', atual[campo])
           }
         }
         // Proteção extra: score_total não pode cair mais de 1.0 ponto numa reanálise
@@ -206,7 +206,7 @@ export async function saveImovelCompleto(imovel, userId) {
   }
   // ────────────────────────────────────────────────────────────────────────────
 
-  console.log('[AXIS Supabase] Salvando imóvel:', payload.id, payload.titulo || '(sem título)')
+  console.debug('[AXIS Supabase] Salvando imóvel:', payload.id, payload.titulo || '(sem título)')
   const { data, error } = await supabase
     .from('imoveis')
     .upsert(payload, { onConflict: 'id' })

@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, lazy, Suspense } from "react"
 import { stLoad, stSave } from "./storage.js"
 import Charts from "./components/Charts.jsx"
-import Timeline from "./components/Timeline.jsx"
 import MobileNav from "./components/MobileNav.jsx"
 import { useIsMobile } from "./hooks/useIsMobile.js"
 import BuscaGPT from "./components/BuscaGPT.jsx"
@@ -1319,11 +1318,11 @@ useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("param
         if(!localStorage.getItem('axis-migracao-concluida')){
           const local=JSON.parse(localStorage.getItem('axis-props')||'[]')
           if(local.length>0){
-            console.log(`[AXIS] Migrando ${local.length} imóveis locais para Supabase...`)
+            console.debug(`[AXIS] Migrando ${local.length} imóveis locais para Supabase...`)
             const{saveImovelCompleto}=await import('./lib/supabase.js')
             let ok=0
             for(const im of local){try{await saveImovelCompleto(im,session.user.id);ok++}catch(e){console.warn('[AXIS] Migração falhou:',im.id,e.message,e)}}
-            console.log(`[AXIS] Migração: ${ok}/${local.length} imóveis salvos no Supabase`)
+            console.debug(`[AXIS] Migração: ${ok}/${local.length} imóveis salvos no Supabase`)
             // Só marcar concluída se pelo menos 1 migrou com sucesso
             if(ok>0) localStorage.setItem('axis-migracao-concluida','true')
           } else {
@@ -1386,7 +1385,7 @@ useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("param
         const salvo=await saveImovelCompleto(p,session.user.id)
         // Atualizar state com dados confirmados pelo Supabase
         setProps(ps=>ps.map(x=>x.id===salvo.id?salvo:x))
-        console.log('[AXIS] Imóvel salvo no Supabase:',salvo.codigo_axis)
+        console.debug('[AXIS] Imóvel salvo no Supabase:',salvo.codigo_axis)
       } catch(e) {
         console.error('[AXIS] FALHA ao salvar no Supabase:',e.message,e)
         showToast(`⚠️ Salvo localmente — sync nuvem falhou: ${e.message}`)
@@ -1530,7 +1529,7 @@ useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("param
       {view==="dashboard"&&<Suspense fallback={<div style={{padding:40,textAlign:"center",color:C.muted}}>Carregando...</div>}><LazyDashboard props={props} onNav={nav} profile={profile} isMobile={isMobile} isPhone={isPhone}/></Suspense>}
   {view==="novo"&&(isAdmin?<NovoImovel onSave={addProp} onCancel={()=>nav("imoveis")} onNav={nav} trello={trello} parametrosBanco={parametrosBanco} criteriosBanco={criteriosBanco} isPhone={isPhone} existingProps={props}/>:<AcessoNegado mensagem="Análise de imóveis é restrita ao administrador."/>)}
       {view==="imoveis"&&<Lista props={props} onNav={nav} onDelete={delProp} trello={trello} onUpdateProp={(id,updates)=>setProps(ps=>ps.map(p=>p.id===id?{...p,...updates}:p))}/>}
-      {view==="detail"&&<Suspense fallback={<div style={{padding:40,textAlign:"center",color:C.muted}}>Carregando...</div>}><LazyDetail p={selP} onDelete={delProp} onNav={nav} trello={trello} onUpdateProp={(id,updates)=>setProps(ps=>ps.map(p=>p.id===id?{...p,...updates}:p))} isAdmin={isAdmin} onArchive={handleArquivar} isMobile={isMobile} isPhone={isPhone}/></Suspense>}
+      {view==="detail"&&<Suspense fallback={<div style={{padding:40,textAlign:"center",color:C.muted}}>Carregando...</div>}><LazyDetail p={selP} onDelete={delProp} onNav={nav} trello={trello} onUpdateProp={(id,updates)=>setProps(ps=>ps.map(p=>p.id===id?{...p,...updates}:p))} isAdmin={isAdmin} onArchive={handleArquivar} isMobile={isMobile} isPhone={isPhone} onReanalyze={(id,updates)=>setProps(ps=>ps.map(p=>p.id===id?{...p,...updates}:p))}/></Suspense>}
       {view==="comparar"&&<Comparativo props={props}/>}
     {view==="busca"&&(isAdmin?<BuscaGPT onAnalisar={(link)=>{nav("novo");setTimeout(()=>{},100)}}/>:<AcessoNegado mensagem="Busca com IA é restrita ao administrador."/>)}
     {view==="graficos"&&<div><div style={{padding:isPhone?"16px":"22px 28px 16px",borderBottom:`1px solid ${C.borderW}`,background:C.white}}><div style={{fontWeight:700,fontSize:19,color:C.text}}>Gráficos</div></div><div style={{padding:isPhone?"16px":"20px 28px"}}><Charts properties={props}/></div></div>}
