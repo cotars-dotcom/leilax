@@ -304,26 +304,59 @@ export default function AbaJuridicaAgente({ imovel, isAdmin, onReclassificado })
     if (!gKey && !cKey) { setErro('Configure Gemini ou Claude em Admin → API Keys'); return }
     setBuscandoAuto(true); setErro(''); setProgresso('')
     try {
-      // Verificar duplicatas antes de baixar
+      // PASSO 1: Extrair links dos PDFs da página do leilão
       const urlsExist = docs.map(d => d.url || d.url_origem).filter(Boolean)
       const { buscarDocumentosAuto } = await import('../lib/agenteJuridico.js')
-      const { documentos, links } = await buscarDocumentosAuto(imovel, gKey, setProgresso)
+      const { links } = await buscarDocumentosAuto(imovel, gKey, setProgresso)
       if (links?.length > 0) setLinksEncontrados(links)
-      const linksNovos = (links || []).filter(l => !urlsExist.includes(l.url))
-      if (linksNovos.length === 0 && (links||[]).length > 0) {
-        setProgresso('✅ Todos os documentos já estão no banco')
-        setBuscandoAuto(false)
-        setSubAba('documentos')
-        return
+      if (!links?.length) { setProgresso('Nenhum documento encontrado na página. Tente upload manual.'); setBuscandoAuto(false); return }
+      const linksNovos = links.filter(l => !urlsExist.includes(l.url))
+      if (!linksNovos.length) { setProgresso(`✅ Todos os ${links.length} documento(s) já estão no banco`); setBuscandoAuto(false); setSubAba('documentos'); return }
+      if (linksNovos.length < links.length) setProgresso(`ℹ️ ${links.length-linksNovos.length} já existe(m) — baixando ${linksNovos.length} novo(s)...`)
+      // PASSO 2: Pipeline completo — download + Gemini Vision para PDFs escaneados
+      const { processarDocumentoCompleto } = await import('../lib/documentosPDF.js')
+      const { supabase: sb } = await import('../lib/supabase.js')
+      const { data: { session } } = await sb.auth.getSession()
+      const { salvarDocumentoJuridico, reclassificarImovel } = await import('../lib/supabase.js')
+      const { calcularNovoScoreJuridico } = await import('../lib/agenteJuridico.js')
+      const resultsFull = []
+      for (const link of linksNovos.slice(0,4)) {
+        const res = await processarDocumentoCompleto({ url:link.url, nome:link.nome||link.tipo, tipo:link.tipo||'outro', imovel, geminiKey:gKey, claudeKey:cKey, onProgress:setProgresso })
+        resultsFull.push(res)
       }
-      if (documentos.length > 0) {
-        await processarResultados(documentos)
-        setSubAba('documentos')
-      } else {
-        setProgresso(links?.length > 0
-          ? `${links.length} link(s) encontrado(s) mas não foi possível ler. Tente upload manual.`
-          : 'Nenhum documento encontrado. Tente upload manual.')
+      // PASSO 3: Salvar com todos os campos estruturados
+      for (const res of resultsFull) {
+        if (!res.sucesso) continue
+        const a = res.analise_estruturada || res.analise
+        await salvarDocumentoJuridico({
+          imovel_id:imovel.id, nome:res.nome, tipo:res.tipo,
+          url:res.url_origem, url_storage:res.url_storage, url_origem:res.url_origem,
+          tamanho_bytes:res.tamanho_bytes||0,
+          analise_ia:a?.parecer_final||a?.resumo_executivo||'',
+          riscos_encontrados:a?.riscos_identificados||[],
+          score_juridico_sugerido:a?.score_juridico_sugerido||null,
+          score_viabilidade:res.score_viabilidade||a?.metricas_viabilidade?.score_geral||null,
+          resumo_executivo:res.resumo_executivo||a?.resumo_executivo||'',
+          pontos_positivos:a?.pontos_positivos||[],
+          alertas_criticos:a?.alertas_criticos||[],
+          responsabilidade_debitos:a?.responsabilidade_debitos||null,
+          ocupacao_confirmada:a?.ocupacao_confirmada||null,
+          prazo_liberacao_meses:a?.prazo_liberacao_estimado_meses||null,
+          recomendacao_juridica:a?.recomendacao_juridica||null,
+          metricas_viabilidade:a?.metricas_viabilidade||null,
+          analise_estruturada:a||null, conteudo_texto:res.conteudo_texto||null,
+          processado:!!a, reclassificado:false,
+          analisado_em:new Date().toISOString(), user_id:session?.user?.id
+        }).catch(e=>console.warn('[AXIS save doc]',e.message))
       }
+      // PASSO 4: Recalcular score jurídico com base nos documentos
+      const analises = resultsFull.filter(r=>r.analise||r.analise_estruturada).map(r=>r.analise||r.analise_estruturada)
+      if (analises.length>0) {
+        const { novoScore, delta } = calcularNovoScoreJuridico(imovel.score_juridico||7, analises)
+        if (onReclassificado&&delta!==0) { try { await reclassificarImovel(imovel.id,{score_juridico:novoScore,reclassificado_por_doc:true},null); onReclassificado({...imovel,score_juridico:novoScore}) } catch(e){} }
+        setProgresso(`✅ ${resultsFull.length} doc(s) — ${analises.length} com parecer IA jurídico. Score: ${novoScore}/10`)
+      } else { setProgresso(`⚠️ ${resultsFull.filter(r=>r.sucesso).length} doc(s) baixado(s) mas sem análise IA — configure Gemini`) }
+      await carregarDocs(); setSubAba('documentos')
     } catch(e) { setErro(e.message) }
     setBuscandoAuto(false)
   }

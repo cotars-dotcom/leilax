@@ -268,12 +268,60 @@ export async function processarDocumentoCompleto({ url, nome, tipo, imovel, gemi
   // 4. Análise IA estruturada
   let analise = null
   if (textoParaAnalise?.length > 100) {
-    onProgress?.(`🤖 IA analisando ${nome}...`)
+    onProgress?.(`🤖 IA analisando ${nome} (texto extraído)...`)
     analise = await analisarDocumentoCompleto(textoParaAnalise, nome, imovel, geminiKey, claudeKey)
-    if (analise) onProgress?.(`✅ ${nome} analisado — score: ${analise.metricas_viabilidade?.score_geral || '?'}/10`)
-    else onProgress?.(`⚠️ Análise IA falhou para ${nome} — documento salvo sem análise`)
+  }
+
+  // Se texto insuficiente ou análise falhou → Gemini Vision com base64 (PDFs escaneados)
+  if (!analise && geminiKey && download.blob) {
+    try {
+      onProgress?.(`🔍 PDF escaneado — Gemini Vision processando ${nome}...`)
+      const arrayBuf = await download.blob.arrayBuffer()
+      const uint8 = new Uint8Array(arrayBuf)
+      let b64 = ''
+      const chunkSize = 8192
+      for (let i = 0; i < uint8.length; i += chunkSize) {
+        b64 += String.fromCharCode(...uint8.subarray(i, i + chunkSize))
+      }
+      const base64 = btoa(b64)
+      const prompt = `Você é especialista em direito imobiliário e leilões judiciais no Brasil (MG).
+Analise este documento (${nome}) do imóvel: ${imovel.titulo || ''} | Processo: ${imovel.processos_ativos || '?'}
+Retorne APENAS JSON:
+{"tipo_documento":"edital|matricula|processo|certidao|outro","titulo_documento":"","resumo_executivo":"3-5 linhas","informacoes_principais":{"processo_numero":"","vara":"","exequente":"","executado":"","matricula_numero":"","cartorio":"","proprietario_atual":"","debitos_declarados":"","gravames":""},"metricas_viabilidade":{"score_geral":7.0,"score_titulo":7.0,"score_debitos":6.0,"score_processos":7.0,"score_ocupacao":5.0,"score_documentacao":8.0,"justificativa":""},"riscos_identificados":[{"categoria":"","descricao":"","gravidade":"alto","impacto_financeiro_estimado":0,"acao_recomendada":""}],"pontos_positivos":[],"alertas_criticos":[],"responsabilidade_debitos":"sub_rogado|arrematante","explicacao_responsabilidade":"","ocupacao_confirmada":"incerto","prazo_liberacao_estimado_meses":0,"recomendacao_juridica":"favoravel|neutro|desfavoravel","parecer_final":"4-6 linhas","score_juridico_sugerido":7.0,"score_juridico_delta":0.0}`
+      const r = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${geminiKey}`,
+        {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({
+            contents:[{parts:[
+              {inline_data:{mime_type: download.contentType || 'application/pdf', data: base64}},
+              {text: prompt}
+            ]}],
+            generationConfig:{temperature:0.1, maxOutputTokens:3000}
+          }),
+          signal: AbortSignal.timeout(120000)
+        }
+      )
+      if (r.ok) {
+        const data = await r.json()
+        const txt = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+        const match = txt.replace(/```json|```/g,'').trim().match(/\{[\s\S]*\}/)
+        if (match) {
+          analise = JSON.parse(match[0])
+          analise._modelo = 'gemini-1.5-pro-vision'
+          onProgress?.(`✅ ${nome} — Vision OK, score: ${analise.metricas_viabilidade?.score_geral || '?'}/10`)
+        }
+      } else {
+        const err = await r.text().catch(()=>'')
+        onProgress?.(`⚠️ Gemini Vision falhou (${r.status}) — ${err.substring(0,60)}`)
+      }
+    } catch(e) { onProgress?.(`⚠️ Gemini Vision erro: ${e.message.substring(0,60)}`) }
+  }
+
+  if (analise) {
+    onProgress?.(`✅ ${nome}: ${analise.recomendacao_juridica||'?'} · viabilidade ${analise.metricas_viabilidade?.score_geral||'?'}/10`)
   } else {
-    onProgress?.(`⚠️ Texto insuficiente em ${nome} para análise IA`)
+    onProgress?.(`⚠️ ${nome}: salvo sem análise IA (texto insuficiente + sem Gemini Vision)`)
   }
 
   return {
