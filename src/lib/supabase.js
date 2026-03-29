@@ -394,7 +394,8 @@ export async function persistApiKeys(userId, { claudeKey, openaiKey, geminiKey, 
       valor: JSON.stringify({
         claude: claudeKey,
         openai: openaiKey,
-        gemini: geminiKey || ''
+        gemini: geminiKey || '',
+        deepseek: deepseekKey || ''
       }),
       atualizado_em: new Date().toISOString()
     }, { onConflict: 'chave' })

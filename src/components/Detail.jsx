@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react"
 import { C, K, RED, btn, inp, card, fmtC, fmtD, scoreColor, scoreLabel, recColor, mapDisplay, normalizarTextoAlerta, ESTRATEGIA_CONFIG, LIQUIDEZ_MAP } from "../appConstants.js"
 import { supabase } from "../lib/supabase.js"
-import { analisarImovelCompleto } from "../lib/dualAI.js"
+import { analisarImovelCompleto } from "../lib/motorIA.js"
 import { criarCardImovel } from "../lib/trelloService.js"
 import CalculadoraROI from "./CalculadoraROI.jsx"
 import { CLASSES_MERCADO_REFORMA, calcularCustoReforma, detectarClasseMercado } from "../data/custos_reforma.js"

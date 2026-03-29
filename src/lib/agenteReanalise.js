@@ -6,7 +6,7 @@
  * Custo: ~R$ 0,005 por reanálise
  */
 
-import { calcularScore, validarECorrigirAnalise } from './dualAI.js'
+import { calcularScore, validarECorrigirAnalise } from './motorIA.js'
 
 export async function reAnalisarComGemini(imovelAtual, geminiKey, parametros, onProgress) {
   const progress = onProgress || (() => {})

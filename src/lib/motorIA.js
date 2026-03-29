@@ -230,7 +230,7 @@ export async function pesquisarMercadoGPT(url, cidade, tipo, openaiKey) {
         return cached.dados
       }
     }
-  } catch(e) { console.warn('[AXIS dualAI] Cache mercado read:', e.message) }
+  } catch(e) { console.warn('[AXIS motorIA] Cache mercado read:', e.message) }
 
   const prompt = `Você é um especialista em mercado imobiliário brasileiro.
 Sempre responda em português com acentos corretos (ã, ç, é, ê, ó, ô, í, ú, à).
@@ -378,7 +378,7 @@ Retorne APENAS JSON válido (sem markdown):
         imovelId, imovelTitulo,
         modoTeste: localStorage.getItem('axis-modo-teste') === 'true',
       })
-    } catch(e) { console.warn('[AXIS dualAI] Log uso GPT:', e.message) }
+    } catch(e) { console.warn('[AXIS motorIA] Log uso GPT:', e.message) }
     // Salvar no cache com TTL variável por bairro
     try {
       const { supabase } = await import('./supabase')
@@ -637,7 +637,7 @@ Use apenas tags de texto: [CRITICO] [ATENCAO] [OK] [INFO]
       imovelId, imovelTitulo,
       modoTeste: localStorage.getItem('axis-modo-teste') === 'true',
     })
-  } catch(e) { console.warn('[AXIS dualAI] Log uso Sonnet:', e.message) }
+  } catch(e) { console.warn('[AXIS motorIA] Log uso Sonnet:', e.message) }
 
   const jsonMatch = txt.match(/\{[\s\S]*\}/)
   if (!jsonMatch) throw new Error('Claude não retornou JSON válido')
@@ -842,7 +842,7 @@ export async function extrairFotosImovel(url, claudeKey) {
         || htmlText.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i)
       if (ogMatch) ogFallback = ogMatch[1]
     }
-  } catch(e) { console.warn('[AXIS dualAI] Fetch HTML fotos:', e.message) }
+  } catch(e) { console.warn('[AXIS motorIA] Fetch HTML fotos:', e.message) }
 
   // Extrair <img src> do HTML como fallback antes de chamar Haiku
   const imgsDoHTML = extrairImgsDoHTML(htmlText, url)
@@ -856,7 +856,7 @@ export async function extrairFotosImovel(url, claudeKey) {
     dominio = new URL(url).hostname
     const loteMatch = url.match(/\/lote\/(\d+)/)
     if (loteMatch) loteId = loteMatch[1]
-  } catch(e) { console.warn('[AXIS dualAI] Parse URL fotos:', e.message) }
+  } catch(e) { console.warn('[AXIS motorIA] Parse URL fotos:', e.message) }
 
   try {
     const promptFotos = `Preciso das fotos deste imovel de leilao: ${url}
@@ -906,7 +906,7 @@ Retorne SOMENTE este JSON (sem texto adicional):
               try {
                 const { logUsoChamadaAPI } = await import('./supabase')
                 logUsoChamadaAPI({ tipo: 'fotos', modelo: 'gemini-1.5-flash', tokensInput: 0, tokensOutput: 0, modoTeste: localStorage.getItem('axis-modo-teste') === 'true' })
-              } catch(e) { console.warn('[AXIS dualAI] Log uso Gemini:', e.message) }
+              } catch(e) { console.warn('[AXIS motorIA] Log uso Gemini:', e.message) }
               return { fotos, foto_principal: fotoPrincipal }
             }
           }
@@ -957,7 +957,7 @@ Retorne SOMENTE este JSON (sem texto adicional):
         tokensOutput: data.usage?.output_tokens || 0,
         modoTeste: localStorage.getItem('axis-modo-teste') === 'true',
       })
-    } catch(e) { console.warn('[AXIS dualAI] Log uso Haiku:', e.message) }
+    } catch(e) { console.warn('[AXIS motorIA] Log uso Haiku:', e.message) }
 
     const parsed = JSON.parse(jsonMatch[0])
     const fotos = (parsed.fotos || []).filter(f => f && f.startsWith('http')).slice(0, 12)
@@ -971,7 +971,7 @@ Retorne SOMENTE este JSON (sem texto adicional):
 
     return { fotos, foto_principal: fotoPrincipal }
   } catch(e) {
-    console.warn('[AXIS dualAI] Fotos IA fallback:', e.message)
+    console.warn('[AXIS motorIA] Fotos IA fallback:', e.message)
     // Fallback final: og:image
     if (ogFallback) return { fotos: [ogFallback], foto_principal: ogFallback }
     return { fotos: [], foto_principal: null }

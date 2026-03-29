@@ -11,7 +11,7 @@
  */
 
 import { scrapeUrlJina, extrairCamposTexto } from './scraperImovel.js'
-import { calcularScore, validarECorrigirAnalise } from './dualAI.js'
+import { calcularScore, validarECorrigirAnalise } from './motorIA.js'
 import { getMercadoComFallback } from './supabase.js'
 import { detectarRegiao, getMercado } from '../data/mercado_regional.js'
 import { calcularCustoReforma, detectarClasseMercado } from '../data/custos_reforma.js'
