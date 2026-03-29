@@ -67,7 +67,7 @@ function PropCard({p,onNav}) {
   </div>
 }
 
-function AxisHeader({profile:prof, imoveis=[], onNav}) {
+function AxisHeader({profile:prof, imoveis=[], onNav, isPhone=false, isMobile=false}) {
   const [notifOpen, setNotifOpen] = useState(false)
   const notifRef = useRef(null)
 
@@ -95,16 +95,17 @@ function AxisHeader({profile:prof, imoveis=[], onNav}) {
   return (
     <header style={{
       display:"flex",alignItems:"center",justifyContent:"space-between",
-      padding:"18px 36px",background:C.white,borderBottom:`1px solid ${C.borderW}`,
+      padding:isPhone?"12px 16px":"18px 36px",background:C.white,borderBottom:`1px solid ${C.borderW}`,
+      gap:8,
     }}>
-      <div>
-        <h1 style={{margin:0,fontSize:22,fontWeight:700,color:C.navy,letterSpacing:"-0.5px"}}>Dashboard Executivo</h1>
-        <p style={{margin:"2px 0 0",fontSize:13,color:C.muted}}>
+      <div style={{minWidth:0,flex:1}}>
+        <h1 style={{margin:0,fontSize:isPhone?16:22,fontWeight:700,color:C.navy,letterSpacing:"-0.5px",whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>Dashboard Executivo</h1>
+        {!isPhone&&<p style={{margin:"2px 0 0",fontSize:13,color:C.muted}}>
           Visão consolidada da carteira de ativos em tempo real
-        </p>
+        </p>}
       </div>
       <div style={{display:"flex",alignItems:"center",gap:14}}>
-        <button style={{
+        {!isPhone&&<button style={{
           display:"flex",alignItems:"center",gap:7,whiteSpace:"nowrap",
           padding:"8px 16px",borderRadius:8,
           border:`1px solid ${C.borderW}`,background:C.white,color:C.navy,
@@ -115,7 +116,7 @@ function AxisHeader({profile:prof, imoveis=[], onNav}) {
             <path d="M2 12h11" stroke={C.navy} strokeWidth="1.3" strokeLinecap="round"/>
           </svg>
           Exportar
-        </button>
+        </button>}
         <div ref={notifRef} style={{position:"relative"}}>
           <div onClick={() => setNotifOpen(o => !o)} style={{position:"relative",cursor:"pointer",padding:4}}>
             <Bell size={18} color={notifOpen ? C.navy : C.muted} />
@@ -134,7 +135,7 @@ function AxisHeader({profile:prof, imoveis=[], onNav}) {
           {notifOpen && (
             <div style={{
               position:"absolute",top:"calc(100% + 8px)",right:0,
-              width:340,background:C.white,
+              width:isPhone?'calc(100vw - 32px)':340,background:C.white,
               border:`1px solid ${C.borderW}`,borderRadius:12,
               boxShadow:"0 12px 40px rgba(0,43,128,0.15)",
               zIndex:100,overflow:"hidden",
@@ -241,7 +242,7 @@ export default function Dashboard({props,onNav,profile:prof,isMobile,isPhone}) {
   }
 
   return <div style={{background:C.bg,minHeight:"100%"}}>
-    <AxisHeader profile={prof} imoveis={props} onNav={onNav} />
+    <AxisHeader profile={prof} imoveis={props} onNav={onNav} isPhone={isPhone} isMobile={isMobile}/>
     <div style={{padding:isPhone?"20px 16px":"28px 32px",display:"flex",flexDirection:"column",gap:20}}>
       {/* Linha 1: 3 colunas — Patrimônio | Valorização | Alertas */}
       <div style={{display:"grid",gridTemplateColumns:isPhone?"1fr":isMobile?"repeat(2,1fr)":"1fr 1fr 1fr",gap:18}}>

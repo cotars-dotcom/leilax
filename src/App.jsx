@@ -777,7 +777,7 @@ function PropCard({p,onNav}) {
     onMouseEnter={e=>{e.currentTarget.style.borderColor=K.teal;e.currentTarget.style.transform="translateY(-2px)"}}
     onMouseLeave={e=>{e.currentTarget.style.borderColor=K.bd;e.currentTarget.style.transform="none"}}>
     {p.foto_principal && (
-      <div style={{marginBottom:10,borderRadius:8,overflow:"hidden",height:100,background:C.offwhite,position:"relative"}}>
+      <div style={{marginBottom:10,borderRadius:8,overflow:"hidden",height:140,background:C.offwhite,position:"relative"}}>
         <img src={p.foto_principal} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}} onError={e=>{e.target.parentElement.style.display="none"}} />
         {(p.score_total||0) >= 7.5 && (
           <div style={{
@@ -806,13 +806,13 @@ function PropCard({p,onNav}) {
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:"10px"}}>
       <div style={{flex:1,minWidth:0}}>
         <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:"4px"}}>
-          <div style={{fontWeight:"600",fontSize:"13px",color:K.wh,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1}}>{p.titulo||"Imóvel sem título"}</div>
+          <div style={{fontWeight:"600",fontSize:"13px",color:K.wh,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1,maxWidth:'100%'}}>{p.titulo||"Imóvel sem título"}</div>
           {p.codigo_axis?<span style={{fontSize:"9.5px",fontWeight:700,padding:"1px 6px",borderRadius:3,background:"#002B8010",color:"#002B80",fontFamily:"monospace",flexShrink:0}}>{p.codigo_axis}</span>:<span style={{fontSize:10,color:C.hint}}>
             # pendente
           </span>}
           {p.criador_nome&&<span style={{fontSize:9.5,color:K.t3,flexShrink:0}}>por {p.criador_nome}</span>}
         </div>
-        <div style={{fontSize:"10.5px",color:K.t3,marginBottom:"8px"}}>📍 {p.cidade}/{p.estado} · {p.tipo} · {p.area_m2?`${p.area_m2}m²`:"—"}</div>
+        <div style={{fontSize:"10.5px",color:K.t3,marginBottom:"8px"}}>📍 {p.cidade}/{p.estado} · {(()=>{const t=p.tipologia||p.tipo||'—';return t.replace('_padrao','').replace('_',' ').replace(/\b\w/g,c=>c.toUpperCase())})() } · {(p.area_privativa_m2||p.area_m2)?`${p.area_privativa_m2||p.area_m2}m²`:"—"}</div>
         <div style={{display:"flex",gap:"5px",flexWrap:"wrap",marginBottom:"10px"}}>
           <Bdg c={rc} ch={p.recomendacao||"—"}/>
           <Bdg c={p.ocupacao==="Desocupado"?K.grn:p.ocupacao==="Ocupado"?K.red:K.t3} ch={p.ocupacao||"—"}/>
