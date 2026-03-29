@@ -479,9 +479,10 @@ function ApiKeyModal({onClose, session}) {
  useEffect(()=>{
    if(!session?.user?.id) return
    import('./lib/supabase.js').then(({loadApiKeys})=>{
-     loadApiKeys(session.user.id).then(({claudeKey,openaiKey})=>{
+     loadApiKeys(session.user.id).then(({claudeKey,openaiKey,geminiKey})=>{
        if(claudeKey&&!localStorage.getItem("axis-api-key")){setKey(claudeKey);localStorage.setItem("axis-api-key",claudeKey)}
        if(openaiKey&&!localStorage.getItem("axis-openai-key")){setOaiKey(openaiKey);localStorage.setItem("axis-openai-key",openaiKey)}
+       if(geminiKey&&!localStorage.getItem('axis-gemini-key')){localStorage.setItem('axis-gemini-key',geminiKey)}
      })
    })
  },[session])
@@ -491,12 +492,31 @@ function ApiKeyModal({onClose, session}) {
    if(ok)localStorage.setItem("axis-openai-key",ok)
    if(session?.user?.id&&k){
      setSaving(true)
-     try{const{persistApiKeys}=await import('./lib/supabase.js');await persistApiKeys(session.user.id,{claudeKey:k,openaiKey:ok})}catch(e){console.warn('[AXIS] save keys:',e)}finally{setSaving(false)}
+     try{const{persistApiKeys}=await import('./lib/supabase.js');await persistApiKeys(session.user.id,{claudeKey:k,openaiKey:ok,geminiKey:localStorage.getItem('axis-gemini-key')||''})}catch(e){console.warn('[AXIS] save keys:',e)}finally{setSaving(false)}
    }
    onClose()
  }
   return <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.75)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:"20px"}}>
     <div style={{background:K.s1,border:`1px solid ${K.bd}`,borderRadius:"10px",padding:"28px",maxWidth:"480px",width:"100%"}}>
+      {/* Status dos providers */}
+      <div style={{display:'flex',gap:8,marginBottom:14,flexWrap:'wrap'}}>
+        {[
+          ['Claude', key, 'claude'],
+          ['OpenAI', oaiKey, 'openai'],
+          ['Gemini', localStorage.getItem('axis-gemini-key')||'', 'gemini'],
+          ['Trello', localStorage.getItem('axis-trello-key')||'', 'trello'],
+        ].map(([label, val]) => (
+          <div key={label} style={{
+            display:'flex',alignItems:'center',gap:4,
+            padding:'3px 10px',borderRadius:12,fontSize:11,fontWeight:600,
+            background: val ? '#E6F7F0' : '#FFF0F0',
+            color: val ? '#085041' : '#791F1F'
+          }}>
+            <div style={{width:6,height:6,borderRadius:'50%',background:val?'#1D9E75':'#E24B4A'}}/>
+            {label}: {val ? 'OK' : 'ausente'}
+          </div>
+        ))}
+      </div>
       <div style={{display:"flex",justifyContent:"space-between",marginBottom:"20px"}}>
         <div>
  <div style={{fontWeight:"700",fontSize:"16px",color:K.wh}}>🔑 Chaves de API</div>
@@ -556,6 +576,21 @@ function NovoImovel({onSave,onCancel,onNav,trello,parametrosBanco,criteriosBanco
 
   const analyze = async () => {
     if(!url.trim()){setError("Cole o link do leilão");return}
+    // Validação de URL
+    const urlTrimmed = url.trim()
+    if (!urlTrimmed.startsWith('http')) {
+      setError('URL inválida — deve começar com http:// ou https://')
+      return
+    }
+    const dominiosConhecidos = ['megaleiloes','zuk','caixa.gov','tjmg','trt','leilaoimovel','superbid','sold','99lotes']
+    const urlLower = urlTrimmed.toLowerCase()
+    const dominioReconhecido = dominiosConhecidos.some(d => urlLower.includes(d))
+    if (!dominioReconhecido) {
+      const continuar = window.confirm(
+        'URL não reconhecida como portal de leilão conhecido.\n\nDomínios suportados: Mega Leilões, Zuk, Caixa, TJMG, TRT, LeilãoImóvel, Superbid.\n\nDeseja analisar mesmo assim?'
+      )
+      if (!continuar) return
+    }
     const hasKey = localStorage.getItem("axis-api-key")
     if(!hasKey){setError("Configure a chave da API Anthropic nas Configurações (⚙️)");return}
     // Verificar permissão de uso da API
@@ -1207,7 +1242,13 @@ const [criteriosBanco,setCriteriosBanco]=useState([])
   const [apiOk,setApiKey]=useState(localStorage.getItem("axis-api-key"))
   const isMobile = useIsMobile(900)
   const isPhone  = useIsMobile(480)
-useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("parametros_score").select("*");if(pr)setParametrosBanco(pr);const{data:cr}=await supabase.from("criterios_avaliacao").select("*");if(cr)setCriteriosBanco(cr)}catch(e){console.warn("parametros:",e)}}lp()},[])
+useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("parametros_score").select("*");if(pr)setParametrosBanco(pr);const{data:cr}=await supabase.from("criterios_avaliacao").select("*");if(cr)setCriteriosBanco(cr)}catch(e){console.warn("parametros:",e)}}lp()
+  // Seed automático de dados de referência (só se tabelas estiverem vazias)
+  import('./lib/supabase.js').then(({ seedMercadoRegional, seedRiscosJuridicos }) => {
+    seedMercadoRegional().catch(() => {})
+    seedRiscosJuridicos().catch(() => {})
+  })
+},[])
 
   // Garante IDs fixos dos boards AXIS no localStorage
   useEffect(() => {
@@ -1227,9 +1268,10 @@ useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("param
   useEffect(()=>{
     if(!session?.user?.id) return
     import('./lib/supabase.js').then(({loadApiKeys})=>{
-      loadApiKeys(session.user.id).then(({claudeKey,openaiKey})=>{
+      loadApiKeys(session.user.id).then(({claudeKey,openaiKey,geminiKey})=>{
         if(claudeKey&&!localStorage.getItem('axis-api-key')){localStorage.setItem('axis-api-key',claudeKey);setApiKey(claudeKey)}
         if(openaiKey&&!localStorage.getItem('axis-openai-key')){localStorage.setItem('axis-openai-key',openaiKey)}
+        if(geminiKey&&!localStorage.getItem('axis-gemini-key')){localStorage.setItem('axis-gemini-key',geminiKey)}
       }).catch(()=>{})
     }).catch(()=>{})
   },[session])

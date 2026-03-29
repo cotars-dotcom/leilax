@@ -10,6 +10,8 @@ export default function PainelConvitesAdmin({ session, imoveis: propImoveis, isP
   const [novoConvite, setNovoConvite] = useState({ nome:'', email:'', role:'member', obs:'' })
   const [linkGerado, setLinkGerado] = useState('')
   const [msg, setMsg] = useState('')
+  const [usoChamadas, setUsoChamadas] = useState(null)
+  const [loadingCustos, setLoadingCustos] = useState(false)
   const APP_URL = window.location.origin
 
   useEffect(() => { carregarDados() }, [])
@@ -22,6 +24,30 @@ export default function PainelConvitesAdmin({ session, imoveis: propImoveis, isP
       setConvites(c); setUsuarios(u)
     } catch(e) { setMsg('Erro ao carregar: ' + e.message) }
     setLoading(false)
+  }
+
+  async function carregarCustos() {
+    setLoadingCustos(true)
+    try {
+      const { getUsoChamadas } = await import('../lib/supabase.js')
+      const rows = await getUsoChamadas({ dias: 30 })
+      if (rows.length === 0) { setUsoChamadas(null); return }
+      const totalUsd = rows.reduce((s, r) => s + (r.custo_usd || 0), 0)
+      const porModelo = rows.reduce((acc, r) => {
+        const m = r.modelo || 'desconhecido'
+        if (!acc[m]) acc[m] = { chamadas: 0, custo_usd: 0 }
+        acc[m].chamadas++
+        acc[m].custo_usd += r.custo_usd || 0
+        return acc
+      }, {})
+      setUsoChamadas({
+        total_usd: totalUsd,
+        total_chamadas: rows.length,
+        custo_medio_usd: rows.length ? totalUsd / rows.length : 0,
+        por_modelo: porModelo
+      })
+    } catch(e) { console.warn('[AXIS] carregarCustos:', e.message) }
+    setLoadingCustos(false)
   }
 
   async function gerarConvite(e) {
@@ -84,7 +110,7 @@ export default function PainelConvitesAdmin({ session, imoveis: propImoveis, isP
       <div style={{ display:'flex', gap:4, marginBottom:24,
         borderBottom:`1px solid ${C.borderW}`, paddingBottom:0 }}>
         {[['convites','🔗 Convites'],['usuarios','👥 Usuários'],['custos','💰 Custos API']].map(([k,l]) => (
-          <button key={k} onClick={() => setAba(k)} style={{
+          <button key={k} onClick={() => { setAba(k); if(k==='custos') carregarCustos() }} style={{
             padding:'8px 20px', border:'none', background:'none',
             fontSize:13.5, fontWeight: aba===k ? 700 : 400,
             color: aba===k ? C.navy : C.muted, cursor:'pointer',
@@ -324,58 +350,49 @@ export default function PainelConvitesAdmin({ session, imoveis: propImoveis, isP
           </div>
         </div>
       )}
-      {aba === 'custos' && (() => {
-        const USD = 5.80
-        const lista = propImoveis || []
-        const totalUSD = lista.reduce((s,p) => s + (p.custo_api_usd || 0.10), 0)
-        const media = lista.length ? totalUSD / lista.length : 0
-        return (
-          <div style={{ paddingTop: 16 }}>
-            <div style={{ display:'grid', gridTemplateColumns: isPhone ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap:10, marginBottom:20 }}>
-              {[
-                ['Total gasto', `R$ ${(totalUSD*USD).toFixed(2)}`],
-                ['Por análise', `R$ ${(media*USD).toFixed(2)}`],
-                ['Análises', lista.length],
-                ['Projeção 50/mês', `R$ ${(media*USD*50).toFixed(0)}`],
-              ].map(([l,v]) => (
-                <div key={l} style={{ background:C.surface, borderRadius:10,
-                  padding:'12px 14px', border:`1px solid ${C.borderW}` }}>
-                  <p style={{ margin:'0 0 3px', fontSize:10, color:C.muted }}>{l}</p>
-                  <p style={{ margin:0, fontSize:16, fontWeight:800, color:C.navy }}>{v}</p>
-                </div>
-              ))}
-            </div>
-            <p style={{ margin:'0 0 8px', fontSize:12, fontWeight:700, color:C.navy }}>Por imóvel</p>
-            <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-              {[...lista]
-                .sort((a,b) => (b.custo_api_usd||0.10)-(a.custo_api_usd||0.10))
-                .map(p => (
-                <div key={p.id} style={{ display:'flex', justifyContent:'space-between',
-                  alignItems:'center', background:C.white,
-                  border:`1px solid ${C.borderW}`, borderRadius:8, padding:'10px 14px' }}>
-                  <div>
-                    <p style={{ margin:0, fontSize:12, fontWeight:600, color:C.navy }}>
-                      {p.codigo_axis && <span style={{ color:C.emerald }}>#{p.codigo_axis} · </span>}
-                      {(p.titulo||p.endereco||'Imóvel').slice(0,40)}
-                      {p.modo_teste && <span style={{ color:C.hint }}> · TESTE</span>}
-                    </p>
-                    <p style={{ margin:0, fontSize:10, color:C.muted }}>
-                      {new Date(p.criado_em||Date.now()).toLocaleDateString('pt-BR')}
-                    </p>
+      {aba === 'custos' && (
+        <div style={{paddingTop:16}}>
+          {loadingCustos && <div style={{color:C.muted,fontSize:12}}>Carregando dados reais...</div>}
+          {usoChamadas && (
+            <>
+              <div style={{display:'grid',gridTemplateColumns:isPhone?'repeat(2,1fr)':'repeat(4,1fr)',gap:10,marginBottom:20}}>
+                {[
+                  ['Total 30 dias', `R$ ${((usoChamadas.total_usd||0)*5.80).toFixed(2)}`],
+                  ['Chamadas', usoChamadas.total_chamadas || 0],
+                  ['Por análise', `R$ ${((usoChamadas.custo_medio_usd||0)*5.80).toFixed(2)}`],
+                  ['Projeção/mês', `R$ ${((usoChamadas.total_usd||0)*5.80*1.2).toFixed(0)}`],
+                ].map(([l,v]) => (
+                  <div key={l} style={{background:C.surface,borderRadius:10,padding:'12px 14px',border:`1px solid ${C.borderW}`}}>
+                    <p style={{margin:'0 0 3px',fontSize:10,color:C.muted}}>{l}</p>
+                    <p style={{margin:0,fontSize:16,fontWeight:800,color:C.navy}}>{v}</p>
                   </div>
-                  <span style={{ fontSize:13, fontWeight:700,
-                    color: (p.custo_api_usd||0.10)*USD > 0.80 ? C.mustard : C.emerald }}>
-                    R$ {((p.custo_api_usd||0.10)*USD).toFixed(2)}
-                  </span>
-                </div>
-              ))}
-            </div>
-            <p style={{ margin:'12px 0 0', fontSize:10, color:C.hint }}>
-              * Estimativas. Sonnet: $3/1M input · $15/1M output. ChatGPT: ~$0,04/análise.
-            </p>
-          </div>
-        )
-      })()}
+                ))}
+              </div>
+              {usoChamadas.por_modelo && (
+                <>
+                  <p style={{margin:'0 0 8px',fontSize:12,fontWeight:700,color:C.navy}}>Por modelo</p>
+                  {Object.entries(usoChamadas.por_modelo).map(([modelo, dados]) => (
+                    <div key={modelo} style={{display:'flex',justifyContent:'space-between',alignItems:'center',
+                      background:C.white,border:`1px solid ${C.borderW}`,borderRadius:8,padding:'10px 14px',marginBottom:6}}>
+                      <div>
+                        <p style={{margin:0,fontSize:12,fontWeight:600,color:C.navy}}>{modelo}</p>
+                        <p style={{margin:0,fontSize:10,color:C.muted}}>{dados.chamadas} chamadas</p>
+                      </div>
+                      <span style={{fontSize:13,fontWeight:700,color:dados.custo_usd*5.80>5?C.mustard:C.emerald}}>
+                        R$ {(dados.custo_usd*5.80).toFixed(2)}
+                      </span>
+                    </div>
+                  ))}
+                </>
+              )}
+              <p style={{margin:'12px 0 0',fontSize:10,color:C.hint}}>Dados reais do api_usage_log · últimos 30 dias</p>
+            </>
+          )}
+          {!usoChamadas && !loadingCustos && (
+            <div style={{color:C.muted,fontSize:12}}>Sem dados de uso ainda. Faça uma análise primeiro.</div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

@@ -50,6 +50,7 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
   const [erro, setErro] = useState('')
   const [sucesso, setSucesso] = useState('')
+  const [emailReset, setEmailReset] = useState('')
 
   async function handleLogin(e) {
     e?.preventDefault()
@@ -91,6 +92,20 @@ export default function Login() {
     } catch(e) {
       setErro(e.message)
     }
+    setLoading(false)
+  }
+
+  async function handleReset(e) {
+    e.preventDefault()
+    if (!emailReset) { setErro('Informe o email cadastrado'); return }
+    setLoading(true); setErro('')
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(emailReset.trim().toLowerCase(), {
+        redirectTo: window.location.origin + '?modo=nova-senha'
+      })
+      if (error) throw error
+      setSucesso('Email de redefinição enviado! Verifique sua caixa de entrada.')
+    } catch(e) { setErro(e.message || 'Erro ao enviar email') }
     setLoading(false)
   }
 
@@ -195,7 +210,7 @@ export default function Login() {
             background:'rgba(0,0,0,0.04)',
             borderRadius:10, padding:4,
           }}>
-            {['login','cadastro'].map(m => (
+            {['login','cadastro','reset'].map(m => (
               <button key={m} onClick={() => { setModo(m); setErro(''); setSucesso('') }}
                 style={{
                   flex:1, padding:'9px 0', borderRadius:7,
@@ -206,7 +221,7 @@ export default function Login() {
                   boxShadow: modo===m ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
                   transition:'all 0.15s',
                 }}>
-                {m === 'login' ? 'Entrar' : 'Criar conta'}
+                {{ login: 'Entrar', cadastro: 'Criar conta', reset: 'Esqueci a senha' }[m]}
               </button>
             ))}
           </div>
@@ -328,6 +343,43 @@ export default function Login() {
                   transition:'all 0.15s', marginTop:4,
                 }}>
                 {loading ? 'Criando conta...' : 'Criar conta →'}
+              </button>
+            </form>
+          )}
+
+          {modo === 'reset' && (
+            <form onSubmit={handleReset}>
+              {erro && (
+                <div style={{
+                  padding:'10px 14px', borderRadius:8,
+                  background:'#FEE8E8', color:'#C0392B', fontSize:13, marginBottom:12,
+                }}>⚠️ {erro}</div>
+              )}
+              {sucesso && (
+                <div style={{
+                  padding:'10px 14px', borderRadius:8,
+                  background:C.emeraldL, color:C.emerald, fontSize:13, fontWeight:500, marginBottom:12,
+                }}>✅ {sucesso}</div>
+              )}
+              <div style={{ marginBottom: 14 }}>
+                <label style={{ display:'block', fontSize:12, color:C.muted, marginBottom:6 }}>
+                  Email cadastrado
+                </label>
+                <input
+                  type="email"
+                  value={emailReset}
+                  onChange={e => setEmailReset(e.target.value)}
+                  placeholder="seu@email.com"
+                  style={{ width:'100%', padding:'10px 14px', borderRadius:8,
+                    border:`1px solid ${C.border}`, fontSize:14, outline:'none',
+                    boxSizing:'border-box' }}
+                />
+              </div>
+              <button type="submit" disabled={loading} style={{
+                width:'100%', padding:'12px', borderRadius:8, border:'none',
+                background: C.navy, color:'#fff', fontSize:14, fontWeight:600, cursor:'pointer'
+              }}>
+                {loading ? 'Enviando...' : 'Enviar link de redefinição'}
               </button>
             </form>
           )}
