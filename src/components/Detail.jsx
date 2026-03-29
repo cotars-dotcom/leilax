@@ -7,6 +7,7 @@ import CalculadoraROI from "./CalculadoraROI.jsx"
 import { CLASSES_MERCADO_REFORMA, calcularCustoReforma, detectarClasseMercado } from "../data/custos_reforma.js"
 import PainelLeilao from './PainelLeilao.jsx'
 import AbaJuridicaAgente from './AbaJuridicaAgente.jsx'
+import AbaDocumentos from './AbaDocumentos.jsx'
 import { buscarArrematesSimilares } from '../lib/buscaArrematesGPT.js'
 import CenariosReforma from './CenariosReforma.jsx'
 
@@ -1078,7 +1079,7 @@ export default function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze
       </>}/>
     {/* Tabs */}
     <div style={{display:"flex",gap:isPhone?4:0,borderBottom:`1px solid ${K.bd}`,padding:isPhone?"0 16px":"0 28px",background:K.s1,overflowX:isPhone?'auto':'visible',scrollbarWidth:'none',WebkitOverflowScrolling:'touch',msOverflowStyle:'none'}}>
-      {[{id:'resumo',label:'📊 Resumo'},{id:'juridico',label:'⚖️ Jurídico'},{id:'fotos',label:'📸 Fotos'},{id:'mercado',label:'🏙️ Mercado'},...(isAdmin?[{id:'arremates',label:'🔨 Arremates'}]:[])].map(tab=>(
+      {[{id:'resumo',label:'📊 Resumo'},{id:'juridico',label:'⚖️ Jurídico'},{id:'documentos',label:'📄 Docs'},{id:'fotos',label:'📸 Fotos'},{id:'mercado',label:'🏙️ Mercado'},...(isAdmin?[{id:'arremates',label:'🔨 Arremates'}]:[])].map(tab=>(
         <button key={tab.id} onClick={()=>setAbaDetalhe(tab.id)} style={{
           background:"none",border:"none",padding:isPhone?"10px 12px":"10px 18px",fontSize:"12.5px",fontWeight:abaDetalhe===tab.id?700:500,whiteSpace:'nowrap',flexShrink:0,
           color:abaDetalhe===tab.id?K.teal:K.t3,cursor:"pointer",
@@ -1093,6 +1094,8 @@ export default function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze
         <div style={{width:8,height:8,borderRadius:"50%",background:K.amb,animation:"pulse 1s infinite",flexShrink:0}}/>
         <span style={{fontSize:"13px",color:K.amb,fontWeight:600}}>{reStep}</span>
       </div>}
+
+      {abaDetalhe==='documentos'&&<AbaDocumentos imovel={p} isAdmin={isAdmin} isMobile={isPhone}/>}
 
       {abaDetalhe==='juridico'&&<AbaJuridicaAgente imovel={p} isAdmin={isAdmin} onReclassificado={(novaAnalise)=>{
           if(onUpdateProp) onUpdateProp(p.id, novaAnalise)
