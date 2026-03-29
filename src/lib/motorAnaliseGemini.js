@@ -205,10 +205,16 @@ export async function analisarComGemini(url, geminiKey, parametros, onProgress) 
   }
 
   // PASSO 5: Mesclar campos básicos + Gemini (regex tem precedência para valores numéricos)
+  // Garantir título nunca seja vazio ou genérico
+  if (!analiseGemini.titulo || analiseGemini.titulo.length < 5 || analiseGemini.titulo.toLowerCase().includes('lote -')) {
+    analiseGemini.titulo = camposBasicos.titulo || analiseGemini.titulo
+  }
+
   const analise = {
     ...analiseGemini,
-    // Campos extraídos por regex têm precedência (mais confiáveis para valores)
-    valor_minimo: camposBasicos.valor_minimo || analiseGemini.valor_minimo,
+    // Campos extraídos por regex têm precedência ABSOLUTA para valores monetários
+    // Se regex extraiu um valor válido, usar mesmo que Gemini discorde
+    valor_minimo: camposBasicos.valor_minimo > 0 ? camposBasicos.valor_minimo : analiseGemini.valor_minimo,
     valor_avaliacao: camposBasicos.valor_avaliacao || analiseGemini.valor_avaliacao,
     area_m2: camposBasicos.area_m2 || analiseGemini.area_m2,
     quartos: camposBasicos.quartos || analiseGemini.quartos,

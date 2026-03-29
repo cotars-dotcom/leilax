@@ -599,7 +599,16 @@ function CardComparavel({item:c, K, isPhone}) {
       {[['Área',c.area_m2?`${c.area_m2}m²`:'—'],['Quartos',c.quartos??'—'],['Vagas',c.vagas??'—'],
         ['Tipo',c.tipo??'—'],['Andar',c.andar??'—'],['Cond./mês',c.condominio_mes?fmtV(c.condominio_mes):'—']
       ].map(([label,val],i)=><div key={i}><div style={{fontSize:10,color:K.t3,textTransform:"uppercase",letterSpacing:.5}}>{label}</div><div style={{fontSize:12.5,fontWeight:600,color:K.wh}}>{val}</div></div>)}
-      {c.link&&<a href={c.link} target="_blank" rel="noreferrer" style={{gridColumn:"1/-1",fontSize:11,color:K.teal,textDecoration:"none"}}>Ver anúncio →</a>}
+      {c.link
+        ? <a href={c.link} target="_blank" rel="noreferrer" style={{gridColumn:"1/-1",fontSize:11,color:K.teal,textDecoration:"none"}}>🔗 Ver anúncio →</a>
+        : (() => {
+            const bairro = c.descricao?.match(/\w+$/)?.[0] || ''
+            const area = c.area_m2 || ''
+            const q = c.quartos || ''
+            const zapUrl = `https://www.zapimoveis.com.br/venda/apartamentos/mg+belo-horizonte/?quartos=${q}&areaMin=${Math.round(area*0.9)}&areaMax=${Math.round(area*1.1)}`
+            return <a href={zapUrl} target="_blank" rel="noreferrer" style={{gridColumn:"1/-1",fontSize:11,color:K.t3,textDecoration:"none"}}>🔍 Buscar similares no ZAP →</a>
+          })()
+      }
     </div>}
   </div>
 }
@@ -740,14 +749,32 @@ export default function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze
         // Sem Gemini — usar Claude
         novaAnalise = await analisarImovelCompleto(p.fonte_url, claudeKey, openaiKey, [], [], setReStep, [])
       }
-      const merged={...p,...novaAnalise,id:p.id,createdAt:p.createdAt,criado_por:p.criado_por}
+      // Proteger campos críticos: nunca sobrescrever com null/0 se já tinhamos valor
+      const protegerCampos = (original, novo) => {
+        const camposCriticos = ['valor_minimo','valor_avaliacao','titulo','fotos','comparaveis',
+          'score_total','score_localizacao','score_desconto','score_juridico','score_ocupacao',
+          'score_liquidez','score_mercado','recomendacao','codigo_axis','endereco','bairro']
+        const merged = {...original, ...novo}
+        for (const campo of camposCriticos) {
+          if ((novo[campo] === null || novo[campo] === undefined || novo[campo] === 0 || novo[campo] === '') && original[campo]) {
+            merged[campo] = original[campo]
+          }
+        }
+        // Fotos e comparáveis: só sobrescrever se o novo tiver mais dados
+        if ((!novo.fotos || novo.fotos.length === 0) && original.fotos?.length > 0) merged.fotos = original.fotos
+        if ((!novo.comparaveis || novo.comparaveis.length === 0) && original.comparaveis?.length > 0) merged.comparaveis = original.comparaveis
+        return merged
+      }
+      const merged={...protegerCampos(p, novaAnalise),id:p.id,createdAt:p.createdAt,criado_por:p.criado_por}
       if(onUpdateProp) onUpdateProp(p.id,merged)
       // Salvar no Supabase — buscar session corretamente
       try {
         const { data:{ session:sess } } = await supabase.auth.getSession()
         const { saveImovelCompleto } = await import('../lib/supabase.js')
         await saveImovelCompleto(merged, sess?.user?.id)
-        setMsg("✅ Imóvel reanalisado e salvo com sucesso!")
+        const modeloUsado = novaAnalise._modelo_usado || 'desconhecido'
+        const avisoModelo = modeloUsado.includes('fallback') ? ' (análise parcial — Gemini indisponível, configure a chave)' : ''
+        setMsg(`✅ Imóvel reanalisado e salvo!${avisoModelo}`)
         try {
           const { logAtividade } = await import('../lib/supabase.js')
           const { data:{ session: sess2 } } = await supabase.auth.getSession()

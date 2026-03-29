@@ -90,6 +90,7 @@ export default function CenariosReforma({ imovel, isAdmin }) {
 
   const p = imovel || {}
   const lance = parseFloat(p.valor_minimo) || 0
+  const semDados = lance === 0
   const avaliacao = parseFloat(p.valor_avaliacao) || lance * 1.3
   const vmercado = parseFloat(p.valor_mercado_estimado) || avaliacao * 1.2
   const area = parseFloat(p.area_m2) || 80
@@ -181,6 +182,12 @@ export default function CenariosReforma({ imovel, isAdmin }) {
         </button>
       </div>
 
+      {/* Aviso quando não há dados de lance */}
+      {semDados && (
+        <div style={{padding:'10px 12px', borderRadius:8, background:'#FAEEDA', border:'1px solid #BA751730', fontSize:12, color:'#633806', marginBottom:12}}>
+          ⚠️ Lance mínimo não disponível — reanalize o imóvel para calcular os cenários corretamente.
+        </div>
+      )}
       {/* Seletor de escopos */}
       <div style={{display:'flex', gap:6, marginBottom:14, overflowX:'auto', paddingBottom:4}}>
         {ESCOPOS.map(esc => (
@@ -201,7 +208,7 @@ export default function CenariosReforma({ imovel, isAdmin }) {
         <div style={{padding:'12px 14px', background:C.surface, borderRadius:10}}>
           <div style={{fontSize:11, fontWeight:600, color:C.muted, marginBottom:8}}>Custos</div>
           {[
-            ['Lance', fmt(lance)],
+            ['Lance', lance > 0 ? fmt(lance) : '⚠ Sem dados'],
             ['Comissão 5%', fmt(comissao)],
             ['ITBI 3%', fmt(itbi)],
             ['Doc + Adv', fmt(doc + adv + reg)],

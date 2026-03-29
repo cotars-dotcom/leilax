@@ -112,7 +112,7 @@ Retorne APENAS JSON com os campos que devem ser ATUALIZADOS (delta):
 // ─── AGENTE DE CUSTO ZERO TOTAL (sem nenhuma API) ────────────────────────────
 // Usa apenas dados existentes no banco para reclassificar
 export function reAnalisarInterno(imovelAtual, parametros) {
-  const { calcularScore, validarECorrigirAnalise } = require('./dualAI.js')
+  // Usar os dados do imovelAtual diretamente — sem chamada de API
 
   // Recalcular score com dados atuais (pode ter score_juridico_manual)
   const analise = { ...imovelAtual }
