@@ -465,6 +465,20 @@ export async function getMercadoRegional() {
   return data || []
 }
 
+export async function getMercadoComFallback(regiaoId) {
+  try {
+    const { data } = await supabase
+      .from('mercado_regional')
+      .select('*')
+      .eq('regiao_id', regiaoId)
+      .single()
+    if (data) return data
+  } catch(e) { console.warn('[AXIS] getMercadoComFallback:', e.message) }
+  // fallback para arquivo JS local
+  const { getMercado } = await import('../data/mercado_regional.js')
+  return getMercado(regiaoId)
+}
+
 export async function getMercadoPorRegiao(regiaoKey) {
   const { data, error } = await supabase
     .from('mercado_regional')
@@ -873,4 +887,47 @@ ${imovel.alertas?.length ? `<h2>Alertas</h2>${imovel.alertas.map(a=>`<div class=
   a.download = `AXIS_${imovel.codigo_axis || 'relatorio'}_${new Date().toISOString().slice(0,10)}.html`
   a.click()
   URL.revokeObjectURL(url)
+}
+
+// == SEED DE DADOS DE REFERÊNCIA ==
+export async function seedMercadoRegional() {
+  const { MERCADO_REGIONAL } = await import('../data/mercado_regional.js')
+  const entradas = Object.entries(MERCADO_REGIONAL).map(([regiao_id, d]) => ({
+    regiao_id,
+    nome: d.label || regiao_id,
+    cidade: d.cidade || 'Belo Horizonte',
+    preco_m2_medio: d.preco_m2_venda_medio || null,
+    variacao_12m: d.tendencia_pct_12m ? d.tendencia_pct_12m / 100 : null,
+    demanda: d.demanda || null,
+    tendencia: d.tendencia || null,
+    yield_bruto_pct: d.yield_bruto_pct || null,
+    atualizado_em: new Date().toISOString()
+  }))
+  const { error } = await supabase
+    .from('mercado_regional')
+    .upsert(entradas, { onConflict: 'regiao_id', ignoreDuplicates: false })
+  if (error) console.error('[AXIS seed] mercado_regional:', error.message)
+  else console.log(`[AXIS seed] ${entradas.length} regiões inseridas em mercado_regional`)
+}
+
+export async function seedRiscosJuridicos() {
+  const { RISCOS_JURIDICOS } = await import('../data/riscos_juridicos.js')
+  const entradas = RISCOS_JURIDICOS.map(r => ({
+    risco_id: r.risco_id,
+    nome: r.label || r.risco_id,
+    categoria: r.categoria || null,
+    custo_min: r.custo_processual_mg_min || null,
+    custo_max: r.custo_processual_mg_max || null,
+    prazo_min_meses: r.prazo_pratico_meses_min || null,
+    prazo_max_meses: r.prazo_pratico_meses_max || null,
+    risco_nota: r.risco_nota || null,
+    score_penalizacao: r.score_penalizacao || null,
+    ativo: true,
+    atualizado_em: new Date().toISOString()
+  }))
+  const { error } = await supabase
+    .from('riscos_juridicos')
+    .upsert(entradas, { onConflict: 'risco_id', ignoreDuplicates: false })
+  if (error) console.error('[AXIS seed] riscos_juridicos:', error.message)
+  else console.log(`[AXIS seed] ${entradas.length} riscos inseridos em riscos_juridicos`)
 }

@@ -675,6 +675,32 @@ export default function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze
   const [abaDetalhe,setAbaDetalhe]=useState('resumo')
   const [reanalyzing,setReanalyzing]=useState(false)
   const [reStep,setReStep]=useState("")
+  const [obs, setObs] = useState([])
+  const [novaObs, setNovaObs] = useState('')
+  const [salvandoObs, setSalvandoObs] = useState(false)
+  const [avaliacoes, setAvaliacoes] = useState([])
+  const [minhaAvaliacao, setMinhaAvaliacao] = useState(null)
+
+  useEffect(() => {
+    if (!p?.id) return
+    import('../lib/supabase.js').then(({ getObservacoes, getAvaliacoes }) => {
+      getObservacoes(p.id).then(setObs).catch(() => {})
+      getAvaliacoes(p.id).then(setAvaliacoes).catch(() => {})
+    })
+  }, [p?.id])
+
+  const salvarObs = async () => {
+    if (!novaObs.trim()) return
+    setSalvandoObs(true)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      const { saveObservacao } = await import('../lib/supabase.js')
+      const nova = await saveObservacao({ imovel_id: p.id, texto: novaObs.trim(), user_id: user?.id })
+      setObs(prev => [nova, ...prev])
+      setNovaObs('')
+    } catch(e) { console.error('[AXIS obs]', e.message) }
+    setSalvandoObs(false)
+  }
 
   const handleReanalyze=async()=>{
     if(!p?.fonte_url){setMsg("⚠️ Imóvel sem URL de origem para reanalisar");return}
@@ -703,6 +729,11 @@ export default function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze
         const { saveImovelCompleto } = await import('../lib/supabase.js')
         await saveImovelCompleto(merged, sess?.user?.id)
         setMsg("✅ Imóvel reanalisado e salvo com sucesso!")
+        try {
+          const { logAtividade } = await import('../lib/supabase.js')
+          const { data:{ session: sess2 } } = await supabase.auth.getSession()
+          if (sess2?.user?.id) logAtividade(sess2.user.id, 'reanalise', 'imovel', p.id, { titulo: p.titulo })
+        } catch(e) {}
       } catch(saveErr) {
         console.warn('[AXIS] Salvar reanálise:', saveErr.message)
         setMsg("✅ Reanalisado! (sync nuvem falhou — tente novamente)")
@@ -1021,6 +1052,64 @@ export default function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze
         </div>
       </div>}
       {p.endereco&&<div style={{...card(),marginBottom:"14px"}}><div style={{fontWeight:"600",color:K.wh,marginBottom:"6px",fontSize:"13px"}}>📍 Localização</div><div style={{fontSize:"13px",color:K.t2}}>{p.endereco}</div></div>}
+
+      {/* Avaliação do grupo */}
+      <div style={{...card(),marginBottom:'14px'}}>
+        <div style={{fontWeight:600,color:K.wh,marginBottom:10,fontSize:13}}>Avaliação do grupo</div>
+        <div style={{display:'flex',gap:6,marginBottom:10}}>
+          {['COMPRAR','AGUARDAR','EVITAR'].map(op => (
+            <button key={op} onClick={async () => {
+              const { data:{ user } } = await supabase.auth.getUser()
+              const { saveAvaliacao, getAvaliacoes } = await import('../lib/supabase.js')
+              await saveAvaliacao({ imovel_id: p.id, user_id: user?.id, nota: op === 'COMPRAR' ? 5 : op === 'AGUARDAR' ? 3 : 1, comentario: op })
+              getAvaliacoes(p.id).then(setAvaliacoes).catch(()=>{})
+              setMinhaAvaliacao(op)
+            }} style={{
+              ...btn('s'),
+              background: minhaAvaliacao === op ? (op==='COMPRAR'?C.emerald:op==='AGUARDAR'?C.mustard:'#E5484D') : K.s2,
+              color: minhaAvaliacao === op ? '#fff' : K.tx,
+              border: 'none'
+            }}>{op}</button>
+          ))}
+        </div>
+        {avaliacoes.length > 0 && (
+          <div style={{fontSize:11,color:K.t3}}>
+            {avaliacoes.length} avaliação(ões) · maioria: {
+              (() => {
+                const counts = avaliacoes.reduce((a,v) => {
+                  const op = v.comentario || (v.nota >= 4 ? 'COMPRAR' : v.nota >= 3 ? 'AGUARDAR' : 'EVITAR')
+                  a[op] = (a[op]||0)+1; return a
+                }, {})
+                return Object.entries(counts).sort((a,b)=>b[1]-a[1])[0]?.[0]
+              })()
+            }
+          </div>
+        )}
+      </div>
+
+      {/* Observações do grupo */}
+      <div style={{...card(),marginBottom:'14px'}}>
+        <div style={{fontWeight:600,color:K.wh,marginBottom:10,fontSize:13}}>Observações do grupo</div>
+        <div style={{display:'flex',gap:8,marginBottom:10}}>
+          <input
+            value={novaObs}
+            onChange={e => setNovaObs(e.target.value)}
+            placeholder="Adicionar observação..."
+            style={{...inp(),flex:1,fontSize:12}}
+            onKeyDown={e => e.key === 'Enter' && salvarObs()}
+          />
+          <button onClick={salvarObs} disabled={salvandoObs} style={{...btn('s'),background:C.emerald,color:'#fff',border:'none'}}>
+            {salvandoObs ? '...' : 'Salvar'}
+          </button>
+        </div>
+        {obs.map(o => (
+          <div key={o.id} style={{padding:'6px 0',borderBottom:`1px solid ${K.bd}`,fontSize:12}}>
+            <span style={{color:K.t3,fontSize:10}}>{o.autor?.nome || 'Membro'} · {new Date(o.criado_em).toLocaleDateString('pt-BR')}</span>
+            <div style={{color:K.tx,marginTop:2}}>{o.texto}</div>
+          </div>
+        ))}
+        {obs.length === 0 && <div style={{fontSize:11,color:K.t3}}>Nenhuma observação ainda</div>}
+      </div>
       </>}
     </div>
     {modoAoVivo && <ModoAoVivo imovel={p} onClose={() => setModoAoVivo(false)} />}
