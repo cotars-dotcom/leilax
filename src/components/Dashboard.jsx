@@ -28,49 +28,82 @@ const Bdg = ({c,ch}) => <span style={{display:"inline-block",fontSize:"10px",fon
 
 function PropCard({p,onNav,isPhone=false}) {
   const sc=p.score_total||0, rc=recColor(p.recomendacao)
-  const tipFmt = (p.tipologia||p.tipo||'—').replace('_padrao','').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())
+  const tipFmt=(p.tipologia||p.tipo||'—').replace('_padrao','').replace(/_/g,' ').replace(/\w/g,c=>c.toUpperCase())
+  const fmtM = v => v ? `R$ ${Math.round(v).toLocaleString('pt-BR')}` : '—'
+  const fmtM2 = v => v ? `R$ ${Math.round(v).toLocaleString('pt-BR')}/m²` : '—'
+  const dataLeilao = p.data_leilao ? new Date(p.data_leilao).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit'}) : null
+  const numLeilao = p.num_leilao ? `${p.num_leilao}º LEILÃO` : null
+  const scoreDelta = p.preco_m2_imovel && p.preco_m2_mercado
+    ? ((1 - p.preco_m2_imovel/p.preco_m2_mercado)*100).toFixed(0) : null
+
   return <div onClick={()=>onNav("detail",{id:p.id})}
-    style={{...card(),cursor:"pointer",transition:"all .15s"}}
+    style={{...card(),cursor:"pointer",transition:"all .15s",padding:isPhone?"12px":"14px"}}
     onMouseEnter={e=>{e.currentTarget.style.borderColor=K.teal;e.currentTarget.style.transform="translateY(-2px)"}}
     onMouseLeave={e=>{e.currentTarget.style.borderColor=K.bd;e.currentTarget.style.transform="none"}}>
+
     {p.foto_principal && (
-      <div style={{marginBottom:10,borderRadius:8,overflow:"hidden",height:isPhone?110:130,background:C.offwhite,position:"relative"}}>
+      <div style={{marginBottom:10,borderRadius:8,overflow:"hidden",height:isPhone?95:115,background:C.offwhite,position:"relative"}}>
         <img src={p.foto_principal} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}} onError={e=>{e.target.parentElement.style.display="none"}} />
-        {(p.score_total||0)>=7.5&&<div style={{position:"absolute",top:8,right:8,background:"#10B981",color:"#fff",fontSize:9,fontWeight:700,padding:"2px 6px",borderRadius:4}}>OPORTUNIDADE</div>}
+        {sc>=7.5&&<div style={{position:'absolute',top:6,left:6,background:'#10B981',color:'#fff',fontSize:9,fontWeight:700,padding:'2px 7px',borderRadius:4}}>⭐ OPORTUNIDADE</div>}
+        {numLeilao&&<div style={{position:'absolute',top:6,right:6,background:p.num_leilao>=2?'#D97706':'#065F46',color:'#fff',fontSize:8,fontWeight:700,padding:'2px 6px',borderRadius:4}}>{numLeilao}</div>}
       </div>
     )}
-    {/* Mobile: coluna vertical — ScoreRing embaixo. Desktop: linha */}
-    <div style={{display:"flex",flexDirection:isPhone?"column":"row",justifyContent:"space-between",alignItems:isPhone?"stretch":"flex-start",gap:10}}>
-      <div style={{flex:1,minWidth:0}}>
-        <div style={{display:"flex",alignItems:"flex-start",gap:6,marginBottom:4,flexWrap:"wrap"}}>
-          <div style={{fontWeight:"600",fontSize:"13px",color:K.wh,flex:1,minWidth:0,wordBreak:"break-word"}}>{p.titulo||"Imóvel sem título"}</div>
-          {p.codigo_axis&&<span style={{fontSize:"9px",fontWeight:700,padding:"1px 6px",borderRadius:3,background:"#002B8010",color:"#002B80",fontFamily:"monospace",flexShrink:0,whiteSpace:"nowrap"}}>{p.codigo_axis}</span>}
+
+    <div style={{display:"flex",alignItems:"flex-start",gap:5,marginBottom:3,flexWrap:"wrap"}}>
+      <div style={{fontWeight:"700",fontSize:"13px",color:K.wh,flex:1,minWidth:0,wordBreak:"break-word",lineHeight:1.3}}>{p.titulo||"Imóvel sem título"}</div>
+      {p.codigo_axis&&<span style={{fontSize:"9px",fontWeight:700,padding:"1px 6px",borderRadius:3,background:"#002B8010",color:"#002B80",fontFamily:"monospace",flexShrink:0}}>{p.codigo_axis}</span>}
+    </div>
+
+    <div style={{fontSize:"10.5px",color:K.t3,marginBottom:6}}>
+      📍 {[p.bairro,p.cidade].filter(Boolean).join(', ')}/{p.estado} · {tipFmt} · {(p.area_privativa_m2||p.area_m2)||'—'}m²
+    </div>
+
+    {dataLeilao&&<div style={{fontSize:10,color:K.t3,marginBottom:6}}>🗓️ Leilão: <strong style={{color:K.wh}}>{dataLeilao}</strong></div>}
+
+    <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:8}}>
+      <Bdg c={rc} ch={p.recomendacao||"—"}/>
+      <Bdg c={p.ocupacao==="Desocupado"?K.grn:p.ocupacao==="Ocupado"?K.red:K.t3} ch={p.ocupacao||"—"}/>
+      {p.financiavel&&<Bdg c={K.blue} ch="Financiável"/>}
+      {p.analise_dupla_ia&&<span style={{fontSize:"9px",fontWeight:"700",background:"linear-gradient(135deg,rgba(0,229,187,0.2),rgba(16,163,127,0.2))",border:"1px solid rgba(0,229,187,0.35)",color:"#00E5BB",padding:"2px 7px",borderRadius:"4px"}}>🤖 IA</span>}
+      {(p.num_documentos>0)&&<Bdg c="#7C3AED" ch={`📄 ${p.num_documentos}doc`}/>}
+    </div>
+
+    <div style={{display:"flex",flexDirection:isPhone?"column":"row",gap:8,alignItems:isPhone?"stretch":"flex-start"}}>
+      <div style={{flex:1,display:"grid",gridTemplateColumns:"1fr 1fr",gap:5}}>
+        <div style={{background:K.s2,borderRadius:6,padding:"7px 9px"}}>
+          <div style={{fontSize:"8.5px",color:K.t3,marginBottom:1}}>LANCE MÍN.</div>
+          <div style={{fontSize:"12px",fontWeight:"800",color:K.amb}}>{fmtM(p.valor_minimo)}</div>
         </div>
-        <div style={{fontSize:"10.5px",color:K.t3,marginBottom:8}}>📍 {p.cidade}/{p.estado} · {tipFmt} · {(p.area_privativa_m2||p.area_m2)?`${p.area_privativa_m2||p.area_m2}m²`:"—"}</div>
-        <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:10}}>
-          <Bdg c={rc} ch={p.recomendacao||"—"}/>
-          <Bdg c={p.ocupacao==="Desocupado"?K.grn:p.ocupacao==="Ocupado"?K.red:K.t3} ch={p.ocupacao||"—"}/>
-          {p.financiavel&&<Bdg c={K.blue} ch="Financiável"/>}
-          {p.analise_dupla_ia&&<span style={{fontSize:"9px",fontWeight:"700",background:"linear-gradient(135deg,rgba(0,229,187,0.2),rgba(16,163,127,0.2))",border:"1px solid rgba(0,229,187,0.35)",color:"#00E5BB",padding:"2px 8px",borderRadius:"4px",letterSpacing:".5px"}}>🤖 CLAUDE + GPT</span>}
-          {(p.num_documentos>0)&&<Bdg c="#7C3AED" ch={`📄 ${p.num_documentos}doc`}/>}
-          {p.score_viabilidade_docs!=null&&<Bdg c={p.score_viabilidade_docs>=7?K.grn:p.score_viabilidade_docs>=5?K.amb:K.red} ch={`⚖️ ${Number(p.score_viabilidade_docs).toFixed(1)}`}/>}
+        <div style={{background:K.s2,borderRadius:6,padding:"7px 9px"}}>
+          <div style={{fontSize:"8.5px",color:K.t3,marginBottom:1}}>DESCONTO</div>
+          <div style={{fontSize:"12px",fontWeight:"800",color:K.grn}}>{p.desconto_percentual?`${p.desconto_percentual}%`:(scoreDelta&&scoreDelta>0?`~${scoreDelta}%`:"—")}</div>
         </div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
-          <div style={{background:K.s2,borderRadius:5,padding:"7px 10px"}}>
-            <div style={{fontSize:9,color:K.t3,marginBottom:2}}>MÍNIMO</div>
-            <div style={{fontSize:13,fontWeight:700,color:K.amb}}>{fmtC(p.valor_minimo)}</div>
-          </div>
-          <div style={{background:K.s2,borderRadius:5,padding:"7px 10px"}}>
-            <div style={{fontSize:9,color:K.t3,marginBottom:2}}>DESCONTO</div>
-            <div style={{fontSize:13,fontWeight:700,color:K.grn}}>{p.desconto_percentual?`${p.desconto_percentual}%`:"—"}</div>
-          </div>
+        <div style={{background:K.s2,borderRadius:6,padding:"7px 9px"}}>
+          <div style={{fontSize:"8.5px",color:K.t3,marginBottom:1}}>ALUGUEL EST.</div>
+          <div style={{fontSize:"12px",fontWeight:"700",color:"#7C3AED"}}>{p.aluguel_mensal_estimado&&p.aluguel_mensal_estimado>0?`R$ ${Math.round(p.aluguel_mensal_estimado).toLocaleString('pt-BR')}/mês`:"—"}</div>
+        </div>
+        <div style={{background:K.s2,borderRadius:6,padding:"7px 9px"}}>
+          <div style={{fontSize:"8.5px",color:K.t3,marginBottom:1}}>MAO FLIP</div>
+          <div style={{fontSize:"12px",fontWeight:"700",color:K.teal}}>{p.mao_flip&&p.mao_flip>0?`R$ ${Math.round(p.mao_flip).toLocaleString('pt-BR')}`:"—"}</div>
         </div>
       </div>
-      <div style={{flexShrink:0,display:"flex",justifyContent:isPhone?"flex-end":"flex-start",alignItems:"flex-start",marginTop:isPhone?8:0}}>
-        <ScoreRing score={sc} size={isPhone?58:68}/>
+      <div style={{flexShrink:0,display:"flex",alignItems:"center",justifyContent:isPhone?"flex-end":"center",marginTop:isPhone?4:0}}>
+        <ScoreRing score={sc} size={isPhone?56:62}/>
       </div>
     </div>
-    <div style={{fontSize:10,color:K.t3,marginTop:10,borderTop:`1px solid ${K.bd}`,paddingTop:8}}>{fmtD(p.createdAt)} · {p.modalidade||"—"}</div>
+
+    {(p.preco_m2_imovel||p.preco_m2_mercado||p.valor_avaliacao)&&(
+      <div style={{marginTop:7,paddingTop:7,borderTop:`1px solid ${K.bd}`,display:'flex',gap:10,flexWrap:'wrap',fontSize:10,color:K.t3}}>
+        {p.valor_avaliacao&&<span>Aval. <strong style={{color:K.wh}}>{fmtM(p.valor_avaliacao)}</strong></span>}
+        {p.preco_m2_imovel&&<span>Imóvel <strong style={{color:K.teal}}>{fmtM2(p.preco_m2_imovel)}</strong></span>}
+        {p.preco_m2_mercado&&<span>Mercado <strong style={{color:K.t2}}>{fmtM2(p.preco_m2_mercado)}</strong></span>}
+      </div>
+    )}
+
+    <div style={{fontSize:"9.5px",color:K.t3,marginTop:6,display:'flex',justifyContent:'space-between'}}>
+      <span>{fmtD(p.createdAt)}</span>
+      <span>{p.modalidade_leilao||p.modalidade||'—'}</span>
+    </div>
   </div>
 }
 
