@@ -474,6 +474,8 @@ function ModalAuditoriaTrello({ config, imoveis, onClose }) {
 function ApiKeyModal({onClose, session}) {
  const [key,setKey]=useState(localStorage.getItem("axis-api-key")||"")
  const [oaiKey,setOaiKey]=useState(localStorage.getItem("axis-openai-key")||"")
+ const [geminiKey,setGeminiKey]=useState(localStorage.getItem("axis-gemini-key")||"")
+ const [deepseekKey,setDeepseekKey]=useState(localStorage.getItem("axis-deepseek-key")||"")
  const [modoTeste,setModoTeste]=useState(localStorage.getItem('axis-modo-teste')==='true')
  const [saving,setSaving]=useState(false)
  // Carregar do Supabase ao abrir (se logado)
@@ -492,9 +494,9 @@ function ApiKeyModal({onClose, session}) {
    const k=key.trim(),ok=oaiKey.trim()
    if(k)localStorage.setItem("axis-api-key",k)
    if(ok)localStorage.setItem("axis-openai-key",ok)
-   if(session?.user?.id&&k){
+   if(session?.user?.id&&(k||geminiKey||deepseekKey)){
      setSaving(true)
-     try{const{persistApiKeys}=await import('./lib/supabase.js');await persistApiKeys(session.user.id,{claudeKey:k,openaiKey:ok,geminiKey:localStorage.getItem('axis-gemini-key')||'',deepseekKey:localStorage.getItem('axis-deepseek-key')||''})}catch(e){console.warn('[AXIS] save keys:',e)}finally{setSaving(false)}
+     try{const{persistApiKeys}=await import('./lib/supabase.js');await persistApiKeys(session.user.id,{claudeKey:k,openaiKey:ok,geminiKey:geminiKey||'',deepseekKey:deepseekKey||''})}catch(e){console.warn('[AXIS] save keys:',e)}finally{setSaving(false)}
    }
    onClose()
  }
@@ -543,14 +545,14 @@ function ApiKeyModal({onClose, session}) {
  </div>
  <div style={{marginTop:"16px",marginBottom:"8px"}}>
   <div style={{fontSize:"10px",color:K.t3,textTransform:"uppercase",letterSpacing:"1px",marginBottom:"5px"}}>Gemini API Key — motor principal (~R$0,03)</div>
-  <input style={inp()} type="password" placeholder="AIza..." value={localStorage.getItem('axis-gemini-key')||''} onChange={e=>localStorage.setItem('axis-gemini-key',e.target.value||'')}/>
+  <input style={inp()} type="password" placeholder="AIza..." value={geminiKey} onChange={e=>{setGeminiKey(e.target.value);localStorage.setItem('axis-gemini-key',e.target.value||'')}}/>
  </div>
  <div style={{fontSize:"11px",color:K.t3,marginBottom:"18px"}}>
   Obtenha grátis em: <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" style={{color:K.blue}}>aistudio.google.com</a> · Motor principal — analisa + fotos
  </div>
  <div style={{marginTop:"16px",marginBottom:"8px"}}>
   <div style={{fontSize:"10px",color:K.t3,textTransform:"uppercase",letterSpacing:"1px",marginBottom:"5px"}}>DeepSeek API Key — fallback (~R$0,08)</div>
-  <input style={inp()} type="password" placeholder="sk-..." value={localStorage.getItem('axis-deepseek-key')||''} onChange={e=>localStorage.setItem('axis-deepseek-key',e.target.value||'')}/>
+  <input style={inp()} type="password" placeholder="sk-..." value={deepseekKey} onChange={e=>{setDeepseekKey(e.target.value);localStorage.setItem('axis-deepseek-key',e.target.value||'')}}/>
  </div>
  <div style={{fontSize:"11px",color:K.t3,marginBottom:"18px"}}>
   Opcional: <a href="https://platform.deepseek.com/api_keys" target="_blank" rel="noopener noreferrer" style={{color:K.blue}}>platform.deepseek.com</a> · Usado se Gemini falhar
@@ -602,7 +604,9 @@ function NovoImovel({onSave,onCancel,onNav,trello,parametrosBanco,criteriosBanco
       if (!continuar) return
     }
     const hasKey = localStorage.getItem("axis-api-key")
-    if(!hasKey){setError("Configure a chave da API Anthropic nas Configurações (⚙️)");return}
+    const hasGemini = localStorage.getItem("axis-gemini-key")
+    const hasDeepseek = localStorage.getItem("axis-deepseek-key")
+    if(!hasKey && !hasGemini && !hasDeepseek){setError("Configure ao menos uma chave de IA nas Configurações (⚙️): Gemini (grátis), DeepSeek ou Claude.");return}
     // Verificar permissão de uso da API
     try {
       const { supabase } = await import('./lib/supabase.js')
