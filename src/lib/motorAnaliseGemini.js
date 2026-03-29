@@ -228,7 +228,18 @@ export async function analisarComGemini(url, geminiKey, parametros, onProgress, 
     onProgress?.(`⚠️ Gemini erro: ${errMsg.substring(0, 120)}`)
     erros.push(`Gemini falhou: ${errMsg}`)
     _modeloGemini = 'regex_fallback' // Gemini realmente falhou
-    // Fallback inteligente: se temos contexto do imóvel, preservar dados existentes
+    // LANÇAR EXCEÇÃO para que a cascata do motorIA tente DeepSeek/Claude
+    // (antes retornava silenciosamente, impedindo o fallback)
+    const geminiErrMsg = errMsg.includes('401') ? 'Chave Gemini inválida' :
+                         errMsg.includes('429') ? 'Quota Gemini excedida' :
+                         errMsg.includes('404') ? 'Modelo Gemini não disponível' :
+                         errMsg.includes('JSON') ? 'Gemini retornou resposta inválida' :
+                         `Gemini falhou: ${errMsg.substring(0,80)}`
+    // Só usar fallback silencioso se for reanálise (tem contexto) — para nova análise, propagar
+    if (!imovelContexto) {
+      throw new Error(geminiErrMsg)
+    }
+    // Fallback inteligente apenas em reanálise: preservar dados existentes
     if (imovelContexto && imovelContexto.score_total > 0) {
       // Usar dados do imóvel já analisado — não degradar scores existentes
       analiseGemini = {
@@ -320,11 +331,11 @@ export async function analisarComGemini(url, geminiKey, parametros, onProgress, 
 }
 
 // ─── LOG DE USO ───────────────────────────────────────────────────────────────
-export async function logUsoGemini(imovelId, titulo, sucesso = true) {
+export async function logUsoGemini(imovelId, titulo, modelo = 'gemini-1.5-flash', sucesso = true) {
   try {
     const { logUsoChamadaAPI } = await import('./supabase.js')
     await logUsoChamadaAPI({
-      tipo: 'analise_principal', modelo: analise?._modelo_usado || 'gemini-1.5-flash',
+      tipo: 'analise_principal', modelo: modelo,
       tokensInput: 4000, tokensOutput: 1500,
       imovelId, imovelTitulo: titulo, sucesso
     })

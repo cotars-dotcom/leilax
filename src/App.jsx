@@ -682,8 +682,20 @@ function NovoImovel({onSave,onCancel,onNav,trello,parametrosBanco,criteriosBanco
           setTrelloMsg("✓ Card criado no Trello com etiquetas")
         } catch(e){ setTrelloMsg(`⚠️ Salvo no app, erro Trello: ${e.message}`) }
       }
+      // Mostrar modelo usado e avisar se análise foi parcial
+      const modeloUsado = data._modelo_usado || 'desconhecido'
+      if (modeloUsado === 'regex_fallback') {
+        setTrelloMsg(prev => (prev ? prev + ' | ' : '') + '⚠️ Análise parcial sem IA — configure Gemini ou Claude')
+      } else {
+        setTrelloMsg(prev => (prev ? prev + ' | ' : '') + `✅ Motor: ${modeloUsado}`)
+      }
       onSave(property)
-    } catch(e){ setError(e.message||"Erro na análise.") }
+    } catch(e){
+      // Mostrar erro detalhado para o usuário saber o que falhou
+      const errMsg = e.message || 'Erro na análise.'
+      setError(errMsg)
+      console.error('[AXIS NovoImovel] Erro análise:', e)
+    }
     setLoading(false);setStep("")
   }
 

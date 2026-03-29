@@ -1027,14 +1027,14 @@ export async function analisarImovelCompleto(url, claudeKey, openaiKey, parametr
 
   if (geminiKey && !forceClassic) {
     try {
-      progress('Iniciando análise (Gemini Flash ~R$0,03)...')
+      progress('🤖 Gemini 1.5-Flash analisando imóvel (~R$ 0,01)...')
       const analiseGemini = await analisarComGemini(url, geminiKey, parametros, progress)
-      logUsoGemini(imovelId, analiseGemini.titulo || imovelTitulo).catch(() => {})
+      logUsoGemini(imovelId, analiseGemini.titulo || imovelTitulo, analiseGemini._modelo_usado || 'gemini-1.5-flash').catch(() => {})
       import('./supabase.js').then(async ({ logAtividade, supabase: sb }) => {
         const { data: { user } } = await sb.auth.getUser()
         if (user) logAtividade(user.id, 'analise_criada', 'imovel', null, { url, titulo: analiseGemini.titulo, modelo: 'gemini-flash' })
       }).catch(() => {})
-      progress('✅ Análise Gemini Flash concluída (~R$ 0,03)')
+      progress(`✅ Análise Gemini concluída — modelo: ${analiseGemini._modelo_usado || 'gemini'} (~R$ 0,01)`)
       return analiseGemini
     } catch(geminiErr) {
       console.warn('[AXIS] Gemini falhou:', geminiErr.message)
@@ -1045,11 +1045,11 @@ export async function analisarImovelCompleto(url, claudeKey, openaiKey, parametr
   // Tier 2: DeepSeek V3 (~R$ 0,08) — se Gemini indisponível
   if (deepseekKey && !forceClassic) {
     try {
-      progress('Analisando com DeepSeek V3 (~R$0,08)...')
+      progress('⚡ Gemini indisponível — DeepSeek V3 (~R$ 0,08)...')
       const { analisarComDeepSeek } = await import('./motorAnaliseGemini.js')
       const analiseDeepSeek = await analisarComDeepSeek(url, deepseekKey, parametros, progress)
-      logUsoGemini(imovelId, analiseDeepSeek.titulo || imovelTitulo).catch(() => {})
-      progress('✅ Análise DeepSeek V3 concluída (~R$ 0,08)')
+      logUsoGemini(imovelId, analiseDeepSeek.titulo || imovelTitulo, 'deepseek-chat').catch(() => {})
+      progress('✅ Análise DeepSeek V3 concluída')
       return analiseDeepSeek
     } catch(dsErr) {
       console.warn('[AXIS] DeepSeek falhou:', dsErr.message)

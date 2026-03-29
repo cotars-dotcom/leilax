@@ -981,12 +981,13 @@ export default function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze
         setMsg('⚠️ Modo Teste ativo — desative em Admin → Config antes de reanalisar.')
         return
       }
-      // Bloquear salvamento de análise sem IA se modelo é regex_fallback
+      // Verificar qualidade da análise retornada
       const modeloUsado = novaAnalise._modelo_usado || ''
       if (modeloUsado === 'regex_fallback') {
-        setReanalyzing(false)
-        setMsg('⚠️ Gemini não respondeu — verifique a chave em Config → API Keys e tente novamente.')
-        return
+        // Na reanálise, regex_fallback significa que Gemini falhou mas preservou dados do banco
+        // Ainda assim avisar o usuário mas NÃO bloquear (dados preservados são válidos)
+        setMsg('⚠️ Gemini não respondeu — dados anteriores preservados. Configure a chave Gemini para reanálise completa.')
+        // Continuar salvamento com dados preservados (não bloqueio total)
       }
       const merged={...protegerCampos(p, novaAnalise),id:p.id,createdAt:p.createdAt,criado_por:p.criado_por}
       if(onUpdateProp) onUpdateProp(p.id,merged)
