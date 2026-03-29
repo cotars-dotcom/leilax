@@ -183,6 +183,15 @@ export async function saveImovelCompleto(imovel, userId) {
             console.log('[AXIS Supabase] Campo protegido:', campo, '=', atual[campo])
           }
         }
+        // Proteção extra: score_total não pode cair mais de 1.0 ponto numa reanálise
+        if (payload.score_total && atual.score_total) {
+          const delta = atual.score_total - payload.score_total
+          if (delta > 1.0) {
+            console.warn('[AXIS Supabase] Score caiu', delta.toFixed(2), 'pts — mantendo score anterior:', atual.score_total)
+            payload.score_total = atual.score_total
+            payload.recomendacao = atual.recomendacao
+          }
+        }
         // Fotos e comparáveis: só sobrescrever se novo tiver mais dados
         if ((!payload.fotos || payload.fotos.length === 0) && atual.fotos?.length > 0) payload.fotos = atual.fotos
         if ((!payload.comparaveis || payload.comparaveis.length === 0) && atual.comparaveis?.length > 0) payload.comparaveis = atual.comparaveis
