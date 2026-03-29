@@ -41,9 +41,10 @@ const PADROES_LEILOEIRO = {
           links.push({ url: fullUrl, tipo, nome: tipo.charAt(0).toUpperCase() + tipo.slice(1) })
         }
       })
-      // Padrão 3: PDFs em formato Markdown [texto](url.pdf) — formato retornado pelo Jina
-      // Captura [texto](https://...pdf) com nome real do documento
-      const mdRegex = /\[([^\]]+)\]\((https?:\/\/[^)]+\.pdf)\)/gi
+      // Padrão 3: PDFs em formato Markdown [texto](url.pdf) — formato retornado pelo Jina com X-Return-Format:markdown
+      // Captura [Edital](https://...pdf) e [Matricula 53.105.pdf](https://...pdf)
+      // IMPORTANTE: URL pode não ter .pdf no final se for redirect — também capturar por nome
+      const mdRegex = /\[([^\]]+)\]\((https?:\/\/[^)]+(?:\.pdf|storage[^)]+))\)/gi
       let mdMatch
       while ((mdMatch = mdRegex.exec(html)) !== null) {
         const nomeReal = mdMatch[1].replace(/\.pdf$/i, '').trim()
@@ -138,10 +139,11 @@ export async function baixarViaJina(url, onProgress) {
   try {
     onProgress?.(`Jina lendo: ${url.split('/').pop().substring(0, 40)}`)
     const jinaUrl = `https://r.jina.ai/${url}`
+    // Usar markdown para capturar links completos [texto](url) — essencial para Marco Antônio
     const r = await fetch(jinaUrl, {
       headers: {
         'Accept': 'text/plain',
-        'X-Return-Format': 'text',
+        'X-Return-Format': 'markdown',
         'X-Timeout': '25'
       },
       signal: AbortSignal.timeout(30000)
