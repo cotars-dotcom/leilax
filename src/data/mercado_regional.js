@@ -504,6 +504,7 @@ export const BAIRRO_PARA_REGIAO = {
   "cidade jardim": "bh_savassi",
   // BH Pampulha
   "pampulha": "bh_pampulha",
+  "dona clara": "bh_pampulha",
   "são luiz": "bh_pampulha", "sao luiz": "bh_pampulha",
   "bandeirantes": "bh_pampulha",
   "itapoã": "bh_pampulha", "itapoa": "bh_pampulha",
