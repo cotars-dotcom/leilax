@@ -15,13 +15,33 @@ async function _getJurimetria() {
   } catch(e) { return [] }
 }
 
-export async function reAnalisarComGemini(imovelAtual, geminiKey, parametros, onProgress) {
+export async function reAnalisarComGemini(imovelAtualParam, geminiKey, parametros, onProgress) {
+  let imovelAtual = imovelAtualParam
   const progress = onProgress || (() => {})
 
   if (!geminiKey) throw new Error('Chave Gemini não configurada')
   if (!imovelAtual?.id) throw new Error('Imóvel inválido')
 
   progress('Preparando dados para reanálise...')
+
+  // Carregar documentos jurídicos existentes para enriquecer o contexto da IA
+  try {
+    const { getDocumentosJuridicos } = await import('./supabase.js')
+    const docs = await getDocumentosJuridicos(imovelAtual.id)
+    if (docs?.length > 0) {
+      imovelAtual = {
+        ...imovelAtual,
+        _documentos_resumo: docs.map(d => ({
+          tipo: d.tipo, nome: d.nome,
+          resumo: d.resumo_executivo || d.analise_ia,
+          score: d.score_viabilidade,
+          recomendacao: d.recomendacao_juridica,
+          riscos: (d.riscos_encontrados||[]).slice(0,3).map(r=>r.descricao||r),
+        }))
+      }
+      progress(`📄 ${docs.length} documento(s) incluído(s) no contexto`)
+    }
+  } catch(e) { console.warn('[AXIS reanalise] docs:', e.message) }
 
   // Construir contexto completo do imóvel para o Gemini
   const contexto = {

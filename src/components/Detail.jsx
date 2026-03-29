@@ -1287,6 +1287,16 @@ export default function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze
           ))}
           {p.obs_juridicas&&<div style={{marginTop:"10px",fontSize:"11.5px",color:K.t2,lineHeight:"1.6",background:K.s2,borderRadius:"5px",padding:"8px"}}>{normalizarTextoAlerta(p.obs_juridicas)}</div>}
           <button onClick={()=>setAbaDetalhe('juridico')} style={{marginTop:10,background:`${K.teal}12`,border:`1px solid ${K.teal}30`,borderRadius:6,padding:"6px 14px",fontSize:12,color:K.teal,fontWeight:600,cursor:"pointer",width:"100%"}}>📎 Anexar documentos jurídicos</button>
+          {p.num_documentos>0&&(
+            <div style={{marginTop:10,padding:'10px 12px',borderRadius:8,background:'#F5F3FF',border:'1px solid #DDD6FE'}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
+                <span style={{fontSize:11,fontWeight:700,color:'#7C3AED'}}>📄 {p.num_documentos} documento(s) analisado(s)</span>
+                {p.score_viabilidade_docs!=null&&<span style={{fontSize:12,fontWeight:800,color:p.score_viabilidade_docs>=7?C.emerald:p.score_viabilidade_docs>=5?C.mustard:'#E5484D'}}>{Number(p.score_viabilidade_docs).toFixed(1)}/10 viabilidade</span>}
+              </div>
+              {p.recomendacao_juridica_docs&&<div style={{fontSize:10,padding:'3px 8px',borderRadius:5,display:'inline-block',marginBottom:6,background:p.recomendacao_juridica_docs==='favoravel'?C.emeraldL:p.recomendacao_juridica_docs==='desfavoravel'?'#FCEBEB':'#FFF8E1',color:p.recomendacao_juridica_docs==='favoravel'?C.emerald:p.recomendacao_juridica_docs==='desfavoravel'?'#E5484D':'#D4A017',fontWeight:700}}>{p.recomendacao_juridica_docs==='favoravel'?'✅ Juridicamente Favorável':p.recomendacao_juridica_docs==='desfavoravel'?'❌ Riscos Identificados':'⚠️ Due Diligence Necessária'}</div>}
+              <button onClick={()=>setAbaDetalhe('documentos')} style={{display:'block',width:'100%',padding:'4px',borderRadius:5,border:'1px solid #DDD6FE',background:'#fff',color:'#7C3AED',fontSize:11,cursor:'pointer',fontWeight:600}}>Ver análise completa dos documentos →</button>
+            </div>
+          )}
           {p.reclassificado_por_doc&&<div style={{marginTop:6,fontSize:10.5,color:K.amb,fontWeight:600}}>🔄 Reclassificado por documento</div>}
         </div>
         <div style={card()}>

@@ -449,15 +449,26 @@ export default function AbaDocumentos({ imovel, isAdmin, isMobile }) {
         setProcessando(false); return
       }
 
-      setProgresso(`📋 ${links.length} documento(s) encontrado(s) — iniciando download e análise...`)
+      setProgresso(`📋 ${links.length} documento(s) encontrado(s) — verificando duplicatas...`)
 
-      // 2. Processar cada documento
+      // 2. Filtrar links já existentes no banco para este imóvel
+      const urlsExistentes = docs.map(d => d.url || d.url_origem).filter(Boolean)
+      const linksNovos = links.filter(l => !urlsExistentes.includes(l.url))
+
+      if (linksNovos.length === 0) {
+        setProgresso(`✅ Todos os ${links.length} documento(s) já estão no banco. Use re-análise para atualizar.`)
+        setProcessando(false); return
+      }
+      if (linksNovos.length < links.length)
+        setProgresso(`ℹ️ ${links.length - linksNovos.length} já existe(m), baixando ${linksNovos.length} novo(s)...`)
+
+      // 3. Processar somente documentos novos
       const { processarDocumentoCompleto } = await import('../lib/documentosPDF.js')
       const { supabase } = await import('../lib/supabase.js')
       const { data: { session } } = await supabase.auth.getSession()
 
       const resultados = []
-      for (const link of links.slice(0, 4)) {
+      for (const link of linksNovos.slice(0, 4)) {
         const res = await processarDocumentoCompleto({
           url: link.url,
           nome: link.nome || link.tipo,

@@ -826,6 +826,8 @@ function PropCard({p,onNav}) {
           <Bdg c={rc} ch={p.recomendacao||"—"}/>
           <Bdg c={p.ocupacao==="Desocupado"?K.grn:p.ocupacao==="Ocupado"?K.red:K.t3} ch={p.ocupacao||"—"}/>
           {p.financiavel&&<Bdg c={K.blue} ch="Financiável"/>}{p.analise_dupla_ia&&<span style={{fontSize:"9px",fontWeight:"700",background:"linear-gradient(135deg,rgba(0,229,187,0.2),rgba(16,163,127,0.2))",border:"1px solid rgba(0,229,187,0.35)",color:"#00E5BB",padding:"2px 8px",borderRadius:"4px",letterSpacing:".5px"}}>🤖 CLAUDE + GPT</span>}
+          {(p.num_documentos>0)&&<Bdg c="#7C3AED" ch={`📄 ${p.num_documentos}doc`}/>}
+          {p.score_viabilidade_docs!=null&&<Bdg c={p.score_viabilidade_docs>=7?K.grn:p.score_viabilidade_docs>=5?K.amb:K.red} ch={`⚖️ ${Number(p.score_viabilidade_docs).toFixed(1)}`}/>}
         </div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"6px"}}>
           <div style={{background:K.s2,borderRadius:"5px",padding:"7px 10px"}}>

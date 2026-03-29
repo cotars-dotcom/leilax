@@ -625,9 +625,23 @@ export async function getDocumentosJuridicos(imovelId) {
 }
 
 export async function salvarDocumentoJuridico(doc) {
-  const { data, error } = await supabase
-    .from('documentos_juridicos')
-    .insert(doc)
+  // Evitar duplicata: verificar se já existe doc com mesma URL ou nome para este imóvel
+  if (doc.imovel_id && (doc.url || doc.url_origem || doc.nome)) {
+    const urlChave = doc.url_origem || doc.url
+    let q = supabase.from('documentos_juridicos').select('id').eq('imovel_id', doc.imovel_id)
+    if (urlChave) q = q.eq('url', urlChave)
+    else q = q.eq('nome', doc.nome)
+    const { data: ex } = await q.maybeSingle()
+    if (ex) {
+      const { data, error } = await supabase.from('documentos_juridicos')
+        .update({ ...doc, analisado_em: new Date().toISOString() })
+        .eq('id', ex.id).select().single()
+      if (error) throw error
+      return data
+    }
+  }
+  const { data, error } = await supabase.from('documentos_juridicos')
+    .insert({ ...doc, url: doc.url_origem || doc.url || null })
     .select().single()
   if (error) throw error
   return data
@@ -958,6 +972,7 @@ export function exportarRelatorioHTML(imovel) {
 <p style="font-size:13px;line-height:1.6;color:#334155">${esc(imovel.sintese_executiva||imovel.justificativa)||'—'}</p>
 ${imovel.positivos?.length ? `<h2>Pontos positivos</h2>${imovel.positivos.map(a=>`<div class="pos">${esc(a)}</div>`).join('')}` : ''}
 ${imovel.alertas?.length ? `<h2>Alertas</h2>${imovel.alertas.map(a=>`<div class="alerta">${esc(a)}</div>`).join('')}` : ''}
+${imovel.resumo_documentos?.length ? `<h2>Documentos Jurídicos (${imovel.num_documentos||imovel.resumo_documentos.length})</h2>${imovel.resumo_documentos.map(d=>`<div style="border:1px solid #e2e8f0;border-radius:8px;padding:10px;margin:4px 0"><div style="display:flex;justify-content:space-between"><strong style="font-size:12px">${esc(d.tipo?.toUpperCase()||'DOC')}: ${esc(d.nome||'')}</strong>${d.score!=null?`<b style="color:${d.score>=7?'#059669':'#D97706'}">${Number(d.score).toFixed(1)}/10</b>`:''}</div>${d.resumo?`<p style="font-size:11px;color:#334155;margin:4px 0">${esc(d.resumo.substring(0,200))}</p>`:''}</div>`).join('')}` : ''}
 <footer>Gerado pelo AXIS Inteligência Patrimonial · ${new Date().toLocaleDateString('pt-BR')}</footer>
 </body></html>`
   const blob = new Blob([html], { type: 'text/html' })
