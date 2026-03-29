@@ -1,0 +1,351 @@
+/**
+ * AXIS — Painel de Estratégia de Lance
+ * Calcula lances máximos viáveis, projeções do 2º leilão
+ * e faixas de lance competitivo — custo zero (sem API)
+ */
+import { useState, useMemo } from 'react'
+import { C, K, fmtC, card } from '../appConstants.js'
+
+const fmt  = v => v != null && v > 0 ? `R$ ${Math.round(v).toLocaleString('pt-BR')}` : '—'
+const pct  = v => v != null ? `${parseFloat(v).toFixed(1)}%` : '—'
+const cor  = (roi) => roi >= 30 ? C.emerald : roi >= 20 ? C.mustard : roi >= 10 ? '#E06A00' : '#E5484D'
+
+// Custos de transação como % do lance
+const TX = {
+  comissao: 0.05,  // 5% comissão leiloeiro
+  itbi:     0.02,  // 2% ITBI BH
+  doc:      0.005, // 0.5% documentação
+  adv:      0.02,  // 2% honorário advogado
+  reg:      1500,  // registro imóvel (fixo)
+  corretagem_venda: 0.06,
+  irpf_pct: 0.15,
+  isencao_irpf: 440000, // isento até R$440k (único imóvel PF)
+}
+
+function calcularCenario(lance, vmercado, reforma, juridico = 0) {
+  const taxas = lance * (TX.comissao + TX.itbi + TX.doc + TX.adv) + TX.reg
+  const custoTotal = lance + taxas + (reforma || 0) + (juridico || 0)
+  const ganho = Math.max(0, vmercado - custoTotal)
+  const irpf = vmercado <= TX.isencao_irpf ? 0 : ganho * TX.irpf_pct
+  const corretagem = vmercado * TX.corretagem_venda
+  const lucro = vmercado - custoTotal - irpf - corretagem
+  const roi = custoTotal > 0 ? (lucro / custoTotal) * 100 : 0
+  // MAO = preço máximo que posso pagar para o lance ainda ser viável
+  const custosExtrasSemLance = taxas + (reforma || 0) + (juridico || 0)
+  // vmercado × margem = lance + taxas_proporcionais × lance + fixos + reforma
+  // vmercado × 0.80 = lance × (1 + tx_proporcionais) + fixos + reforma
+  const txProporcional = TX.comissao + TX.itbi + TX.doc + TX.adv
+  const maoFlip = (vmercado * 0.80 - TX.reg - (reforma || 0) - (juridico || 0)) / (1 + txProporcional)
+  return {
+    lance, custo_total: Math.round(custoTotal),
+    irpf: Math.round(irpf), corretagem: Math.round(corretagem),
+    lucro: Math.round(lucro), roi: parseFloat(roi.toFixed(1)),
+    mao_flip: Math.round(maoFlip), viavel: lance <= maoFlip,
+  }
+}
+
+function BarROI({ roi }) {
+  const c = cor(roi)
+  const w = Math.min(100, Math.max(0, roi * 1.5))
+  return (
+    <div style={{ height: 5, borderRadius: 3, background: `${C.borderW}`, overflow: 'hidden', marginTop: 3 }}>
+      <div style={{ height: '100%', width: `${w}%`, background: c, borderRadius: 3, transition: 'width .4s' }} />
+    </div>
+  )
+}
+
+function CardCenario({ label, sublabel, lance, cenario, isDestaque, avaliacao }) {
+  const [aberto, setAberto] = useState(false)
+  const pctAval = avaliacao > 0 ? ((lance / avaliacao) * 100).toFixed(0) : '—'
+
+  return (
+    <div style={{
+      border: `1.5px solid ${cenario.viavel ? (isDestaque ? C.emerald : C.borderW) : '#E5484D'}`,
+      borderRadius: 10, overflow: 'hidden', marginBottom: 8,
+      background: isDestaque ? `${C.emerald}05` : C.white,
+    }}>
+      {/* Header */}
+      <div onClick={() => setAberto(!aberto)} style={{
+        padding: '10px 12px', cursor: 'pointer',
+        display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
+      }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 2 }}>
+            <span style={{ fontSize: 12.5, fontWeight: 700, color: C.navy }}>{label}</span>
+            {sublabel && <span style={{ fontSize: 10, color: C.muted }}>{sublabel}</span>}
+            {isDestaque && (
+              <span style={{ fontSize: 9, fontWeight: 700, background: C.emerald, color: '#fff',
+                padding: '1px 6px', borderRadius: 4 }}>RECOMENDADO</span>
+            )}
+          </div>
+          <div style={{ fontSize: 11, color: C.muted }}>
+            Lance: <strong style={{ color: C.amber }}>{fmt(lance)}</strong>
+            {avaliacao > 0 && <span style={{ marginLeft: 6, color: C.hint }}>({pctAval}% da avaliação)</span>}
+          </div>
+          <BarROI roi={cenario.roi} />
+        </div>
+        <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 10 }}>
+          <div style={{ fontSize: 16, fontWeight: 800, color: cor(cenario.roi) }}>
+            {pct(cenario.roi)}
+          </div>
+          <div style={{ fontSize: 9, color: C.hint }}>ROI</div>
+          <div style={{ fontSize: 11, marginTop: 3 }}>
+            {cenario.viavel
+              ? <span style={{ color: C.emerald, fontWeight: 600 }}>✓ Viável</span>
+              : <span style={{ color: '#E5484D', fontWeight: 600 }}>✗ Acima MAO</span>}
+          </div>
+        </div>
+      </div>
+
+      {/* Detalhe expandido */}
+      {aberto && (
+        <div style={{
+          padding: '10px 12px', borderTop: `1px solid ${C.borderW}`,
+          background: C.surface, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8
+        }}>
+          {[
+            ['Custo total', fmt(cenario.custo_total), C.navy],
+            ['Lucro líquido', fmt(cenario.lucro), cenario.lucro > 0 ? C.emerald : '#E5484D'],
+            ['IRPF (15%)', fmt(cenario.irpf), C.muted],
+            ['Corretagem', fmt(cenario.corretagem), C.muted],
+            ['MAO flip', fmt(cenario.mao_flip), C.teal],
+            ['Margem segurança', fmt(cenario.mao_flip - lance), cenario.mao_flip > lance ? C.emerald : '#E5484D'],
+          ].map(([lbl, val, c]) => (
+            <div key={lbl}>
+              <div style={{ fontSize: 9, color: C.hint, marginBottom: 1 }}>{lbl}</div>
+              <div style={{ fontSize: 11.5, fontWeight: 600, color: c }}>{val}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+export default function PainelLancamento({ imovel }) {
+  const [roiAlvo, setRoiAlvo] = useState(25)
+  const [margemSeg, setMargemSeg] = useState(10)
+
+  const {
+    valor_minimo, valor_avaliacao, valor_mercado_estimado,
+    preco_m2_mercado, preco_m2_imovel,
+    area_privativa_m2, area_m2,
+    custo_reforma_calculado, custo_juridico_estimado,
+    num_leilao, aluguel_mensal_estimado,
+  } = imovel
+
+  const area = parseFloat(area_privativa_m2 || area_m2) || 0
+  const avaliacao = parseFloat(valor_avaliacao) || 0
+  const lancePrin = parseFloat(valor_minimo) || 0
+  const reforma = parseFloat(custo_reforma_calculado) || 0
+  const juridico = parseFloat(custo_juridico_estimado) || 0
+  const aluguel = parseFloat(aluguel_mensal_estimado) || 0
+
+  // Valor de mercado — preferir o do banco, senão calcular por m²
+  const vmercado = useMemo(() => {
+    const vBanco = parseFloat(valor_mercado_estimado) || 0
+    const vM2 = parseFloat(preco_m2_mercado) > 0 && area > 0
+      ? parseFloat(preco_m2_mercado) * area : 0
+    return vBanco > 0 ? vBanco : vM2 > 0 ? vM2 : lancePrin * 1.35
+  }, [valor_mercado_estimado, preco_m2_mercado, area, lancePrin])
+
+  // Lance máximo viável para dado ROI alvo
+  const txProporcional = TX.comissao + TX.itbi + TX.doc + TX.adv
+  const lanceMaxViavel = useMemo(() => {
+    return (vmercado * 0.80 - TX.reg - reforma - juridico) / (1 + txProporcional)
+  }, [vmercado, reforma, juridico])
+
+  const lanceMaxROIAlvo = useMemo(() => {
+    // roi_alvo = (vmercado - custo - irpf - corretagem) / custo
+    // Simplificado: lance_max = vmercado / (1 + roi_alvo/100) / (1 + tx_totais) - fixos
+    const roiFator = 1 + roiAlvo / 100
+    const custoMax = vmercado / roiFator
+    return (custoMax - TX.reg - reforma - juridico - vmercado * TX.corretagem_venda) / (1 + txProporcional)
+  }, [vmercado, roiAlvo, reforma, juridico])
+
+  const lanceMaxMargem = useMemo(() => {
+    // com margem de segurança sobre o MAO
+    return lanceMaxViavel * (1 - margemSeg / 100)
+  }, [lanceMaxViavel, margemSeg])
+
+  // Cenário 1º leilão
+  const c1 = useMemo(() => calcularCenario(lancePrin, vmercado, reforma, juridico), [lancePrin, vmercado, reforma, juridico])
+  const cMax = useMemo(() => calcularCenario(Math.round(lanceMaxViavel), vmercado, reforma, juridico), [lanceMaxViavel, vmercado, reforma, juridico])
+  const cAlvo = useMemo(() => calcularCenario(Math.round(lanceMaxROIAlvo), vmercado, reforma, juridico), [lanceMaxROIAlvo, vmercado, reforma, juridico])
+
+  // Projeções 2º leilão
+  const lance2p = avaliacao ? Math.round(avaliacao * 0.50) : 0
+  const lance2e = avaliacao ? Math.round(avaliacao * 0.57) : 0
+  const lance2c = avaliacao ? Math.round(avaliacao * 0.65) : 0
+  const c2p = useMemo(() => calcularCenario(lance2p, vmercado, reforma, juridico), [lance2p, vmercado, reforma, juridico])
+  const c2e = useMemo(() => calcularCenario(lance2e, vmercado, reforma, juridico), [lance2e, vmercado, reforma, juridico])
+  const c2c = useMemo(() => calcularCenario(lance2c, vmercado, reforma, juridico), [lance2c, vmercado, reforma, juridico])
+
+  // Recomendação estratégica
+  const estrategia = useMemo(() => {
+    if (!c1.viavel && c1.roi < 15) return 'aguardar_2'
+    if (c1.roi >= 25 && c1.viavel) return 'lance_1'
+    if (c2e.roi > c1.roi * 1.25) return 'aguardar_2'
+    return 'lance_1_cauteloso'
+  }, [c1, c2e])
+
+  const rendaYield = vmercado > 0 && aluguel > 0
+    ? ((aluguel * 12 / vmercado) * 100).toFixed(1) : null
+
+  return (
+    <div style={{ ...card(), marginBottom: 14 }}>
+      {/* Header */}
+      <div style={{ marginBottom: 14 }}>
+        <div style={{ fontWeight: 700, color: C.navy, fontSize: 13, marginBottom: 4 }}>
+          🎯 Estratégia de Lance
+        </div>
+        <div style={{ fontSize: 10.5, color: C.muted }}>
+          Valor de mercado referência: <strong style={{ color: C.navy }}>{fmt(vmercado)}</strong>
+          {preco_m2_mercado > 0 && ` · R$ ${parseFloat(preco_m2_mercado).toLocaleString('pt-BR')}/m²`}
+        </div>
+      </div>
+
+      {/* Recomendação estratégica */}
+      <div style={{
+        padding: '10px 12px', borderRadius: 8, marginBottom: 14,
+        background: estrategia === 'aguardar_2' ? `${C.mustard}10` : `${C.emerald}08`,
+        border: `1px solid ${estrategia === 'aguardar_2' ? C.mustard : C.emerald}30`,
+      }}>
+        <div style={{ fontSize: 11, fontWeight: 700,
+          color: estrategia === 'aguardar_2' ? C.mustard : C.emerald, marginBottom: 3 }}>
+          {estrategia === 'aguardar_2' ? '⏳ Estratégia recomendada: AGUARDAR 2º LEILÃO'
+            : estrategia === 'lance_1_cauteloso' ? '⚠️ 1º leilão: lance com cautela'
+            : '✅ 1º leilão: lance viável'}
+        </div>
+        <div style={{ fontSize: 10.5, color: C.muted }}>
+          {estrategia === 'aguardar_2'
+            ? `ROI atual de ${pct(c1.roi)} no 1º leilão vs ${pct(c2e.roi)} no 2º leilão esperado — diferença de ${pct(c2e.roi - c1.roi)}`
+            : estrategia === 'lance_1_cauteloso'
+            ? `ROI de ${pct(c1.roi)} — margem ok mas aguardar pode melhorar retorno`
+            : `ROI de ${pct(c1.roi)} com lance atual — lançar até R$ ${Math.round(lanceMaxViavel).toLocaleString('pt-BR')}`}
+        </div>
+      </div>
+
+      {/* Controles de ROI alvo */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 }}>
+        <div style={{ background: C.surface, padding: '8px 10px', borderRadius: 7 }}>
+          <div style={{ fontSize: 9.5, color: C.hint, marginBottom: 4 }}>ROI alvo mínimo</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input type="range" min="10" max="60" value={roiAlvo}
+              onChange={e => setRoiAlvo(Number(e.target.value))}
+              style={{ flex: 1, accentColor: C.teal }} />
+            <strong style={{ fontSize: 13, color: C.teal, minWidth: 32 }}>{roiAlvo}%</strong>
+          </div>
+        </div>
+        <div style={{ background: C.surface, padding: '8px 10px', borderRadius: 7 }}>
+          <div style={{ fontSize: 9.5, color: C.hint, marginBottom: 4 }}>Margem de segurança</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input type="range" min="0" max="25" value={margemSeg}
+              onChange={e => setMargemSeg(Number(e.target.value))}
+              style={{ flex: 1, accentColor: C.emerald }} />
+            <strong style={{ fontSize: 13, color: C.emerald, minWidth: 32 }}>{margemSeg}%</strong>
+          </div>
+        </div>
+      </div>
+
+      {/* Resumo dos lances máximos */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 14 }}>
+        {[
+          { label: 'MAO flip', sublabel: 'Lance máximo (quebrar-even)', val: lanceMaxViavel, c: C.teal },
+          { label: `ROI ≥ ${roiAlvo}%`, sublabel: 'Lance para atingir meta', val: lanceMaxROIAlvo, c: C.navy },
+          { label: `Margem ${margemSeg}%`, sublabel: 'Com colchão de segurança', val: lanceMaxMargem, c: C.emerald },
+        ].map(({ label, sublabel, val, c }) => (
+          <div key={label} style={{ background: C.surface, borderRadius: 7, padding: '8px 10px',
+            border: lancePrin <= val ? `1px solid ${c}30` : '1px solid #E5484D30' }}>
+            <div style={{ fontSize: 9, color: C.hint, marginBottom: 2 }}>{label}</div>
+            <div style={{ fontSize: 11, fontWeight: 800,
+              color: lancePrin <= val ? c : '#E5484D' }}>{fmt(Math.round(val))}</div>
+            <div style={{ fontSize: 8.5, color: C.hint, marginTop: 1 }}>{sublabel}</div>
+            <div style={{ fontSize: 9, marginTop: 3, fontWeight: 600,
+              color: lancePrin <= val ? C.emerald : '#E5484D' }}>
+              {lancePrin <= val
+                ? `Lance atual R$${Math.round(lanceMaxViavel - lancePrin).toLocaleString('pt-BR')} abaixo`
+                : `Lance atual R$${Math.round(lancePrin - val).toLocaleString('pt-BR')} acima`}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Cenários 1º leilão */}
+      <div style={{ fontSize: 10.5, fontWeight: 700, color: C.navy,
+        textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
+        {num_leilao || 1}º Leilão
+      </div>
+
+      <CardCenario
+        label={`Lance atual — ${num_leilao || 1}º Leilão`}
+        sublabel={avaliacao > 0 ? `${((lancePrin/avaliacao)*100).toFixed(0)}% da avaliação` : ''}
+        lance={lancePrin} cenario={c1} avaliacao={avaliacao}
+        isDestaque={c1.viavel && c1.roi >= 20}
+      />
+      <CardCenario
+        label="Lance máximo viável"
+        sublabel={`ROI ≥ ${roiAlvo}% com margem ${margemSeg}%`}
+        lance={Math.round(lanceMaxMargem)} cenario={calcularCenario(Math.round(lanceMaxMargem), vmercado, reforma, juridico)}
+        avaliacao={avaliacao} isDestaque={false}
+      />
+
+      {/* Cenários 2º leilão */}
+      {avaliacao > 0 && (
+        <>
+          <div style={{ fontSize: 10.5, fontWeight: 700, color: C.navy,
+            textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 14 }}>
+            Projeção 2º Leilão
+            <span style={{ fontSize: 9, fontWeight: 400, color: C.hint, marginLeft: 6 }}>
+              (se 1º leilão não fechar)
+            </span>
+          </div>
+
+          <CardCenario label="Piso legal (50%)" sublabel="Lance mínimo obrigatório"
+            lance={lance2p} cenario={c2p} avaliacao={avaliacao} />
+          <CardCenario label="Esperado (57%)" sublabel="Média histórica TRT-MG"
+            lance={lance2e} cenario={c2e} avaliacao={avaliacao}
+            isDestaque={c2e.roi >= 30 && !c1.viavel} />
+          <CardCenario label="Competitivo (65%)" sublabel="Cenário com concorrência"
+            lance={lance2c} cenario={c2c} avaliacao={avaliacao} />
+
+          {/* Comparativo 1º vs 2º */}
+          {c1.viavel && c2e.roi > c1.roi && (
+            <div style={{ padding: '8px 12px', borderRadius: 7, background: `${C.mustard}10`,
+              border: `1px solid ${C.mustard}30`, marginTop: 4, fontSize: 10.5, color: C.muted }}>
+              💡 Aguardar 2º leilão pode melhorar o ROI em <strong style={{ color: C.mustard }}>
+                +{pct(c2e.roi - c1.roi)}</strong> no cenário esperado, mas há risco de concorrência.
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Renda de locação */}
+      {aluguel > 0 && (
+        <div style={{ marginTop: 12, padding: '10px 12px', borderRadius: 7,
+          background: '#F5F3FF', border: '1px solid #DDD6FE' }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: '#7C3AED', marginBottom: 6 }}>
+            📊 Estratégia de Locação
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+            {[
+              ['Aluguel est.', `R$ ${Math.round(aluguel).toLocaleString('pt-BR')}/mês`],
+              ['Yield bruto', rendaYield ? `${rendaYield}% a.a.` : '—'],
+              ['MAO locação', fmt(aluguel * 120 * 0.90)],
+            ].map(([lbl, val]) => (
+              <div key={lbl}>
+                <div style={{ fontSize: 9, color: '#7C3AED', marginBottom: 1 }}>{lbl}</div>
+                <div style={{ fontSize: 11.5, fontWeight: 700, color: '#5B21B6' }}>{val}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Nota de custos */}
+      <div style={{ marginTop: 10, fontSize: 9.5, color: C.hint, lineHeight: 1.5 }}>
+        Premissas: comissão 5% · ITBI 2% · doc 0,5% · honorário adv 2% · registro R$1.500 · IRPF 15% (isenção ≤ R$440k) · corretagem venda 6%
+      </div>
+    </div>
+  )
+}

@@ -8,6 +8,7 @@ import { CLASSES_MERCADO_REFORMA, calcularCustoReforma, detectarClasseMercado } 
 import PainelLeilao from './PainelLeilao.jsx'
 import AbaJuridicaAgente from './AbaJuridicaAgente.jsx'
 import { buscarArrematesSimilares } from '../lib/buscaArrematesGPT.js'
+import PainelLancamento from './PainelLancamento.jsx'
 import CenariosReforma from './CenariosReforma.jsx'
 
 const ESCOPOS_INFO = {
@@ -1254,6 +1255,7 @@ export default function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze
       </div>
       {/* Análise de Leilão */}
       <PainelLeilao imovel={p} isAdmin={isAdmin} />
+        <PainelLancamento imovel={p}/>
       {/* Cenários de Reforma */}
       <CenariosReforma imovel={p} isAdmin={isAdmin} />
       {/* Calculadora ROI */}
