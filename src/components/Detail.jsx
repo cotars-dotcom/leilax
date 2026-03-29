@@ -6,6 +6,7 @@ import { criarCardImovel } from "../lib/trelloService.js"
 import CalculadoraROI from "./CalculadoraROI.jsx"
 import { CLASSES_MERCADO_REFORMA, calcularCustoReforma, detectarClasseMercado } from "../data/custos_reforma.js"
 import PainelLeilao from './PainelLeilao.jsx'
+import AbaJuridicaAgente from './AbaJuridicaAgente.jsx'
 import CenariosReforma from './CenariosReforma.jsx'
 
 const ESCOPOS_INFO = {
@@ -956,14 +957,9 @@ export default function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze
         <span style={{fontSize:"13px",color:K.amb,fontWeight:600}}>{reStep}</span>
       </div>}
 
-      {abaDetalhe==='juridico'&&<AbaJuridica imovel={p} onReclassificado={(novaAnalise)=>{
-        if(onUpdateProp) onUpdateProp(p.id, {
-          score_juridico: novaAnalise.novo_score_juridico ?? p.score_juridico,
-          recomendacao: novaAnalise.nova_recomendacao || p.recomendacao,
-          processos_ativos: novaAnalise.processos_totais?.join(', ') || p.processos_ativos,
-          reclassificado_por_doc: true
-        })
-      }}/>}
+      {abaDetalhe==='juridico'&&<AbaJuridicaAgente imovel={p} isAdmin={isAdmin} onReclassificado={(novaAnalise)=>{
+          if(onUpdateProp) onUpdateProp(p.id, novaAnalise)
+        }}/>}}
 
       {abaDetalhe==='fotos'&&<GaleriaFotos 
           fotos={p.fotos||[]} 

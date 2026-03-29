@@ -46,7 +46,7 @@ const DIRETRIZES = [
   { titulo:'Score mínimo para ação', texto:'Score ≥ 7.0: avaliar compra. Score ≥ 8.0: sinal de compra imediata. Score < 6.0: evitar, salvo situação excepcional documentada pelo grupo.' },
   { titulo:'Margem de segurança (MAO)', texto:'Nunca pagar acima do MAO (80% do valor de mercado menos custos). O MAO garante margem mínima de 20% mesmo no cenário mais pessimista.' },
   { titulo:'Reforma dentro do teto', texto:'Reforma máxima: 5% do valor do imóvel para Classe C, 6% para Classe B, 7% para Classe A. Acima disso, risco de sobrecapitalização.' },
-  { titulo:'Verificação jurídica obrigatória', texto:'Toda análise passa pelo Pedro (jurídico) antes do lance. Documentos da matrícula devem ser anexados na aba Jurídico para reclassificação automática.' },
+  { titulo:'Verificação jurídica obrigatória', texto:'Toda análise passa pela equipe jurídica antes do lance. Documentos da matrícula devem ser anexados na aba Jurídico para reclassificação automática do score.' },
   { titulo:'Estrutura de aquisição', texto:'CPF único para imóveis simples. Consórcio voluntário para múltiplos investidores. Holding/LTDA para operações recorrentes — consultar Pedro.' },
   { titulo:'Presença no leilão', texto:'Verificar ocupação pessoalmente antes de fazer lance. Nunca basear ocupação apenas no edital — informação frequentemente imprecisa.' },
   { titulo:'Custo de oportunidade', texto:'Imóveis com prazo de liberação > 12 meses: considerar custo de oportunidade do capital imobilizado (~12% CDI a.a.) no cálculo do ROI efetivo.' },
@@ -105,7 +105,7 @@ export default function ManualAxis({ isMobile }) {
               ['🏆','Diferencial único','Único sistema que combina: Score 6D + IA dual + SINAPI reforma + MAO automático + jurimetria real de varas'],
               ['💰','Custo por análise','~R$ 0,01 com Gemini Flash-Lite. Fallback para Claude Sonnet (~R$ 3,00) apenas se necessário'],
               ['🔒','Segurança','Dados no Supabase com RLS. Chaves de API sincronizadas entre dispositivos via banco criptografado'],
-              ['👥','Multi-usuário','Admin cria convites com link. Membros veem todos os imóveis. Pedro (jurídico), Carlos (arquitetura), Juliana e Felipe (comercial)'],
+              ['👥','Multi-usuário','Admin cria convites com link. Membros veem todos os imóveis. Cada usuário tem acesso conforme seu papel (admin/membro/viewer)'],
             ].map(([icon, titulo, texto]) => (
               <div key={titulo} style={{...card(), padding:14}}>
                 <div style={{fontSize:16, marginBottom:4}}>{icon}</div>
