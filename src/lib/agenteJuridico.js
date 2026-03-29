@@ -7,7 +7,15 @@
  * Custo: ~R$ 0,02 por análise completa.
  */
 
-import { RISCOS_JURIDICOS } from '../data/riscos_juridicos.js'
+async function _getRiscos() {
+  try {
+    const { getRiscosJuridicos } = await import('./supabase.js')
+    const d = await getRiscosJuridicos()
+    if (d && d.length > 0) return d
+  } catch(e) {}
+  const { RISCOS_JURIDICOS } = await import('../data/riscos_juridicos.js')
+  return RISCOS_JURIDICOS
+}
 
 // ─── PADRÕES ESPECÍFICOS POR LEILOEIRO ──────────────────────────────────────
 
@@ -241,12 +249,15 @@ Retorne APENAS JSON:
 
 // ─── ANÁLISE JURÍDICA COM GEMINI ──────────────────────────────────────────────
 
-const RISCOS_REFERENCIA = RISCOS_JURIDICOS.map(r =>
-  `- ${r.risco_id} (${r.categoria}): penalização ${r.score_penalizacao || -10}pts, prazo ${r.prazo_pratico_meses_min || 0}-${r.prazo_pratico_meses_max || 24}m`
-).join('\n')
+// RISCOS_REFERENCIA gerado async dentro de analisarTextoJuridicoGemini
 
 export async function analisarTextoJuridicoGemini(texto, nomeArq, imovel, geminiKey) {
   if (!texto || !geminiKey) return null
+
+  const RISCOS_ATUAL = await _getRiscos()
+  const RISCOS_REFERENCIA = RISCOS_ATUAL.map(r =>
+    `- ${r.risco_id||r.id||'risco'} (${r.categoria||'juridico'}): -${Math.abs(r.score_penalizacao||10)}pts, prazo ${r.prazo_min_meses||r.prazo_pratico_meses_min||0}-${r.prazo_max_meses||r.prazo_pratico_meses_max||24}m`
+  ).join('\n')
 
   const prompt = `Você é especialista em direito imobiliário e leilões judiciais no Brasil (Minas Gerais).
 
@@ -257,6 +268,10 @@ PROCESSOS CONHECIDOS: ${imovel.processos_ativos || 'Nenhum'}
 
 TEXTO DO DOCUMENTO (primeiros 6000 chars):
 ${texto.substring(0, 6000)}
+
+JURIMETRIA DAS VARAS BH (estimativa de prazo):
+- TRT-3 geral: 90d | TRT-3 Penhora: 240d | Extrajudicial Caixa: 90d
+- TJMG Cível Imissão: 180d | TJMG Geral: 270d | TJMG Fiscal: 360d
 
 BASE DE RISCOS DO SISTEMA AXIS:
 ${RISCOS_REFERENCIA}

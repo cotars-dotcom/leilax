@@ -12,12 +12,12 @@
 
 import { scrapeUrlJina, extrairCamposTexto } from './scraperImovel.js'
 import { calcularScore, validarECorrigirAnalise } from './motorIA.js'
-import { getMercadoComFallback } from './supabase.js'
+import { getMercadoComFallback, getJurimetriaVara, getMetricasBairro } from './supabase.js'
 import { detectarRegiao, getMercado } from '../data/mercado_regional.js'
 import { calcularCustoReforma, detectarClasseMercado } from '../data/custos_reforma.js'
 
 // ─── PROMPT GEMINI COMPACTO ──────────────────────────────────────────────────
-function buildPromptGemini(campos, textoScrapeado, contextoMercado, imovelContexto = null) {
+function buildPromptGemini(campos, textoScrapeado, contextoMercado, imovelContexto = null, jurimetria = [], metricasBairro = null) {
   return `Você é especialista em leilões judiciais imobiliários no Brasil (BH/MG).
 Analise o imóvel e retorne APENAS JSON válido (sem markdown, sem texto extra).
 
@@ -46,6 +46,22 @@ ${textoScrapeado?.substring(0, 4000) || 'Não disponível'}
 
 CONTEXTO MERCADO (${campos.bairro || campos.cidade || 'BH'}):
 ${contextoMercado ? JSON.stringify(contextoMercado) : 'Usar conhecimento geral de BH/MG'}
+
+${jurimetria.length > 0 ? `
+JURIMETRIA DAS VARAS (dados reais TJMG/TRT-3 BH):
+${jurimetria.map(v => `- ${v.vara_nome}: ${v.tempo_total_ciclo_dias} dias ciclo | ${v.taxa_sucesso_posse_pct}% sucesso posse`).join('\n')}
+Use o tipo de processo para identificar a vara e calibrar prazo_liberacao_estimado_meses.
+Taxa sucesso < 85% → score_juridico máximo 6.0.` : ''}
+${metricasBairro ? `
+MÉTRICAS DO BAIRRO ${metricasBairro.bairro} (FipeZAP/QuintoAndar 2026):
+- Preço anúncio: R$ ${(metricasBairro.preco_anuncio_m2||0).toLocaleString('pt-BR')}/m²
+- Preço contrato real: R$ ${(metricasBairro.preco_contrato_m2||0).toLocaleString('pt-BR')}/m²
+- Yield bruto: ${metricasBairro.yield_bruto||'—'}% a.a. | Classe IPEAD: ${metricasBairro.classe_ipead||'—'}
+USE preço contrato como preco_m2_mercado — é o que o mercado realmente fecha.` : ''}
+CALCULE mao_flip e mao_locacao:
+- mao_flip = (valor_mercado_estimado × 0.80) − (custo_reforma_estimado + valor_minimo × 0.10)
+- mao_locacao = aluguel_mensal_estimado × 120 × 0.90
+- Lance acima do mao_flip → [CRITICO] nos alertas.
 
 Complete e corrija os dados. Retorne JSON com EXATAMENTE estes campos:
 {
@@ -214,11 +230,20 @@ export async function analisarComGemini(url, geminiKey, parametros, onProgress, 
     }
   } catch(e) { /* sem contexto, Gemini usa conhecimento interno */ }
 
+  // PASSO 3b: Jurimetria + métricas de bairro do banco
+  let _jurimetria = [], _metricasBairro = null
+  try {
+    ;[_jurimetria, _metricasBairro] = await Promise.all([
+      getJurimetriaVara(),
+      camposBasicos.bairro ? getMetricasBairro(camposBasicos.bairro) : Promise.resolve(null)
+    ])
+  } catch(e) { /* banco opcional */ }
+
   // PASSO 4: Gemini Flash-Lite para campos complexos + scores + síntese
   onProgress?.('Gemini analisando imóvel (~$0.002)...')
   let analiseGemini = null
   try {
-    const prompt = buildPromptGemini(camposBasicos, textoScrapeado, contextoMercado, imovelContexto)
+    const prompt = buildPromptGemini(camposBasicos, textoScrapeado, contextoMercado, imovelContexto, _jurimetria, _metricasBairro)
     const { resultado: geminiResult, modeloUsado: geminiModelo } = await chamarGemini(prompt, geminiKey)
     analiseGemini = geminiResult
     _modeloGemini = geminiModelo

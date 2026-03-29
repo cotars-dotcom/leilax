@@ -234,6 +234,34 @@ export async function updateImovelStatus(id, status) {
 }
 
 // == PARAMETROS DE SCORE ==
+// ─── JURIMETRIA ───────────────────────────────────────────────────────────────
+
+export async function getJurimetriaVara() {
+  try {
+    const { data } = await supabase
+      .from('jurimetria_varas')
+      .select('vara_nome, tempo_total_ciclo_dias, taxa_sucesso_posse_pct, amostras_n')
+      .order('tempo_total_ciclo_dias', { ascending: true })
+    return data || []
+  } catch(e) { console.warn('[AXIS] getJurimetriaVara:', e.message); return [] }
+}
+
+// ─── MÉTRICAS DE BAIRRO ──────────────────────────────────────────────────────
+
+export async function getMetricasBairro(bairro) {
+  if (!bairro) return null
+  try {
+    const termo = bairro.trim().split(' ')[0]
+    const { data } = await supabase
+      .from('metricas_bairros')
+      .select('bairro, preco_anuncio_m2, preco_contrato_m2, yield_bruto, classe_ipead, zona')
+      .ilike('bairro', '%' + termo + '%')
+      .limit(1)
+    return (data && data.length > 0) ? data[0] : null
+  } catch(e) { console.warn('[AXIS] getMetricasBairro:', e.message); return null }
+}
+
+
 export async function getParametros() {
   const { data, error } = await supabase
     .from('parametros_score').select('*').eq('ativo', true).order('ordem')

@@ -2,6 +2,7 @@
 // AXIS — Analisador de Documentos de Leilão (Edital, RGI, Débitos)
 // Usa Claude Sonnet para extrair informações de PDFs via base64
 // ═══════════════════════════════════════════════════════════════
+import { salvarDocumentoJuridico } from './supabase.js'
 
 const CLAUDE_MODEL = 'claude-sonnet-4-20250514'
 
@@ -144,4 +145,29 @@ export async function analisarDocumentos(urls, apiKey, onProgress) {
   }
 
   return resultado
+}
+
+
+// ─── SALVAR NO BANCO AUTOMATICAMENTE ─────────────────────────────────────────
+export async function analisarESalvarDocumento(imovelId, tipo, conteudoBase64OuTexto, claudeKey, openaiKey, nomeArq) {
+  try {
+    const resultado = await processarDocumentoJuridico(conteudoBase64OuTexto, tipo, claudeKey, openaiKey)
+    if (resultado && imovelId) {
+      await salvarDocumentoJuridico({
+        imovel_id: imovelId,
+        tipo: resultado.tipo_documento || tipo || 'outro',
+        nome: nomeArq || resultado.tipo_documento || 'Documento',
+        analise_ia: resultado.parecer || resultado.resumo || null,
+        riscos_encontrados: resultado.riscos_identificados || [],
+        score_juridico_sugerido: resultado.score_juridico_sugerido || null,
+        analisado_em: new Date().toISOString(),
+        processado: true,
+        status: 'analisado',
+      }).catch(e => console.warn('[AXIS] salvar doc:', e.message))
+    }
+    return resultado
+  } catch(e) {
+    console.warn('[AXIS] analisarESalvar:', e.message)
+    return null
+  }
 }

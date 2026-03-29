@@ -8,6 +8,13 @@
 
 import { calcularScore, validarECorrigirAnalise } from './motorIA.js'
 
+async function _getJurimetria() {
+  try {
+    const { getJurimetriaVara } = await import('./supabase.js')
+    return await getJurimetriaVara()
+  } catch(e) { return [] }
+}
+
 export async function reAnalisarComGemini(imovelAtual, geminiKey, parametros, onProgress) {
   const progress = onProgress || (() => {})
 
@@ -53,7 +60,13 @@ export async function reAnalisarComGemini(imovelAtual, geminiKey, parametros, on
     riscos_presentes: imovelAtual.riscos_presentes,
     comparaveis: imovelAtual.comparaveis,
     fonte_url: imovelAtual.fonte_url,
+    vara_judicial: imovelAtual.vara_judicial || null,
+    tipo_justica: imovelAtual.tipo_justica || null,
+    mao_flip: imovelAtual.mao_flip || null,
+    mao_locacao: imovelAtual.mao_locacao || null,
   }
+
+  const jurimetriaVaras = await _getJurimetria()
 
   const prompt = `Você é especialista em análise de imóveis em leilão judicial no Brasil (BH/MG).
 
@@ -62,6 +75,10 @@ Use APENAS os dados fornecidos para validar, corrigir e enriquecer a análise.
 
 DADOS ATUAIS DO IMÓVEL:
 ${JSON.stringify(contexto, null, 2)}
+
+${jurimetriaVaras.length > 0 ? `JURIMETRIA DAS VARAS (TJMG/TRT-3 BH — dados reais):
+${jurimetriaVaras.map(v => '- ' + v.vara_nome + ': ' + v.tempo_total_ciclo_dias + 'd ciclo | ' + v.taxa_sucesso_posse_pct + '% sucesso').join('\n')}
+Use vara_judicial do imóvel para calibrar prazo_liberacao_estimado_meses.` : ''}
 
 SCORES ATUAIS:
 - Localização: ${imovelAtual.score_localizacao} (peso 20%)
@@ -78,6 +95,11 @@ CALIBRAÇÃO DOS SCORES (escala 0-10):
 - Ocupação: desocupado→8.5, incerto→5.5, ocupado→3.0
 - Liquidez: alta demanda bairro→8.5, média→6.5, baixa→4.0
 - Mercado: classe Luxo BH→8.5, Alto→7.0, Médio→5.5, Popular→4.0
+
+Se mao_flip ou mao_locacao estiverem nulos, calcule:
+- mao_flip = (valor_mercado_estimado × 0.80) - (custo_reforma_estimado + valor_minimo × 0.10)
+- mao_locacao = aluguel_mensal_estimado × 120 × 0.90
+Lance acima do mao_flip → [CRITICO] nos alertas.
 
 Retorne APENAS JSON com os campos atualizados:
 {
@@ -185,6 +207,8 @@ Retorne APENAS JSON com os campos atualizados:
     comparaveis: delta.comparaveis || imovelAtual.comparaveis || [],
     criado_em: imovelAtual.criado_em,
     criado_por: imovelAtual.criado_por,
+    mao_flip: delta.mao_flip || imovelAtual.mao_flip || null,
+    mao_locacao: delta.mao_locacao || imovelAtual.mao_locacao || null,
     _modelo_usado: modeloUsado,
   }
 

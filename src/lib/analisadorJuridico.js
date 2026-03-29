@@ -2,6 +2,7 @@
 // Claude analisa texto (PDF/TXT), ChatGPT analisa imagens, Claude consolida
 
 import { RISCOS_JURIDICOS } from '../data/riscos_juridicos.js'
+import { salvarDocumentoJuridico } from './supabase.js'
 
 const CLAUDE_MODEL = 'claude-sonnet-4-20250514'
 const GPT_MODEL    = 'gpt-4o'
@@ -255,4 +256,30 @@ export async function processarDocumentoJuridico(arquivo, imovel, claudeKey, ope
   }
 
   return resultadoClaude || resultadoGPT
+}
+
+
+// ─── SALVAR ANÁLISE NO BANCO ─────────────────────────────────────────────────
+export async function processarESalvar(imovelId, conteudo, tipo, claudeKey, openaiKey) {
+  try {
+    const analise = await processarDocumentoJuridico(conteudo, tipo, claudeKey, openaiKey)
+    if (analise && imovelId) {
+      await salvarDocumentoJuridico({
+        imovel_id: imovelId,
+        tipo: analise.tipo_documento || tipo || 'matricula',
+        nome: analise.nome || 'RGI / Matrícula',
+        analise_ia: analise.analise_texto || analise.resumo || null,
+        riscos_encontrados: analise.riscos_identificados || [],
+        score_juridico_sugerido: analise.score_juridico_sugerido || null,
+        impacto_score: analise.impacto_score || null,
+        analisado_em: new Date().toISOString(),
+        processado: true,
+        status: 'analisado',
+      }).catch(e => console.warn('[AXIS] salvar juridico:', e.message))
+    }
+    return analise
+  } catch(e) {
+    console.warn('[AXIS] processarESalvar:', e.message)
+    return null
+  }
 }
