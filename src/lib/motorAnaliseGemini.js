@@ -227,6 +227,7 @@ export async function analisarComGemini(url, geminiKey, parametros, onProgress, 
     console.error('[AXIS Gemini] Erro detalhado:', errMsg)
     onProgress?.(`⚠️ Gemini erro: ${errMsg.substring(0, 120)}`)
     erros.push(`Gemini falhou: ${errMsg}`)
+    _modeloGemini = 'regex_fallback' // Gemini realmente falhou
     // Fallback inteligente: se temos contexto do imóvel, preservar dados existentes
     if (imovelContexto && imovelContexto.score_total > 0) {
       // Usar dados do imóvel já analisado — não degradar scores existentes
@@ -285,7 +286,7 @@ export async function analisarComGemini(url, geminiKey, parametros, onProgress, 
     fonte_url: url,
     analise_dupla_ia: false,
     _erros_extracao: erros,
-    _modelo_usado: erros.length > 0 ? 'regex_fallback' : _modeloGemini,
+    _modelo_usado: _modeloGemini,
   }
 
   // PASSO 6: Calcular reforma com SINAPI
