@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react"
 import { C, K, btn, fmtC, fmtD, card, recColor, scoreColor, scoreLabel } from "../appConstants.js"
 import { ArrowUpRight, Bell, TrendingUp, AlertTriangle, Package } from "lucide-react"
+import { supabase } from '../lib/supabase.js'
 
 // Inline ScoreRing (used by PropCard)
 function ScoreRing({score,size=80}) {
@@ -225,6 +226,19 @@ export default function Dashboard({props,onNav,profile:prof,isMobile,isPhone}) {
   const topAlerta=[...props].filter(p=>p.recomendacao!=="EVITAR").sort((a,b)=>(b.score_total||0)-(a.score_total||0))[0]
   const totalValor=props.reduce((s,p)=>s+(p.valor_minimo||0),0)
   const fmtM=v=>{if(v>=1e6)return`R$ ${(v/1e6).toFixed(1)}M`;if(v>=1e3)return`R$ ${(v/1e3).toFixed(0)}K`;return`R$ ${v}`}
+  const [leads, setLeads] = useState([])
+  const [buscando, setBuscando] = useState(false)
+  const [ultimaBusca, setUltimaBusca] = useState(null)
+  const buscarOportunidades = async () => {
+    setBuscando(true)
+    try {
+      const { data, err } = await supabase.functions.invoke('get-top-auctions')
+      if (err) throw err
+      setLeads(data.top3 || [])
+      setUltimaBusca(data.gerado_em)
+    } catch(e) { console.error('buscarOportunidades:', e) }
+    finally { setBuscando(false) }
+  }
 
   return <div style={{background:C.bg,minHeight:"100%"}}>
     <AxisHeader profile={prof} imoveis={props} onNav={onNav} />
@@ -375,5 +389,32 @@ export default function Dashboard({props,onNav,profile:prof,isMobile,isPhone}) {
           </div>
         </div>}
     </div>
+      {/* Seção: Buscar Oportunidades */}
+      <div style={{marginTop:24,background:C.white,borderRadius:14,border:`1px solid ${C.border}`,padding:"20px 24px"}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:leads.length?16:0}}>
+          <div style={{fontWeight:"600",color:C.text,fontSize:15}}>Oportunidades de Leilão</div>
+          <button style={{...btn(C.emerald),display:"flex",alignItems:"center",gap:6,fontSize:13}} onClick={buscarOportunidades} disabled={buscando}>
+            {buscando?"Buscando…":"🔍 Buscar Oportunidades"}
+          </button>
+        </div>
+        {ultimaBusca&&<div style={{fontSize:11,color:C.hint,marginBottom:12}}>Atualizado: {new Date(ultimaBusca).toLocaleString("pt-BR")}</div>}
+        {leads.length>0&&<div style={{display:"flex",flexDirection:"column",gap:10}}>
+          {leads.map((l,i)=>(
+            <div key={l.id||i} style={{display:"flex",gap:12,alignItems:"flex-start",padding:"12px 0",borderTop:i>0?`1px solid ${C.border}`:"none"}}>
+              <div style={{width:28,height:28,borderRadius:"50%",background:i===0?C.emerald:i===1?C.mustard:"#94a3b8",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:"700",fontSize:13,flexShrink:0}}>{i+1}</div>
+              <div style={{flex:1}}>
+                <div style={{fontWeight:"600",fontSize:13,color:C.text,marginBottom:2}}>{l.titulo||l.endereco}</div>
+                <div style={{fontSize:12,color:C.muted,marginBottom:4}}>{l.bairro}{l.bairro&&l.cidade?", ":""}{l.cidade}</div>
+                <div style={{display:"flex",gap:12,fontSize:12}}>
+                  <span><span style={{color:C.hint}}>Lance: </span><strong style={{color:C.text}}>{l.lance_fmt}</strong></span>
+                  <span><span style={{color:C.hint}}>Aval: </span>{l.aval_fmt}</span>
+                  <span style={{color:C.emerald,fontWeight:"600"}}>{l.desc_fmt} desc.</span>
+                </div>
+              </div>
+              {l.url_edital&&<a href={l.url_edital} target="_blank" rel="noreferrer" style={{fontSize:11,color:C.emerald,whiteSpace:"nowrap",marginTop:2}}>Ver edital ↗</a>}
+            </div>
+          ))}
+        </div>}
+      </div>
   </div>
 }
