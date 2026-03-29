@@ -379,11 +379,12 @@ export async function loadApiKeys(userId) {
       return {
         claudeKey: keys.claude || '',
         openaiKey: keys.openai || '',
-        geminiKey: keys.gemini || ''
+        geminiKey: keys.gemini || '',
+        deepseekKey: keys.deepseek || ''
       }
     }
   } catch(e) { console.warn('[AXIS supabase] Load API keys:', e.message) }
-  return { claudeKey: '', openaiKey: '', geminiKey: '' }
+  return { claudeKey: '', openaiKey: '', geminiKey: '', deepseekKey: '' }
 }
 
 export async function persistApiKeys(userId, { claudeKey, openaiKey, geminiKey, deepseekKey = '' }) {

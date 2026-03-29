@@ -890,6 +890,7 @@ export default function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze
         if (keys.geminiKey) { geminiKey = keys.geminiKey; localStorage.setItem('axis-gemini-key', geminiKey) }
         if (keys.claudeKey) { claudeKey = keys.claudeKey; localStorage.setItem('axis-api-key', claudeKey) }
         if (keys.openaiKey) localStorage.setItem('axis-openai-key', keys.openaiKey)
+        if (keys.deepseekKey) localStorage.setItem('axis-deepseek-key', keys.deepseekKey)
       }
     } catch(e) { console.warn('[AXIS] Sync chaves do banco:', e.message) }
     if(!geminiKey && !claudeKey){setMsg("⚠️ Configure ao menos a Gemini API Key em Admin → API Keys");return}

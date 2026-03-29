@@ -289,7 +289,7 @@ export default function AbaJuridicaAgente({ imovel, isAdmin, onReclassificado })
               padding:'4px 0', borderBottom:`1px solid ${C.borderW}`, fontSize:11}}>
               <span style={{color:C.navy, fontWeight:500}}>{l.nome || l.tipo}</span>
               <a href={l.url} target="_blank" rel="noreferrer"
-                style={{color:C.teal||'#0066CC', fontSize:10, textDecoration:'none'}}>
+                style={{color:'#0066CC', fontSize:10, textDecoration:'none'}}>
                 Abrir PDF →
               </a>
             </div>
