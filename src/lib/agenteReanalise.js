@@ -211,6 +211,18 @@ Retorne APENAS JSON com os campos atualizados:
   }
   progress('✅ Reanálise Gemini concluída')
 
+  // Fallback: calcular aluguel se Gemini retornou 0
+  if ((!delta.aluguel_mensal_estimado || delta.aluguel_mensal_estimado === 0) &&
+      (delta.preco_m2_mercado || imovelAtual.preco_m2_mercado) > 0 &&
+      (imovelAtual.area_m2 || imovelAtual.area_privativa_m2)) {
+    const area = imovelAtual.area_privativa_m2 || imovelAtual.area_m2
+    const preco = delta.preco_m2_mercado || imovelAtual.preco_m2_mercado
+    const yieldMap = { Popular: 0.075, Médio: 0.060, Medio: 0.060, Alto: 0.050, Luxo: 0.040 }
+    const classe = delta.classe_ipead || imovelAtual.classe_ipead || 'Medio'
+    const yieldAnual = yieldMap[classe] || 0.060
+    delta.aluguel_mensal_estimado = Math.round(preco * area * yieldAnual / 12)
+  }
+
   // Mesclar delta com dados existentes — preservar campos não retornados pelo Gemini
   const analiseAtualizada = {
     ...imovelAtual,

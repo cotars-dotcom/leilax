@@ -999,6 +999,10 @@ export default function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze
         const modeloUsado = novaAnalise._modelo_usado || 'desconhecido'
         const avisoModelo = modeloUsado.includes('fallback') ? ' (análise parcial — Gemini indisponível, configure a chave)' : ''
         setMsg(`✅ Imóvel reanalisado e salvo!${avisoModelo}`)
+        // Após reanálise, ir para a aba jurídico para facilitar busca de documentos
+        if (!merged.num_documentos || merged.num_documentos === 0) {
+          setTimeout(() => setMsg('💡 Vá em Jurídico → Documentos para baixar e analisar o edital e matrícula.'), 2500)
+        }
         try {
           const { logAtividade } = await import('../lib/supabase.js')
           const { data:{ session: sess2 } } = await supabase.auth.getSession()

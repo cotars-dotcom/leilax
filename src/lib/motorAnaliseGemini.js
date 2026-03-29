@@ -58,10 +58,14 @@ MÉTRICAS DO BAIRRO ${metricasBairro.bairro} (FipeZAP/QuintoAndar 2026):
 - Preço contrato real: R$ ${(metricasBairro.preco_contrato_m2||0).toLocaleString('pt-BR')}/m²
 - Yield bruto: ${metricasBairro.yield_bruto||'—'}% a.a. | Classe IPEAD: ${metricasBairro.classe_ipead||'—'}
 USE preço contrato como preco_m2_mercado — é o que o mercado realmente fecha.` : ''}
-CALCULE mao_flip e mao_locacao:
+CALCULE obrigatoriamente:
+- aluguel_mensal_estimado = preco_m2_mercado × area_m2 × (yield_bruto_anual_pct / 100) / 12
+  Se não tiver yield, use: Popular=7.5%, Médio=6.0%, Alto=5.0%, Luxo=4.0%
+  Exemplo: 7065/m² × 97m² × 6% / 12 = R$ 3.432/mês
 - mao_flip = (valor_mercado_estimado × 0.80) − (custo_reforma_estimado + valor_minimo × 0.10)
 - mao_locacao = aluguel_mensal_estimado × 120 × 0.90
 - Lance acima do mao_flip → [CRITICO] nos alertas.
+NUNCA retorne aluguel_mensal_estimado = 0 se tiver preco_m2_mercado e area_m2.
 
 Complete e corrija os dados. Retorne JSON com EXATAMENTE estes campos:
 {
@@ -307,6 +311,16 @@ export async function analisarComGemini(url, geminiKey, parametros, onProgress, 
   // Garantir título nunca seja vazio ou genérico
   if (!analiseGemini.titulo || analiseGemini.titulo.length < 5 || analiseGemini.titulo.toLowerCase().includes('lote -')) {
     analiseGemini.titulo = camposBasicos.titulo || analiseGemini.titulo
+  }
+
+  // Fallback: calcular aluguel se Gemini retornou 0
+  if ((!analiseGemini.aluguel_mensal_estimado || analiseGemini.aluguel_mensal_estimado === 0) &&
+      analiseGemini.preco_m2_mercado > 0 && (camposBasicos.area_m2 || analiseGemini.area_m2)) {
+    const area = camposBasicos.area_m2 || analiseGemini.area_m2
+    const yieldMap = { Popular: 0.075, Médio: 0.060, Medio: 0.060, Alto: 0.050, Luxo: 0.040 }
+    const yieldAnual = contextoMercado?.yield_bruto_pct ? contextoMercado.yield_bruto_pct / 100
+      : yieldMap[analiseGemini.classe_ipead] || 0.060
+    analiseGemini.aluguel_mensal_estimado = Math.round(analiseGemini.preco_m2_mercado * area * yieldAnual / 12)
   }
 
   const analise = {
