@@ -32,7 +32,7 @@ export const DISPLAY_MAP = {
   medio:'Médio', Medio:'Médio', alta:'Alta', baixa:'Baixa',
   queda:'Queda', crescimento:'Crescimento',
 }
-export function mapDisplay(v) { return (v && DISPLAY_MAP[v]) || v }
+export function mapDisplay(v) { return (v && (ESTRUTURA_MAP[v] || DISPLAY_MAP[v])) || v }
 
 
 export function normalizarTextoAlerta(texto) {
