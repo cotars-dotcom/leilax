@@ -169,11 +169,10 @@ async function chamarGemini(prompt, geminiKey) {
       console.log('[AXIS Gemini] Tentando modelo:', modelo)
       const resultado = await chamarGeminiModelo(prompt, geminiKey, modelo)
       console.log('[AXIS Gemini] Sucesso com:', modelo)
-      return resultado
+      return { resultado, modeloUsado: modelo }
     } catch(e) {
       console.warn('[AXIS Gemini] Falhou com', modelo, ':', e.message.substring(0, 100))
       ultimoErro = e
-      // Se for erro de chave inválida (401/403 sem ser quota), não tentar outros modelos
       if (e.message.includes('400') && e.message.includes('API_KEY_INVALID')) break
     }
   }
@@ -183,6 +182,7 @@ async function chamarGemini(prompt, geminiKey) {
 // ─── MOTOR PRINCIPAL ─────────────────────────────────────────────────────────
 export async function analisarComGemini(url, geminiKey, parametros, onProgress, imovelContexto = null) {
   const erros = []
+  let _modeloGemini = 'gemini-1.5-flash' // default, atualizado após chamada
 
   // PASSO 1: Scrape com Jina (grátis)
   onProgress?.('Coletando dados do imóvel (Jina AI)...')
@@ -219,7 +219,9 @@ export async function analisarComGemini(url, geminiKey, parametros, onProgress, 
   let analiseGemini = null
   try {
     const prompt = buildPromptGemini(camposBasicos, textoScrapeado, contextoMercado, imovelContexto)
-    analiseGemini = await chamarGemini(prompt, geminiKey)
+    const { resultado: geminiResult, modeloUsado: geminiModelo } = await chamarGemini(prompt, geminiKey)
+    analiseGemini = geminiResult
+    _modeloGemini = geminiModelo
   } catch(e) {
     const errMsg = e.message || 'erro desconhecido'
     console.error('[AXIS Gemini] Erro detalhado:', errMsg)
@@ -283,7 +285,7 @@ export async function analisarComGemini(url, geminiKey, parametros, onProgress, 
     fonte_url: url,
     analise_dupla_ia: false,
     _erros_extracao: erros,
-    _modelo_usado: erros.length > 0 ? 'regex_fallback' : 'gemini-1.5-flash',
+    _modelo_usado: erros.length > 0 ? 'regex_fallback' : _modeloGemini,
   }
 
   // PASSO 6: Calcular reforma com SINAPI
@@ -321,7 +323,7 @@ export async function logUsoGemini(imovelId, titulo, sucesso = true) {
   try {
     const { logUsoChamadaAPI } = await import('./supabase.js')
     await logUsoChamadaAPI({
-      tipo: 'analise_principal', modelo: 'gemini-1.5-flash',
+      tipo: 'analise_principal', modelo: analise?._modelo_usado || 'gemini-1.5-flash',
       tokensInput: 4000, tokensOutput: 1500,
       imovelId, imovelTitulo: titulo, sucesso
     })
