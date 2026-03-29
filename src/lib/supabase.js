@@ -449,8 +449,8 @@ export async function getAtividades() {
 export async function logAtividade(userId, acao, entidade, entidadeId, detalhes) {
   try {
     await supabase.from('atividades').insert({
-      usuario_id: userId, acao, entidade,
-      entidade_id: entidadeId, detalhes
+      user_id: userId, tipo: acao, descricao: entidade,
+      imovel_id: entidadeId, metadata: detalhes
     })
   } catch(e) { console.warn('[AXIS supabase] Log atividade:', e.message) }
 }
