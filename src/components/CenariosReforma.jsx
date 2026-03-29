@@ -201,8 +201,9 @@ export default function CenariosReforma({ imovel, isAdmin }) {
         ))}
       </div>
 
-      {/* Painel do cenário selecionado */}
-      <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:12}}>
+      {/* Painel do cenário selecionado — ocultar cálculos se sem dados */}
+      {semDados ? null : <></>}
+      <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:12, opacity: semDados ? 0.3 : 1, pointerEvents: semDados ? 'none' : 'auto'}}>
 
         {/* Coluna esquerda — custos */}
         <div style={{padding:'12px 14px', background:C.surface, borderRadius:10}}>

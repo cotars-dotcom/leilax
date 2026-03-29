@@ -482,7 +482,7 @@ function ApiKeyModal({onClose, session}) {
  useEffect(()=>{
    if(!session?.user?.id) return
    import('./lib/supabase.js').then(({loadApiKeys})=>{
-     loadApiKeys(session.user.id).then(({claudeKey,openaiKey,geminiKey})=>{
+     loadApiKeys(session.user.id).then(({claudeKey,openaiKey,geminiKey,deepseekKey})=>{
        if(claudeKey){setKey(claudeKey);localStorage.setItem("axis-api-key",claudeKey)}
        if(openaiKey&&!localStorage.getItem("axis-openai-key")){setOaiKey(openaiKey);localStorage.setItem("axis-openai-key",openaiKey)}
        // Sempre sincronizar do banco (sobrescreve localStorage para garantir consistência)
@@ -1287,7 +1287,7 @@ useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("param
   useEffect(()=>{
     if(!session?.user?.id) return
     import('./lib/supabase.js').then(({loadApiKeys})=>{
-      loadApiKeys(session.user.id).then(({claudeKey,openaiKey,geminiKey})=>{
+      loadApiKeys(session.user.id).then(({claudeKey,openaiKey,geminiKey,deepseekKey})=>{
         if(claudeKey&&!localStorage.getItem('axis-api-key')){localStorage.setItem('axis-api-key',claudeKey);setApiKey(claudeKey)}
         if(openaiKey&&!localStorage.getItem('axis-openai-key')){localStorage.setItem('axis-openai-key',openaiKey)}
         // Sempre sincronizar do banco (sobrescreve localStorage para garantir consistência)
