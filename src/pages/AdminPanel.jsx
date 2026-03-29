@@ -78,7 +78,7 @@ export default function AdminPanel(){
             <div style={{fontWeight:600,fontSize:'13px',color:K.wh}}>{p.nome||'Sem nome'}</div>
             <div style={{fontSize:'11px',color:K.t3}}>{p.email}</div>
           </div>
-          <select value={p.role||'viewer'} onChange={e=>changeRole(p.id,e.target.value)} style={{...inp,width:'140px'}}>
+          <select value={p.role||'viewer'} onChange={e=>changeRole(p.id,e.target.value)} style={{...inp(),width:'140px'}}>
             {ROLES.map(r=><option key={r.id} value={r.id}>{r.label}</option>)}
           </select>
           <span style={badge(p.ativo)}>{p.ativo?'Ativo':'Inativo'}</span>
@@ -98,7 +98,7 @@ export default function AdminPanel(){
             <div style={{fontSize:'11px',color:K.t3}}>{p.descricao}</div>
           </div>
           <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
-            <input type="number" min="0" max="100" value={p.peso||0} onChange={e=>setParametros(prev=>prev.map(x=>x.id===p.id?{...x,peso:Number(e.target.value)}:x))} style={{...inp,width:'70px',textAlign:'center'}}/>
+            <input type="number" min="0" max="100" value={p.peso||0} onChange={e=>setParametros(prev=>prev.map(x=>x.id===p.id?{...x,peso:Number(e.target.value)}:x))} style={{...inp(),width:'70px',textAlign:'center'}}/>
             <span style={{color:K.t3,fontSize:'12px'}}>%</span>
             <button onClick={()=>saveParam(p)} disabled={saving} style={{background:K.teal+'15',border:'1px solid '+K.teal,borderRadius:'6px',padding:'5px 12px',color:K.teal,cursor:'pointer',fontSize:'11px',fontWeight:700}}>Salvar</button>
           </div>

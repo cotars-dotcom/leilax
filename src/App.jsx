@@ -245,7 +245,7 @@ function TrelloModal({config,onSave,onClose}) {
         <div style={{marginBottom:"12px"}}>
           <div style={{fontSize:"10px",color:K.t3,textTransform:"uppercase",letterSpacing:"1px",marginBottom:"5px"}}>Board</div>
           {boards.length>0
-            ?<select style={{...inp,cursor:"pointer"}} value={boardId} onChange={e=>fetchLists(e.target.value)}>
+            ?<select style={{...inp(),cursor:"pointer"}} value={boardId} onChange={e=>fetchLists(e.target.value)}>
               <option value="">— Selecione o board —</option>
               {boards.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}
             </select>
@@ -255,7 +255,7 @@ function TrelloModal({config,onSave,onClose}) {
         <div style={{marginBottom:"18px"}}>
           <div style={{fontSize:"10px",color:K.t3,textTransform:"uppercase",letterSpacing:"1px",marginBottom:"5px"}}>Lista de Destino</div>
           {lists.length>0
-            ?<select style={{...inp,cursor:"pointer"}} value={listId} onChange={e=>setListId(e.target.value)}>
+            ?<select style={{...inp(),cursor:"pointer"}} value={listId} onChange={e=>setListId(e.target.value)}>
               {lists.map(l=><option key={l.id} value={l.id}>{l.name}</option>)}
             </select>
             :<input style={inp()} placeholder="ID da lista (ex: 5f4e3d2c1b0b)" value={listId} onChange={e=>setListId(e.target.value)}/>
@@ -703,7 +703,7 @@ function NovoImovel({onSave,onCancel,onNav,trello,parametrosBanco,criteriosBanco
 
       <div style={{marginBottom:"16px"}}>
         <div style={{fontSize:"10px",color:K.t3,textTransform:"uppercase",letterSpacing:"1px",marginBottom:"6px"}}>Link do Leilão *</div>
-        <input type="url" inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false} style={{...inp,fontSize:isPhone?16:14,padding:isPhone?'14px 16px':'10px 14px'}} placeholder="https://venda-imoveis.caixa.gov.br/..." value={url} onChange={e=>setUrl(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")analyze()}}/>
+        <input type="url" inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false} style={{...inp(),fontSize:isPhone?16:14,padding:isPhone?'14px 16px':'10px 14px'}} placeholder="https://venda-imoveis.caixa.gov.br/..." value={url} onChange={e=>setUrl(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")analyze()}}/>
         <div style={{fontSize:"11px",color:K.t3,marginTop:"5px"}}>Portal CAIXA, sites de leiloeiros, qualquer anúncio público</div>
 
       <div style={{marginTop:"12px"}}>
@@ -735,7 +735,7 @@ function NovoImovel({onSave,onCancel,onNav,trello,parametrosBanco,criteriosBanco
           placeholder={"URLs dos documentos (uma por linha)\nEx: https://site.com/edital.pdf\nhttps://site.com/rgi.pdf"}
           value={urlsDocumentos}
           onChange={e=>setUrlsDocumentos(e.target.value)}
-          style={{...inp,minHeight:"72px",resize:"vertical",fontSize:isPhone?14:13,lineHeight:"1.5"}}
+          style={{...inp(),minHeight:"72px",resize:"vertical",fontSize:isPhone?14:13,lineHeight:"1.5"}}
         />
         <div style={{fontSize:"11px",color:K.t3,marginTop:"4px"}}>PDFs de edital, matrícula/RGI e planilha de débitos — serão analisados automaticamente pela IA</div>
       </div>
@@ -969,11 +969,11 @@ function Lista({props,onNav,onDelete,trello,onUpdateProp}) {
     <div style={{padding:isPhoneL?"16px":"20px 28px"}}>
       {syncMsg&&<div style={{background:`${K.teal}10`,border:`1px solid ${K.teal}30`,borderRadius:"6px",padding:"10px",marginBottom:"14px",fontSize:"12px",color:K.teal}}>{syncMsg}</div>}
       <div style={{display:"flex",gap:"10px",marginBottom:"16px",flexWrap:"wrap"}}>
-        <input style={{...inp,maxWidth:isPhoneL?"100%":"260px",fontSize:isPhoneL?16:13}} placeholder="🔍 Buscar..." value={q} onChange={e=>setQ(e.target.value)}/>
-        <select style={{...inp,width:"auto",cursor:"pointer"}} value={filter} onChange={e=>setFilter(e.target.value)}>
+        <input style={{...inp(),maxWidth:isPhoneL?"100%":"260px",fontSize:isPhoneL?16:13}} placeholder="🔍 Buscar..." value={q} onChange={e=>setQ(e.target.value)}/>
+        <select style={{...inp(),width:"auto",cursor:"pointer"}} value={filter} onChange={e=>setFilter(e.target.value)}>
           <option value="todos">Todos</option><option value="comprar">Comprar</option><option value="aguardar">Aguardar</option><option value="evitar">Evitar</option>
         </select>
-        <select style={{...inp,width:"auto",cursor:"pointer"}} value={sort} onChange={e=>setSort(e.target.value)}>
+        <select style={{...inp(),width:"auto",cursor:"pointer"}} value={sort} onChange={e=>setSort(e.target.value)}>
           <option value="score">Maior Score</option><option value="desconto">Maior Desconto</option><option value="valor">Menor Valor</option><option value="data">Mais Recente</option>
         </select>
       </div>

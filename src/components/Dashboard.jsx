@@ -393,7 +393,7 @@ export default function Dashboard({props,onNav,profile:prof,isMobile,isPhone}) {
       <div style={{marginTop:24,background:C.white,borderRadius:14,border:`1px solid ${C.border}`,padding:"20px 24px"}}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:leads.length?16:0}}>
           <div style={{fontWeight:"600",color:C.text,fontSize:15}}>Oportunidades de Leilão</div>
-          <button style={{...btn(C.emerald),display:"flex",alignItems:"center",gap:6,fontSize:13}} onClick={buscarOportunidades} disabled={buscando}>
+          <button style={{...btn('s'),background:C.emerald,color:'#fff',border:'none',display:'flex',alignItems:'center',gap:6,fontSize:13}} onClick={buscarOportunidades} disabled={buscando}>
             {buscando?"Buscando…":"🔍 Buscar Oportunidades"}
           </button>
         </div>

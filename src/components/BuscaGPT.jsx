@@ -178,7 +178,7 @@ export default function BuscaGPT({ onAnalisar }) {
         </div>
         <div>
           <div style={{ fontSize: 10, color: K.t3, textTransform: "uppercase", letterSpacing: 1, marginBottom: 5 }}>Tipo</div>
-          <select style={{ ...inp, cursor: "pointer" }} value={tipo} onChange={e => setTipo(e.target.value)}>
+          <select style={{ ...inp(), cursor: "pointer" }} value={tipo} onChange={e => setTipo(e.target.value)}>
             <option>Apartamento</option><option>Casa</option><option>Terreno</option><option>Comercial</option><option>Qualquer</option>
           </select>
         </div>

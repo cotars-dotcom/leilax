@@ -73,7 +73,7 @@ export default function Tarefas(){
     <div style={{padding:isPhone?'16px 16px 12px':'22px 28px 16px',borderBottom:'1px solid '+K.bd,display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:10}}>
       <div style={{fontWeight:700,fontSize:19,color:K.wh}}>✅ Tarefas</div>
       <div style={{display:'flex',gap:'10px',alignItems:'center'}}>
-        {isAdmin&&<select value={filtroMembro} onChange={e=>setFiltroMembro(e.target.value)} style={{...inp,width:'auto',padding:'7px 10px'}}>
+        {isAdmin&&<select value={filtroMembro} onChange={e=>setFiltroMembro(e.target.value)} style={{...inp(),width:'auto',padding:'7px 10px'}}>
           <option value="todos">Todos os membros</option>
           {profiles.map(p=><option key={p.id} value={p.id}>{p.nome}</option>)}
         </select>}
@@ -123,7 +123,7 @@ export default function Tarefas(){
           </div>
           <div style={{marginBottom:'14px'}}>
             <div style={{fontSize:'11px',color:K.t3,marginBottom:'5px',textTransform:'uppercase'}}>Descrição</div>
-            <textarea style={{...inp,height:'80px',resize:'vertical'}} value={form.descricao} onChange={e=>setForm(f=>({...f,descricao:e.target.value}))} placeholder="Detalhes..."/>
+            <textarea style={{...inp(),height:'80px',resize:'vertical'}} value={form.descricao} onChange={e=>setForm(f=>({...f,descricao:e.target.value}))} placeholder="Detalhes..."/>
           </div>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'12px',marginBottom:'14px'}}>
             <div>
