@@ -972,9 +972,18 @@ export default function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze
         const camposCriticos = ['valor_minimo','valor_avaliacao','titulo','fotos','comparaveis',
           'score_total','score_localizacao','score_desconto','score_juridico','score_ocupacao',
           'score_liquidez','score_mercado','recomendacao','codigo_axis','endereco','bairro']
+        // Campos que nunca devem ser sobrescritos com zero (zero = dado inválido)
+        const camposNuncaZero = ['valor_minimo','valor_avaliacao','desconto_percentual',
+          'preco_m2_mercado','preco_m2_imovel','aluguel_mensal_estimado',
+          'valor_mercado_estimado','num_leilao']
         const merged = {...original, ...novo}
         for (const campo of camposCriticos) {
           if ((novo[campo] === null || novo[campo] === undefined || novo[campo] === 0 || novo[campo] === '') && original[campo]) {
+            merged[campo] = original[campo]
+          }
+        }
+        for (const campo of camposNuncaZero) {
+          if ((novo[campo] === 0 || novo[campo] === null || novo[campo] === undefined || novo[campo] === '') && original[campo] && original[campo] !== 0) {
             merged[campo] = original[campo]
           }
         }

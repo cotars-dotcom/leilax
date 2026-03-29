@@ -177,9 +177,15 @@ export async function saveImovelCompleto(imovel, userId) {
       if (atual) {
         const CAMPOS_PROTEGIDOS = ['valor_minimo','valor_avaliacao','titulo','score_total',
           'score_localizacao','score_desconto','score_juridico','score_ocupacao',
-          'score_liquidez','score_mercado','recomendacao','codigo_axis']
+          'score_liquidez','score_mercado','recomendacao','codigo_axis',
+          'desconto_percentual','preco_m2_mercado','preco_m2_imovel',
+          'aluguel_mensal_estimado','num_leilao','valor_mercado_estimado']
         for (const campo of CAMPOS_PROTEGIDOS) {
-          const novoVazio = payload[campo] === null || payload[campo] === undefined || payload[campo] === 0 || payload[campo] === ''
+          // Scores podem ser zero válido; campos monetários e percentuais com zero = dado errado
+          const camposNuncaZero = ['valor_minimo','valor_avaliacao','desconto_percentual',
+            'preco_m2_mercado','preco_m2_imovel','aluguel_mensal_estimado','valor_mercado_estimado']
+          const novoVazio = payload[campo] === null || payload[campo] === undefined || payload[campo] === ''
+            || (camposNuncaZero.includes(campo) && (payload[campo] === 0 || payload[campo] === '0'))
           const novoGenerico = campo === 'titulo' && ['Imóvel de Teste','Lote - Marco Antônio Leiloeiro'].includes(payload[campo])
           if ((novoVazio || novoGenerico) && atual[campo] != null && atual[campo] !== 0 && atual[campo] !== '') {
             payload[campo] = atual[campo]

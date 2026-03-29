@@ -223,6 +223,19 @@ Retorne APENAS JSON com os campos atualizados:
     delta.aluguel_mensal_estimado = Math.round(preco * area * yieldAnual / 12)
   }
 
+  // Preservar campos críticos contra zeros/nulls do Gemini
+  const PRESERVAR_SE_ZERO = ['desconto_percentual','preco_m2_mercado','preco_m2_imovel',
+    'aluguel_mensal_estimado','valor_mercado_estimado','num_leilao']
+  for (const campo of PRESERVAR_SE_ZERO) {
+    const novoVal = delta[campo]
+    const valAnterior = imovelAtual[campo]
+    const novoEhZeroOuVazio = novoVal === 0 || novoVal === null || novoVal === undefined || novoVal === ''
+    const anteriorEhValido = valAnterior != null && valAnterior !== 0 && valAnterior !== ''
+    if (novoEhZeroOuVazio && anteriorEhValido) {
+      delete delta[campo] // remover do delta — imovelAtual prevalece no spread abaixo
+    }
+  }
+
   // Mesclar delta com dados existentes — preservar campos não retornados pelo Gemini
   const analiseAtualizada = {
     ...imovelAtual,
