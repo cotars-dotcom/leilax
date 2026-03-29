@@ -481,9 +481,10 @@ function ApiKeyModal({onClose, session}) {
    if(!session?.user?.id) return
    import('./lib/supabase.js').then(({loadApiKeys})=>{
      loadApiKeys(session.user.id).then(({claudeKey,openaiKey,geminiKey})=>{
-       if(claudeKey&&!localStorage.getItem("axis-api-key")){setKey(claudeKey);localStorage.setItem("axis-api-key",claudeKey)}
+       if(claudeKey){setKey(claudeKey);localStorage.setItem("axis-api-key",claudeKey)}
        if(openaiKey&&!localStorage.getItem("axis-openai-key")){setOaiKey(openaiKey);localStorage.setItem("axis-openai-key",openaiKey)}
-       if(geminiKey&&!localStorage.getItem('axis-gemini-key')){localStorage.setItem('axis-gemini-key',geminiKey)}
+       // Sempre sincronizar do banco (sobrescreve localStorage para garantir consistência)
+      if(geminiKey){localStorage.setItem('axis-gemini-key',geminiKey)}
      })
    })
  },[session])
@@ -1272,7 +1273,8 @@ useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("param
       loadApiKeys(session.user.id).then(({claudeKey,openaiKey,geminiKey})=>{
         if(claudeKey&&!localStorage.getItem('axis-api-key')){localStorage.setItem('axis-api-key',claudeKey);setApiKey(claudeKey)}
         if(openaiKey&&!localStorage.getItem('axis-openai-key')){localStorage.setItem('axis-openai-key',openaiKey)}
-        if(geminiKey&&!localStorage.getItem('axis-gemini-key')){localStorage.setItem('axis-gemini-key',geminiKey)}
+        // Sempre sincronizar do banco (sobrescreve localStorage para garantir consistência)
+      if(geminiKey){localStorage.setItem('axis-gemini-key',geminiKey)}
       }).catch(()=>{})
     }).catch(()=>{})
   },[session])
