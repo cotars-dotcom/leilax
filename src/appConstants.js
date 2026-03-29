@@ -19,7 +19,8 @@ export const K = {
   bd:C.border, bd2:C.borderW, teal:C.emerald, amb:C.mustard,
   red:"#E5484D", blue:"#4A9EFF", pur:"#A78BFA", grn:C.emerald,
   gold:"#C68A00", tx:C.text, t2:C.muted, t3:C.hint, wh:C.navy,
-  trello:"#0052CC"
+  trello:"#0052CC", border:C.borderW, gpt:"#19C37D", green:C.emerald, warn:C.mustard
+
 }
 
 
