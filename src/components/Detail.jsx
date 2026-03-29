@@ -950,9 +950,9 @@ export default function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze
       }
       // Bloquear salvamento de análise sem IA se modelo é regex_fallback
       const modeloUsado = novaAnalise._modelo_usado || ''
-      if (modeloUsado === 'regex_fallback' && !confirm('⚠️ Gemini indisponível — reanálise feita sem IA.\n\nOs scores originais serão preservados. Deseja salvar?')) {
+      if (modeloUsado === 'regex_fallback') {
         setReanalyzing(false)
-        setMsg('Reanálise cancelada — chave Gemini necessária para análise completa.')
+        setMsg('⚠️ Gemini não respondeu — verifique a chave em Config → API Keys e tente novamente.')
         return
       }
       const merged={...protegerCampos(p, novaAnalise),id:p.id,createdAt:p.createdAt,criado_por:p.criado_por}

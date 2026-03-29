@@ -104,9 +104,10 @@ Retorne APENAS JSON com os campos atualizados:
 }`
 
   // Cascata de modelos: 2.0-flash → 1.5-flash → 1.5-pro
-  const MODELOS_GEMINI = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro']
+  const MODELOS_GEMINI = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-1.5-pro']
   let data = null
   let ultimoErro = null
+  let modeloUsado = 'gemini-1.5-flash'
 
   for (const modelo of MODELOS_GEMINI) {
     progress(`Gemini revalidando análise (${modelo})...`)
@@ -131,6 +132,7 @@ Retorne APENAS JSON com os campos atualizados:
         continue
       }
       data = await r.json()
+      modeloUsado = modelo
       console.log('[AXIS agenteReanalise] Sucesso com modelo:', modelo)
       break
     } catch(e) {
@@ -164,7 +166,7 @@ Retorne APENAS JSON com os campos atualizados:
     comparaveis: delta.comparaveis || imovelAtual.comparaveis || [],
     criado_em: imovelAtual.criado_em,
     criado_por: imovelAtual.criado_por,
-    _modelo_usado: 'gemini-2.0-flash',
+    _modelo_usado: modeloUsado,
   }
 
   // Recalcular score total com os pesos corretos
