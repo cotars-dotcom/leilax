@@ -707,7 +707,20 @@ export default function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze
         console.warn('[AXIS] Salvar reanálise:', saveErr.message)
         setMsg("✅ Reanalisado! (sync nuvem falhou — tente novamente)")
       }
-    } catch(e) { setMsg(`⚠️ Erro ao reanalisar: ${e.message}`) }
+    } catch(e) {
+      const msg = e.message || ''
+      if (msg.includes('Créditos esgotados') || msg.includes('402')) {
+        setMsg('⚠️ Créditos Claude esgotados — recarregue em console.anthropic.com')
+      } else if (msg.includes('Chave inválida') || msg.includes('401')) {
+        setMsg('⚠️ Chave Claude inválida — verifique em Admin > API Keys')
+      } else if (msg.includes('Timeout') || msg.includes('AbortError')) {
+        setMsg('⚠️ Timeout — o imóvel pode ser complexo. Tente novamente.')
+      } else if (msg.includes('URL') || msg.includes('fetch')) {
+        setMsg('⚠️ URL inacessível — o site do edital pode estar fora do ar')
+      } else {
+        setMsg(`⚠️ Erro: ${msg}`)
+      }
+    }
     setReanalyzing(false);setReStep("")
   }
   if(!p) return <div style={{padding:"40px",textAlign:"center",color:K.t3}}>Não encontrado</div>

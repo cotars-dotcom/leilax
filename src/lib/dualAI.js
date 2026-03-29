@@ -335,7 +335,11 @@ Retorne APENAS JSON válido (sem markdown):
     })
     if (!res.ok) {
       const err = await res.json()
-      throw new Error(err.error?.message || `OpenAI erro ${res.status}`)
+      const status = res.status
+      if (status === 401) throw new Error('[OpenAI] Chave inválida — verifique em Admin > API Keys')
+      if (status === 429) throw new Error('[OpenAI] Limite de requisições atingido — aguarde alguns minutos')
+      if (status === 402) throw new Error('[OpenAI] Créditos insuficientes — adicione saldo em platform.openai.com')
+      throw new Error(err.error?.message || `[OpenAI] Erro ${status}`)
     }
     const data = await res.json()
     const txt = (data.output || [])
@@ -603,7 +607,11 @@ Use apenas tags de texto: [CRITICO] [ATENCAO] [OK] [INFO]
 
   if (!res.ok) {
     const err = await res.json()
-    throw new Error(err.error?.message || `Claude erro ${res.status}`)
+    const cStatus = res.status
+    if (cStatus === 401) throw new Error('[Claude] Chave inválida — verifique em Admin > API Keys')
+    if (cStatus === 402 || cStatus === 529) throw new Error('[Claude] Créditos esgotados — recarregue em console.anthropic.com')
+    if (cStatus === 429) throw new Error('[Claude] Muitas requisições simultâneas — aguarde e tente novamente')
+    throw new Error(err.error?.message || `[Claude] Erro ${cStatus}`)
   }
 
   const data = await res.json()

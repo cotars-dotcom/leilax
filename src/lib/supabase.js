@@ -340,17 +340,25 @@ export async function loadApiKeys(userId) {
       .single()
     if (data?.valor) {
       const keys = JSON.parse(data.valor)
-      return { claudeKey: keys.claude || '', openaiKey: keys.openai || '' }
+      return {
+        claudeKey: keys.claude || '',
+        openaiKey: keys.openai || '',
+        geminiKey: keys.gemini || ''
+      }
     }
   } catch(e) { console.warn('[AXIS supabase] Load API keys:', e.message) }
-  return { claudeKey: '', openaiKey: '' }
+  return { claudeKey: '', openaiKey: '', geminiKey: '' }
 }
 
-export async function persistApiKeys(userId, { claudeKey, openaiKey }) {
+export async function persistApiKeys(userId, { claudeKey, openaiKey, geminiKey }) {
   try {
     await supabase.from('app_settings').upsert({
       chave: `api_keys_${userId}`,
-      valor: JSON.stringify({ claude: claudeKey, openai: openaiKey }),
+      valor: JSON.stringify({
+        claude: claudeKey,
+        openai: openaiKey,
+        gemini: geminiKey || ''
+      }),
       atualizado_em: new Date().toISOString()
     }, { onConflict: 'chave' })
   } catch(e) { console.warn('[AXIS] persistApiKeys:', e.message) }
