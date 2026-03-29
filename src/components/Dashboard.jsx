@@ -5,8 +5,9 @@ import { supabase } from '../lib/supabase.js'
 
 // Inline ScoreRing (used by PropCard)
 function ScoreRing({score,size=80}) {
-  const maxVal = size > 60 ? 10 : 100
-  const c = maxVal === 10 ? scoreColor(score||0) : ((score||0)>=70?C.emerald:(score||0)>=50?C.mustard:"#E5484D")
+  // Scores AXIS são sempre 0-10; usar scoreColor diretamente
+  const maxVal = 10
+  const c = scoreColor(score||0)
   const r = (size-10)/2
   const circ = 2*Math.PI*r
   const dash = ((score||0)/maxVal)*circ
@@ -289,14 +290,14 @@ export default function Dashboard({props,onNav,profile:prof,isMobile,isPhone}) {
             paddingTop:12,borderTop:`1px solid ${C.borderW}`,
           }}>
             <div>
-              <p style={{margin:0,fontSize:10.5,color:C.hint}}>Para comprar</p>
-              <p style={{margin:"2px 0 0",fontSize:14,fontWeight:700,color:C.emerald}}>{comprar}</p>
-              <p style={{margin:0,fontSize:10,color:C.hint}}>Recomendação positiva</p>
+              <p style={{margin:0,fontSize:10,color:C.hint,whiteSpace:"nowrap"}}>Para comprar</p>
+              <p style={{margin:"2px 0 0",fontSize:18,fontWeight:800,color:C.emerald,lineHeight:1}}>{comprar}</p>
+              <p style={{margin:"2px 0 0",fontSize:9.5,color:C.hint}}>Rec. positiva</p>
             </div>
             <div>
-              <p style={{margin:0,fontSize:10.5,color:C.hint}}>Score forte</p>
-              <p style={{margin:"2px 0 0",fontSize:14,fontWeight:700,color:C.emerald}}>{forte}</p>
-              <p style={{margin:0,fontSize:10,color:C.hint}}>Score &ge; 7.5</p>
+              <p style={{margin:0,fontSize:10,color:C.hint,whiteSpace:"nowrap"}}>Score forte</p>
+              <p style={{margin:"2px 0 0",fontSize:18,fontWeight:800,color:C.emerald,lineHeight:1}}>{forte}</p>
+              <p style={{margin:"2px 0 0",fontSize:9.5,color:C.hint}}>Score ≥ 7.5</p>
             </div>
           </div>
         </div>
