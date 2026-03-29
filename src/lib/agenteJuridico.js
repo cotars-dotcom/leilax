@@ -33,26 +33,30 @@ const PADROES_LEILOEIRO = {
           links.push({ url: fullUrl, tipo, nome: tipo.charAt(0).toUpperCase() + tipo.slice(1) })
         }
       })
-      // Padrão 3: PDFs em formato Markdown (retorno do Jina) — [texto](url.pdf)
-      const mdPdfs = html.match(/\[[^\]]+\]\(([^)]+\.pdf[^)]*)\)/gi) || []
-      mdPdfs.forEach(m => {
-        const urlMatch = m.match(/\(([^)]+\.pdf[^)]*)\)/)
-        if (urlMatch) {
-          const fullUrl = urlMatch[1].startsWith('http') ? urlMatch[1] : `https://www.marcoantonioleiloeiro.com.br${urlMatch[1]}`
-          if (!links.find(l => l.url === fullUrl)) {
-            const nome = fullUrl.toLowerCase()
-            const tipo = nome.includes('edital') ? 'edital'
-              : nome.includes('matri') || nome.includes('rgi') ? 'matricula'
-              : nome.includes('process') ? 'processo' : 'documento'
-            links.push({ url: fullUrl, tipo, nome: tipo.charAt(0).toUpperCase() + tipo.slice(1) })
-          }
+      // Padrão 3: PDFs em formato Markdown [texto](url.pdf) — formato retornado pelo Jina
+      // Captura [texto](https://...pdf) com nome real do documento
+      const mdRegex = /\[([^\]]+)\]\((https?:\/\/[^)]+\.pdf)\)/gi
+      let mdMatch
+      while ((mdMatch = mdRegex.exec(html)) !== null) {
+        const nomeReal = mdMatch[1].replace(/\.pdf$/i, '').trim()
+        const fullUrl = mdMatch[2]
+        if (!links.find(l => l.url === fullUrl)) {
+          const nomeLower = (nomeReal + fullUrl).toLowerCase()
+          const tipo = nomeLower.includes('edital') ? 'edital'
+            : nomeLower.includes('matri') || nomeLower.includes('rgi') ? 'matricula'
+            : nomeLower.includes('process') ? 'processo'
+            : nomeLower.includes('certid') ? 'certidao' : 'documento'
+          links.push({ url: fullUrl, tipo, nome: nomeReal || tipo })
         }
-      })
-      // Padrão 4: links do suporteleiloes.com.br (storage de documentos)
-      const storageLinks = html.match(/https?:\/\/static\.suporteleiloes\.com\.br\/[^\s"'\)]+\.pdf/gi) || []
+      }
+      // Padrão 4: URLs diretas do storage suporteleiloes.com.br (sem markdown)
+      const storageLinks = html.match(/https?:\/\/static\.suporteleiloes\.com\.br\/[^\s"'\)\]]+\.pdf/gi) || []
       storageLinks.forEach(u => {
         if (!links.find(l => l.url === u)) {
-          const tipo = u.toLowerCase().includes('edital') ? 'edital' : u.toLowerCase().includes('matri') ? 'matricula' : 'documento'
+          const nomeLower = u.toLowerCase()
+          const tipo = nomeLower.includes('edital') ? 'edital'
+            : nomeLower.includes('matri') ? 'matricula'
+            : 'documento'
           links.push({ url: u, tipo, nome: tipo.charAt(0).toUpperCase() + tipo.slice(1) })
         }
       })
