@@ -230,21 +230,70 @@ ${p.fonte_url?`\n🔗 ${p.fonte_url}`:""}`
   return { name:`${emoji} [${score}] ${p.titulo||p.tipo||"Imóvel"} — ${p.cidade||""}`, desc }
 }
 
-function GaleriaFotos({ fotos = [], foto_principal = null, url = null }) {
+function GaleriaFotos({ fotos = [], foto_principal = null, url = null, imovelId = null, onFotosAtualizadas = null, isAdmin = false }) {
   const [fotoAtiva, setFotoAtiva] = useState(foto_principal || fotos[0] || null)
-  if (!fotos.length && !foto_principal) return (
-    <div style={{ textAlign:'center', padding:'40px 24px', color:C.hint }}>
+  const [buscando, setBuscando] = useState(false)
+  const [msgFoto, setMsgFoto] = useState('')
+  const [fotosLocais, setFotosLocais] = useState(fotos)
+  const [principalLocal, setPrincipalLocal] = useState(foto_principal)
+
+  const buscarFotos = async () => {
+    if (!url) return
+    setBuscando(true); setMsgFoto('')
+    try {
+      const { buscarFotosImovel } = await import('../lib/buscadorFotos.js')
+      const geminiKey = localStorage.getItem('axis-gemini-key') || ''
+      const resultado = await buscarFotosImovel({ fonte_url: url, id: imovelId }, geminiKey, setMsgFoto)
+      if (resultado.fotos.length > 0 || resultado.foto_principal) {
+        setFotosLocais(resultado.fotos)
+        setPrincipalLocal(resultado.foto_principal)
+        setFotoAtiva(resultado.foto_principal || resultado.fotos[0])
+        setMsgFoto(`✅ ${resultado.fotos.length} fotos encontradas (${resultado.fonte})`)
+        // Salvar no banco
+        if (imovelId && onFotosAtualizadas) {
+          onFotosAtualizadas(resultado.fotos, resultado.foto_principal)
+        }
+      } else {
+        setMsgFoto('⚠️ Nenhuma foto encontrada automaticamente. Tente ver o anúncio original.')
+      }
+    } catch(e) {
+      setMsgFoto('⚠️ Erro ao buscar fotos: ' + e.message)
+    }
+    setBuscando(false)
+  }
+
+  const todasFotosExib = principalLocal
+    ? [principalLocal, ...fotosLocais.filter(f => f !== principalLocal)]
+    : fotosLocais
+
+  if (!fotosLocais.length && !principalLocal) return (
+    <div style={{ textAlign:'center', padding:'32px 24px', color:C.hint }}>
       <div style={{ fontSize:40, marginBottom:12 }}>📷</div>
       <p style={{ margin:'0 0 6px', fontSize:14, fontWeight:600, color:C.muted }}>Nenhuma foto disponível</p>
-      <p style={{ margin:0, fontSize:12, color:C.hint }}>As fotos são extraídas automaticamente do anúncio original. Sites com carregamento dinâmico (SPA) podem não ter fotos.</p>
-      {url && <a href={url} target="_blank" rel="noopener noreferrer" style={{ display:'inline-block', marginTop:12, padding:'8px 16px', borderRadius:8, background:C.navy, color:'#fff', fontSize:12, fontWeight:600, textDecoration:'none' }}>Ver anúncio original →</a>}
+      <p style={{ margin:'0 0 16px', fontSize:12, color:C.hint }}>
+        Fotos são extraídas automaticamente do edital. Clique em buscar ou veja o anúncio original.
+      </p>
+      {msgFoto && <p style={{ fontSize:11, color:msgFoto.includes('✅') ? C.emerald : C.mustard, marginBottom:10 }}>{msgFoto}</p>}
+      <div style={{ display:'flex', gap:8, justifyContent:'center', flexWrap:'wrap' }}>
+        {isAdmin && url && (
+          <button onClick={buscarFotos} disabled={buscando} style={{
+            padding:'8px 16px', borderRadius:8, background:C.navy, color:'#fff',
+            fontSize:12, fontWeight:600, border:'none', cursor:'pointer', opacity:buscando?0.6:1
+          }}>
+            {buscando ? (msgFoto || 'Buscando...') : '🔍 Buscar fotos automaticamente'}
+          </button>
+        )}
+        {url && <a href={url} target="_blank" rel="noopener noreferrer" style={{
+          display:'inline-flex', alignItems:'center', padding:'8px 16px',
+          borderRadius:8, background:C.surface, border:`1px solid ${C.borderW}`,
+          color:C.navy, fontSize:12, fontWeight:600, textDecoration:'none'
+        }}>Ver anúncio original →</a>}
+      </div>
     </div>
   )
-  const todasFotos = foto_principal
-    ? [foto_principal, ...fotos.filter(f => f !== foto_principal)]
-    : fotos
   return (
     <div style={{ marginBottom: 20 }}>
+      {msgFoto && <p style={{ fontSize:11, color:msgFoto.includes('✅') ? C.emerald : C.mustard, marginBottom:8, textAlign:'center' }}>{msgFoto}</p>}
       {fotoAtiva && (
         <div style={{
           width: '100%', height: 240,
@@ -283,6 +332,17 @@ function GaleriaFotos({ fotos = [], foto_principal = null, url = null }) {
               onError={e => { e.target.style.display = 'none' }}
             />
           ))}
+        </div>
+      )}
+      {isAdmin && url && (
+        <div style={{ marginTop:10, textAlign:'center' }}>
+          <button onClick={buscarFotos} disabled={buscando} style={{
+            padding:'5px 12px', borderRadius:6, background:C.surface,
+            border:`1px solid ${C.borderW}`, color:C.muted, fontSize:11,
+            cursor:'pointer', opacity:buscando?0.6:1
+          }}>
+            {buscando ? (msgFoto || 'Buscando...') : '🔄 Buscar mais fotos'}
+          </button>
         </div>
       )}
     </div>
@@ -905,7 +965,23 @@ export default function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze
         })
       }}/>}
 
-      {abaDetalhe==='fotos'&&<GaleriaFotos fotos={p.fotos||[]} foto_principal={p.foto_principal} url={p.url}/>}
+      {abaDetalhe==='fotos'&&<GaleriaFotos 
+          fotos={p.fotos||[]} 
+          foto_principal={p.foto_principal} 
+          url={p.fonte_url||p.url} 
+          imovelId={p.id}
+          isAdmin={isAdmin}
+          onFotosAtualizadas={async (fotos, foto_principal) => {
+            // Salvar fotos no banco
+            try {
+              const { saveImovelCompleto } = await import('../lib/supabase.js')
+              const { data:{ session } } = await supabase.auth.getSession()
+              await saveImovelCompleto({ ...p, fotos, foto_principal }, session?.user?.id)
+              if (onUpdateProp) onUpdateProp(p.id, { ...p, fotos, foto_principal })
+              setMsg('✅ Fotos salvas!')
+            } catch(e) { console.warn('[AXIS] Salvar fotos:', e.message) }
+          }}
+        />}
 
       {abaDetalhe==='mercado'&&<div>
         <div style={card()}>

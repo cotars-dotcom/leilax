@@ -1143,12 +1143,21 @@ DADOS DE BAIRRO (parcial):
       analise.alertas = [...(analise.alertas||[]), ...dadosGPT.noticias.map(n => `📰 ${n}`)]
   }
 
-  // Extrair fotos do site
-  progress('[FOTOS] Extraindo fotos do imovel...')
+  // Extrair fotos — usar buscadorFotos (custo zero) com fallback para extrairFotosImovel
+  progress('📷 Buscando fotos do imóvel...')
   let fotosResult = { fotos: [], foto_principal: null }
   try {
-    fotosResult = await extrairFotosImovel(url, claudeKey) || { fotos: [], foto_principal: null }
-  } catch { /* ignorar erro de fotos */ }
+    const { buscarFotosImovel } = await import('./buscadorFotos.js')
+    const gemKey = typeof localStorage !== 'undefined' ? localStorage.getItem('axis-gemini-key') : null
+    fotosResult = await buscarFotosImovel({ fonte_url: url }, gemKey, (msg) => progress(`📷 ${msg}`))
+    if (!fotosResult.fotos?.length && claudeKey) {
+      // Fallback para Haiku se buscador não encontrou nada
+      fotosResult = await extrairFotosImovel(url, claudeKey) || { fotos: [], foto_principal: null }
+    }
+  } catch(e) {
+    console.warn('[AXIS] Busca de fotos:', e.message)
+    try { fotosResult = await extrairFotosImovel(url, claudeKey) || { fotos: [], foto_principal: null } } catch {}
+  }
 
   // Validação pós-análise: corrigir área, preço/m², alertas contraditórios
   progress('🔍 Validando dados da análise...')
