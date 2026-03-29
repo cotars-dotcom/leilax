@@ -839,9 +839,15 @@ export default function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze
         if ((!novo.comparaveis || novo.comparaveis.length === 0) && original.comparaveis?.length > 0) merged.comparaveis = original.comparaveis
         return merged
       }
+      // NUNCA salvar dados de modo_teste no banco
+      if (novaAnalise.modo_teste === true) {
+        setReanalyzing(false)
+        setMsg('⚠️ Modo Teste ativo — desative em Admin → Config antes de reanalisar.')
+        return
+      }
       // Bloquear salvamento de análise sem IA se modelo é regex_fallback
       const modeloUsado = novaAnalise._modelo_usado || ''
-      if (modeloUsado === 'regex_fallback' && !confirm('⚠️ Gemini indisponível — a reanálise foi feita sem IA e pode ter dados incompletos.\n\nDeseja salvar mesmo assim? Os scores originais serão preservados.')) {
+      if (modeloUsado === 'regex_fallback' && !confirm('⚠️ Gemini indisponível — reanálise feita sem IA.\n\nOs scores originais serão preservados. Deseja salvar?')) {
         setReanalyzing(false)
         setMsg('Reanálise cancelada — chave Gemini necessária para análise completa.')
         return

@@ -176,8 +176,9 @@ export async function saveImovelCompleto(imovel, userId) {
           'score_localizacao','score_desconto','score_juridico','score_ocupacao',
           'score_liquidez','score_mercado','recomendacao','codigo_axis']
         for (const campo of CAMPOS_PROTEGIDOS) {
-          if ((payload[campo] === null || payload[campo] === undefined || payload[campo] === 0 || payload[campo] === '')
-              && atual[campo] != null && atual[campo] !== 0 && atual[campo] !== '') {
+          const novoVazio = payload[campo] === null || payload[campo] === undefined || payload[campo] === 0 || payload[campo] === ''
+          const novoGenerico = campo === 'titulo' && ['Imóvel de Teste','Lote - Marco Antônio Leiloeiro'].includes(payload[campo])
+          if ((novoVazio || novoGenerico) && atual[campo] != null && atual[campo] !== 0 && atual[campo] !== '') {
             payload[campo] = atual[campo]
             console.log('[AXIS Supabase] Campo protegido:', campo, '=', atual[campo])
           }
@@ -186,7 +187,7 @@ export async function saveImovelCompleto(imovel, userId) {
         if ((!payload.fotos || payload.fotos.length === 0) && atual.fotos?.length > 0) payload.fotos = atual.fotos
         if ((!payload.comparaveis || payload.comparaveis.length === 0) && atual.comparaveis?.length > 0) payload.comparaveis = atual.comparaveis
         // Justificativa: só sobrescrever se nova não for genérica
-        const textoGenerico = ['verifique os scores manualmente', 'revise os dados antes', 'análise automática']
+        const textoGenerico = ['verifique os scores manualmente', 'revise os dados antes', 'análise automática', 'imóvel de teste', 'análise simulada']
         if (payload.justificativa && textoGenerico.some(t => payload.justificativa.toLowerCase().includes(t)) && atual.justificativa && !textoGenerico.some(t => atual.justificativa.toLowerCase().includes(t))) {
           payload.justificativa = atual.justificativa
           payload.sintese_executiva = atual.sintese_executiva || payload.sintese_executiva

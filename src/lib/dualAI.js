@@ -876,7 +876,7 @@ Retorne SOMENTE este JSON (sem texto adicional):
   "fonte_fotos": "como foram encontradas"
 }`
 
-    // Se chave Gemini disponível, usar Gemini Flash-Lite (mais barato que Haiku)
+    // Se chave Gemini disponível, usar Gemini Flash (mais barato que Haiku)
     const geminiKey = typeof localStorage !== 'undefined' ? localStorage.getItem('axis-gemini-key') : null
     if (geminiKey) {
       try {
@@ -999,7 +999,7 @@ export async function analisarImovelCompleto(url, claudeKey, openaiKey, parametr
   }
 
   // ─── CASCATA DE CUSTO ZERO ─────────────────────────────────────────────────
-  // Tier 1: Gemini Flash-Lite (~$0.002) — 99% mais barato que Claude Sonnet
+  // Tier 1: Gemini Flash (~$0.002) — 99% mais barato que Claude Sonnet
   const forceClassic = false  // flag interna — mover aqui para evitar TDZ
   const geminiKey = typeof localStorage !== 'undefined' ? localStorage.getItem('axis-gemini-key') : null
   // ─── CASCATA IA: Gemini Flash → DeepSeek V3 → Claude Sonnet ─────────────────
