@@ -161,6 +161,41 @@ export async function saveImovelCompleto(imovel, userId) {
   payload.atualizado_em = new Date().toISOString()
   if (!payload.status_operacional) payload.status_operacional = 'ativo'
 
+  // ─── PROTEÇÃO DEFINITIVA NO SERVIDOR ────────────────────────────────────────
+  // Buscar dados atuais do banco antes de salvar (evita sobrescrever com null)
+  if (imovel.id) {
+    try {
+      const { data: atual } = await supabase
+        .from('imoveis')
+        .select('valor_minimo,valor_avaliacao,titulo,score_total,score_localizacao,score_desconto,score_juridico,score_ocupacao,score_liquidez,score_mercado,recomendacao,fotos,comparaveis,justificativa,sintese_executiva,codigo_axis,bairro,endereco')
+        .eq('id', imovel.id)
+        .single()
+
+      if (atual) {
+        const CAMPOS_PROTEGIDOS = ['valor_minimo','valor_avaliacao','titulo','score_total',
+          'score_localizacao','score_desconto','score_juridico','score_ocupacao',
+          'score_liquidez','score_mercado','recomendacao','codigo_axis']
+        for (const campo of CAMPOS_PROTEGIDOS) {
+          if ((payload[campo] === null || payload[campo] === undefined || payload[campo] === 0 || payload[campo] === '')
+              && atual[campo] != null && atual[campo] !== 0 && atual[campo] !== '') {
+            payload[campo] = atual[campo]
+            console.log('[AXIS Supabase] Campo protegido:', campo, '=', atual[campo])
+          }
+        }
+        // Fotos e comparáveis: só sobrescrever se novo tiver mais dados
+        if ((!payload.fotos || payload.fotos.length === 0) && atual.fotos?.length > 0) payload.fotos = atual.fotos
+        if ((!payload.comparaveis || payload.comparaveis.length === 0) && atual.comparaveis?.length > 0) payload.comparaveis = atual.comparaveis
+        // Justificativa: só sobrescrever se nova não for genérica
+        const textoGenerico = ['verifique os scores manualmente', 'revise os dados antes', 'análise automática']
+        if (payload.justificativa && textoGenerico.some(t => payload.justificativa.toLowerCase().includes(t)) && atual.justificativa && !textoGenerico.some(t => atual.justificativa.toLowerCase().includes(t))) {
+          payload.justificativa = atual.justificativa
+          payload.sintese_executiva = atual.sintese_executiva || payload.sintese_executiva
+        }
+      }
+    } catch(e) { console.warn('[AXIS Supabase] Proteção campos:', e.message) }
+  }
+  // ────────────────────────────────────────────────────────────────────────────
+
   console.log('[AXIS Supabase] Salvando imóvel:', payload.id, payload.titulo || '(sem título)')
   const { data, error } = await supabase
     .from('imoveis')
