@@ -74,7 +74,7 @@ export async function updateProfile(id, updates) {
 }
 
 // == IMOVEIS ==
-const IMOVEIS_LIST_COLS = `id,codigo_axis,titulo,cidade,estado,bairro,tipo,tipologia,score_total,recomendacao,status,valor_minimo,valor_avaliacao,desconto_percentual,area_m2,area_privativa_m2,ocupacao,processos_ativos,foto_principal,fotos,fonte_url,criado_em,criado_por,num_leilao,data_leilao,modalidade_leilao,score_localizacao,score_desconto,score_juridico,score_ocupacao,score_liquidez,score_mercado,jurimetria_vara,prazo_liberacao_estimado_meses,aluguel_mensal_estimado,valor_mercado_estimado,custo_reforma_calculado,mao_flip,mao_locacao,vara_judicial,tipo_justica,sintese_executiva,estrategia_recomendada,financiavel,analise_dupla_ia,preco_m2_imovel,preco_m2_mercado,num_documentos,score_viabilidade_docs,recomendacao_juridica_docs,resumo_documentos,mercado_tendencia,mercado_demanda,mercado_tempo_venda_meses,mercado_obs,yield_bruto_pct,classe_ipead,debitos_condominio,debitos_iptu,estrutura_recomendada,responsabilidade_debitos,obs_juridicas,positivos,negativos,alertas,custo_reforma_previsto,comparaveis`
+const IMOVEIS_LIST_COLS = `id,codigo_axis,titulo,cidade,estado,bairro,tipo,tipologia,score_total,recomendacao,status,valor_minimo,valor_avaliacao,desconto_percentual,area_m2,area_privativa_m2,ocupacao,processos_ativos,foto_principal,fotos,fonte_url,criado_em,criado_por,num_leilao,data_leilao,modalidade_leilao,score_localizacao,score_desconto,score_juridico,score_ocupacao,score_liquidez,score_mercado,jurimetria_vara,prazo_liberacao_estimado_meses,aluguel_mensal_estimado,valor_mercado_estimado,custo_reforma_calculado,mao_flip,mao_locacao,vara_judicial,tipo_justica,sintese_executiva,estrategia_recomendada,financiavel,analise_dupla_ia,preco_m2_imovel,preco_m2_mercado,num_documentos,score_viabilidade_docs,recomendacao_juridica_docs,resumo_documentos,mercado_tendencia,mercado_demanda,mercado_tempo_venda_meses,mercado_obs,yield_bruto_pct,classe_ipead,debitos_condominio,debitos_iptu,estrutura_recomendada,responsabilidade_debitos,obs_juridicas,positivos,negativos,alertas,custo_reforma_previsto,comparaveis,desconto_sobre_mercado_pct`
 
 export async function getImoveis() {
   const { data, error } = await supabase
@@ -183,7 +183,8 @@ export async function saveImovelCompleto(imovel, userId) {
         for (const campo of CAMPOS_PROTEGIDOS) {
           // Scores podem ser zero válido; campos monetários e percentuais com zero = dado errado
           const camposNuncaZero = ['valor_minimo','valor_avaliacao','desconto_percentual',
-            'preco_m2_mercado','preco_m2_imovel','aluguel_mensal_estimado','valor_mercado_estimado']
+            'preco_m2_mercado','preco_m2_imovel','aluguel_mensal_estimado','valor_mercado_estimado',
+            'num_leilao','desconto_sobre_mercado_pct']
           const novoVazio = payload[campo] === null || payload[campo] === undefined || payload[campo] === ''
             || (camposNuncaZero.includes(campo) && (payload[campo] === 0 || payload[campo] === '0'))
           const novoGenerico = campo === 'titulo' && ['Imóvel de Teste','Lote - Marco Antônio Leiloeiro'].includes(payload[campo])
