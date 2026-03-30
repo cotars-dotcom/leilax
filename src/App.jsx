@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, lazy, Suspense } from "react"
+import React, { useState, useEffect, useRef, lazy, Suspense } from "react"
 import { stLoad, stSave } from "./storage.js"
 const Charts = lazy(() => import('./components/Charts.jsx'))
 import MobileNav from "./components/MobileNav.jsx"
@@ -1285,6 +1285,29 @@ function BancoArquivados({ session, isAdmin, isPhone }) {
 }
 
 // ── APP ROOT ──────────────────────────────────────────────────────────────────
+// ErrorBoundary para capturar crashes em componentes lazy
+class ErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { hasError: false, error: null } }
+  static getDerivedStateFromError(error) { return { hasError: true, error } }
+  componentDidCatch(error, info) { console.error('[AXIS] ErrorBoundary:', error, info) }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: 40, textAlign: 'center', color: '#E5484D' }}>
+          <div style={{ fontSize: 32, marginBottom: 12 }}>⚠️</div>
+          <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 8 }}>Erro ao carregar</div>
+          <div style={{ fontSize: 13, color: '#666', marginBottom: 20 }}>{this.state.error?.message || 'Componente falhou'}</div>
+          <button onClick={() => { this.setState({ hasError: false, error: null }); window.location.reload() }}
+            style={{ padding: '10px 24px', borderRadius: 8, background: '#002B80', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600 }}>
+            Recarregar
+          </button>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
+
 export default function App() {
   const { session, profile, loading: authLoading, isAdmin } = useAuth()
   const isViewer = !isAdmin && profile?.role === 'viewer'
@@ -1497,7 +1520,7 @@ useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("param
     <div style={{color:C.muted,fontWeight:"500",fontSize:"14px",marginTop:8}}>Carregando...</div>
   </div>
 
-  return <div style={{display:"flex",minHeight:"100dvh",background:C.offwhite,color:C.text,fontFamily:"'Inter',system-ui,sans-serif",fontSize:"14px",overflow:"hidden"}}>
+  return <ErrorBoundary><div style={{display:"flex",minHeight:"100dvh",background:C.offwhite,color:C.text,fontFamily:"'Inter',system-ui,sans-serif",fontSize:"14px",overflow:"hidden"}}>
     <style>{`*{box-sizing:border-box;}::-webkit-scrollbar{width:4px;}::-webkit-scrollbar-track{background:${C.offwhite};}::-webkit-scrollbar-thumb{background:${C.border};border-radius:2px;}select option{background:${C.white};}@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}a:hover{opacity:.8;}`}</style>
 
     {showTrello&&<TrelloModal config={trello} onSave={saveTrello} onClose={()=>setShowTrello(false)}/>}
@@ -1589,5 +1612,5 @@ useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("param
 
     {toast&&<div style={{position:"fixed",bottom:"16px",right:"16px",background:C.white,color:C.text,padding:"12px 20px",borderRadius:"10px",fontSize:"13px",fontWeight:"600",zIndex:9999,boxShadow:"0 8px 32px rgba(0,33,128,0.15)",maxWidth:"340px",border:`1px solid ${C.borderW}`}}>{toast.msg}</div>}
     <MobileNav items={navItems} activeKey={view} onNavigate={(v)=>nav(v)}/>
-  </div>
+  </div></ErrorBoundary>
 }
