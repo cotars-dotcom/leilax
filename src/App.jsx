@@ -1,15 +1,15 @@
 import { useState, useEffect, useRef, lazy, Suspense } from "react"
 import { stLoad, stSave } from "./storage.js"
-import Charts from "./components/Charts.jsx"
+const Charts = lazy(() => import('./components/Charts.jsx'))
 import MobileNav from "./components/MobileNav.jsx"
 import { useIsMobile } from "./hooks/useIsMobile.js"
-import BuscaGPT from "./components/BuscaGPT.jsx"
+const LazyBuscaGPT = lazy(() => import('./components/BuscaGPT.jsx'))
 import { useAuth } from "./lib/AuthContext.jsx"
 import Login from "./pages/Login.jsx"
 import { supabase, getImoveis, deleteImovel } from "./lib/supabase.js"
-import Tarefas from "./pages/Tarefas.jsx"
-import { analisarImovelCompleto } from "./lib/motorIA.js"
-import { setupBoardAxis, criarCardImovel, AXIS_BOARDS } from "./lib/trelloService.js"
+const LazyTarefas = lazy(() => import('./pages/Tarefas.jsx'))
+// motorIA carregado dinamicamente no momento do uso para reduzir bundle inicial
+// trelloService carregado dinamicamente para reduzir bundle inicial
 import { LayoutDashboard, TrendingUp, Package, ShieldCheck, FileText, BarChart3, Settings, Search, Bell, AlertTriangle, ArrowUpRight, Plus, MessageSquare, Scale, CheckSquare, LogOut } from "lucide-react"
 import { C, K, RED, btn, inp, card, fmtC, fmtD, scoreColor, scoreLabel, recColor, mapDisplay, normalizarTextoAlerta, ESTRATEGIA_CONFIG, ESTRUTURA_MAP, LIQUIDEZ_MAP, TENDENCIA_MAP, DEMANDA_MAP } from "./appConstants.js"
 
@@ -636,7 +636,8 @@ function NovoImovel({onSave,onCancel,onNav,trello,parametrosBanco,criteriosBanco
       setStep("🧠 IA analisando: score, risco jurídico, mercado...")
       const openaiKey = localStorage.getItem("axis-openai-key") || ""
       const claudeKeyReal = localStorage.getItem("axis-api-key") || ""
-        const data = await analisarImovelCompleto(url.trim(), claudeKeyReal, openaiKey, parametrosBanco, criteriosBanco, (msg) => setStep(msg), anexos, null, null)
+        const { analisarImovelCompleto: _analisarImovelCompleto } = await import('./lib/motorIA.js')
+        const data = await _analisarImovelCompleto(url.trim(), claudeKeyReal, openaiKey, parametrosBanco, criteriosBanco, (msg) => setStep(msg), anexos, null, null)
       data.fonte_url = url.trim()
       // Analisar documentos (edital, RGI, débitos) se fornecidos
       const docUrls = urlsDocumentos.split('\n').map(u=>u.trim()).filter(Boolean)
@@ -1453,9 +1454,11 @@ useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("param
   const saveTrello=cfg=>{
     setTrello(cfg);setShowTrello(false);showToast("✓ Trello configurado — "+cfg.boardName,K.trello)
     if(cfg.boardId&&cfg.key&&cfg.token){
-      setupBoardAxis(AXIS_BOARDS.PIPELINE,cfg.key,cfg.token)
-        .then(()=>console.log('[AXIS] Board Trello configurado'))
-        .catch(e=>console.warn('[AXIS] Setup Trello:',e.message))
+      import('./lib/trelloService.js').then(({setupBoardAxis,AXIS_BOARDS:AB})=>{
+        setupBoardAxis(AB.PIPELINE,cfg.key,cfg.token)
+          .then(()=>console.log('[AXIS] Board Trello configurado'))
+          .catch(e=>console.warn('[AXIS] Setup Trello:',e.message))
+      })
     }
   }
 
@@ -1575,9 +1578,9 @@ useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("param
       {view==="imoveis"&&<Lista props={props} onNav={nav} onDelete={delProp} trello={trello} onUpdateProp={(id,updates)=>setProps(ps=>ps.map(p=>p.id===id?{...p,...updates}:p))}/>}
       {view==="detail"&&<Suspense fallback={<div style={{padding:40,textAlign:"center",color:C.muted}}>Carregando...</div>}><LazyDetail p={selP} onDelete={delProp} onNav={nav} trello={trello} onUpdateProp={(id,updates)=>setProps(ps=>ps.map(p=>p.id===id?{...p,...updates}:p))} isAdmin={isAdmin} onArchive={handleArquivar} isMobile={isMobile} isPhone={isPhone} onReanalyze={(id,updates)=>setProps(ps=>ps.map(p=>p.id===id?{...p,...updates}:p))}/></Suspense>}
       {view==="comparar"&&<Comparativo props={props}/>}
-    {view==="busca"&&(isAdmin?<BuscaGPT onAnalisar={(link)=>{nav("novo");setTimeout(()=>{},100)}}/>:<AcessoNegado mensagem="Busca com IA é restrita ao administrador."/>)}
-    {view==="graficos"&&<div><div style={{padding:isPhone?"16px":"22px 28px 16px",borderBottom:`1px solid ${C.borderW}`,background:C.white}}><div style={{fontWeight:700,fontSize:19,color:C.text}}>Gráficos</div></div><div style={{padding:isPhone?"16px":"20px 28px"}}><Charts properties={props}/></div></div>}
-    {view==="tarefas"&&<Tarefas/>}
+    {view==="busca"&&(isAdmin?<LazyBuscaGPT onAnalisar={(link)=>{nav("novo");setTimeout(()=>{},100)}}/>:<AcessoNegado mensagem="Busca com IA é restrita ao administrador."/>)}
+    {view==="graficos"&&<div><div style={{padding:isPhone?"16px":"22px 28px 16px",borderBottom:`1px solid ${C.borderW}`,background:C.white}}><div style={{fontWeight:700,fontSize:19,color:C.text}}>Gráficos</div></div><div style={{padding:isPhone?"16px":"20px 28px"}}><Suspense fallback={<div style={{padding:40,textAlign:'center',color:C.muted}}>Carregando gráficos...</div>}><Charts properties={props}/></Suspense></div></div>}
+    {view==="tarefas"&&<LazyTarefas/>}
     {view==="arquivados"&&<BancoArquivados session={session} isAdmin={isAdmin} isPhone={isPhone}/>}
     {view==="portfolio"&&isAdmin&&<PainelPortfolio props={props} isMobile={isMobile} isPhone={isPhone} onNav={nav}/>}
     {view==="manual"&&<Suspense fallback={<div style={{padding:40,textAlign:"center",color:C.muted}}>Carregando...</div>}><LazyManualAxis isMobile={isMobile}/></Suspense>}
