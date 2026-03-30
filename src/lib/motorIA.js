@@ -241,6 +241,11 @@ REGRAS DE PESQUISA:
    - Leia o endereço completo: rua, número, bairro, cidade, UF
    - Não confundir município: Contagem ≠ BH, Nova Lima ≠ BH
    - Identificar tipologia: apartamento, cobertura, duplex, casa, studio
+   - Extrair atributos do prédio/edital: elevador (sim/não), piscina, área de lazer,
+     salão de festas, churrasqueira, academia, portaria 24h, andares do prédio,
+     andar do apartamento, nº de suítes, banheiros, ano de construção, condomínio/mês
+   - IMPORTANTE: esses atributos afetam o valor de mercado real (NBR 14653)
+     Apartamento sem elevador = -13% sobre o preço/m² do bairro
 
 2. PESQUISAR COMPARÁVEIS — TIPOLOGIA OBRIGATÓRIA: ${tipologia || tipo}:
    ANTES DE BUSCAR: identifique a tipologia exata: "${tipologia || tipo}" com ${quartos || '?'} quartos, ${area_m2 || '?'}m²
@@ -495,6 +500,17 @@ Use apenas tags de texto: [CRITICO] [ATENCAO] [OK] [INFO]
   "andar": null,
   "andares_unidade": null,
   "elevador": null,
+  "piscina": null,
+  "area_lazer": null,
+  "salao_festas": null,
+  "churrasqueira": null,
+  "academia": null,
+  "portaria_24h": null,
+  "suites": 0,
+  "banheiros": 0,
+  "andar": null,
+  "total_andares": null,
+  "ano_construcao": null,
   "condominio_mensal": null,
   "padrao_acabamento": "simples|medio|alto|luxo",
   "vaga_tipo": "privativa_vinculada|privativa_autonoma|comum_rotativa|null",

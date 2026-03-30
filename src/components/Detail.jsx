@@ -9,6 +9,7 @@ import PainelLeilao from './PainelLeilao.jsx'
 import AbaJuridicaAgente from './AbaJuridicaAgente.jsx'
 import { buscarArrematesSimilares } from '../lib/buscaArrematesGPT.js'
 import PainelLancamento from './PainelLancamento.jsx'
+import PainelRentabilidade from './PainelRentabilidade.jsx'
 import CenariosReforma from './CenariosReforma.jsx'
 
 const ESCOPOS_INFO = {
@@ -1289,6 +1290,7 @@ if (original.comparaveis?.length > 2) {
       {/* Análise de Leilão */}
       <PainelLeilao imovel={p} isAdmin={isAdmin} />
         <PainelLancamento imovel={p}/>
+        <PainelRentabilidade imovel={p}/>
       {/* Cenários de Reforma */}
       <CenariosReforma imovel={p} isAdmin={isAdmin} />
       {/* Calculadora ROI */}

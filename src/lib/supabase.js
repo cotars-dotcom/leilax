@@ -143,6 +143,15 @@ const IMOVEIS_COLS = new Set([
   'motivo_arquivamento','arquivado_por','arquivado_em',
   'trello_card_id','trello_card_url','trello_list_id','trello_sincronizado_em',
   'analise_dupla_ia','comparaveis','sintese_executiva',
+  // Atributos físicos do imóvel
+  'piscina','salao_festas','area_lazer','churrasqueira','academia','portaria_24h','playground',
+  'suites','banheiros','andar','total_andares','ano_construcao','condominio_mensal',
+  // Métricas de mercado homogeneizadas
+  'fator_homogenizacao','valor_mercado_homogenizado','aluguel_ajustado',
+  'aluguel_sem_reforma','aluguel_com_reforma','aluguel_m2_estimado',
+  'custo_reforma_basica','custo_reforma_media','custo_reforma_completa',
+  'roi_locacao_basica','roi_locacao_media','roi_locacao_completa',
+  'payback_locacao_basica_meses','payback_locacao_media_meses',
   'edital_dados','rgi_dados','debitos_dados',
   'vara_judicial','tipo_justica',
   'jurimetria_vara','jurimetria_taxa_embargo',
