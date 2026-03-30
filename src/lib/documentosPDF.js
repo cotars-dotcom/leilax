@@ -183,6 +183,33 @@ Retorne APENAS JSON válido com esta estrutura EXATA:
     } catch(e) { console.warn('[AXIS análise doc] Gemini:', e.message) }
   }
 
+  // Fallback DeepSeek (barato e eficaz para análise de texto)
+  const deepseekKey = typeof localStorage !== 'undefined' ? localStorage.getItem('axis-deepseek-key') : null
+  if (deepseekKey && !geminiKey) {
+    try {
+      const r = await fetch('https://api.deepseek.com/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${deepseekKey}` },
+        body: JSON.stringify({
+          model: 'deepseek-chat',
+          messages: [{ role: 'user', content: prompt }],
+          max_tokens: 3000, temperature: 0.1
+        }),
+        signal: AbortSignal.timeout(60000)
+      })
+      if (r.ok) {
+        const data = await r.json()
+        const txt = data.choices?.[0]?.message?.content || ''
+        const match = txt.replace(/```json|```/g, '').trim().match(/\{[\s\S]*\}/)
+        if (match) {
+          const res = JSON.parse(match[0])
+          res._modelo = 'deepseek-chat'
+          return res
+        }
+      }
+    } catch(e) { console.warn('[AXIS análise doc] DeepSeek:', e.message) }
+  }
+
   // Fallback Claude Haiku
   if (claudeKey) {
     try {
@@ -298,14 +325,20 @@ export async function processarDocumentoCompleto({ url, nome, tipo, imovel, gemi
   if (!analise && geminiKey && download.blob) {
     try {
       onProgress?.(`🔍 PDF escaneado — Gemini Vision processando ${nome}...`)
+      // Converter para base64 eficientemente (evitar stack overflow com PDFs grandes)
       const arrayBuf = await download.blob.arrayBuffer()
-      const uint8 = new Uint8Array(arrayBuf)
-      let b64 = ''
-      const chunkSize = 8192
-      for (let i = 0; i < uint8.length; i += chunkSize) {
-        b64 += String.fromCharCode(...uint8.subarray(i, i + chunkSize))
+      const base64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result.split(',')[1])
+        reader.onerror = reject
+        reader.readAsDataURL(new Blob([arrayBuf], { type: download.contentType || 'application/pdf' }))
+      })
+      // Verificar tamanho — Gemini limite: 20MB para inline_data
+      if (base64.length > 15_000_000) {
+        onProgress?.(`⚠️ ${nome} muito grande para Vision (${Math.round(base64.length/1024)}KB) — usando análise parcial`)
+        // Para PDFs muito grandes, analisar apenas as primeiras páginas via texto
+        throw new Error('PDF muito grande para Vision — usar análise de texto')
       }
-      const base64 = btoa(b64)
       const prompt = `Você é especialista em direito imobiliário e leilões judiciais no Brasil (MG).
 Analise este documento (${nome}) do imóvel: ${imovel.titulo || ''} | Processo: ${imovel.processos_ativos || '?'}
 Retorne APENAS JSON:
@@ -344,6 +377,43 @@ Retorne APENAS JSON:
     onProgress?.(`✅ ${nome}: ${analise.recomendacao_juridica||'?'} · viabilidade ${analise.metricas_viabilidade?.score_geral||'?'}/10`)
   } else {
     onProgress?.(`⚠️ ${nome}: salvo sem análise IA (texto insuficiente + sem Gemini Vision)`)
+  }
+
+  // 5. Atualizar pré-registro com análise completa (se foi pré-registrado)
+  if (preRegistroId && analise) {
+    try {
+      const { salvarDocumentoJuridico } = await import('./supabase.js')
+      await salvarDocumentoJuridico({
+        id: preRegistroId,
+        imovel_id: imovel.id,
+        tipo,
+        nome,
+        url: url,
+        url_origem: url,
+        url_storage: urlStorage,
+        tamanho_bytes: download.tamanho,
+        status: 'analisado',
+        processado: true,
+        analisado_em: new Date().toISOString(),
+        analise_ia: analise?.parecer_final || analise?.resumo_executivo || '',
+        resumo_executivo: analise?.resumo_executivo || '',
+        pontos_positivos: analise?.pontos_positivos || [],
+        alertas_criticos: analise?.alertas_criticos || [],
+        riscos_encontrados: analise?.riscos_identificados || [],
+        score_juridico_sugerido: analise?.score_juridico_sugerido || null,
+        score_viabilidade: analise?.metricas_viabilidade?.score_geral || null,
+        responsabilidade_debitos: analise?.responsabilidade_debitos || null,
+        ocupacao_confirmada: analise?.ocupacao_confirmada || null,
+        prazo_liberacao_meses: analise?.prazo_liberacao_estimado_meses || null,
+        recomendacao_juridica: analise?.recomendacao_juridica || null,
+        metricas_viabilidade: analise?.metricas_viabilidade || null,
+        analise_estruturada: analise || null,
+        conteudo_texto: textoParaAnalise?.substring(0, 8000) || '',
+      })
+      onProgress?.(`💾 Análise salva no banco (${analise._modelo || 'IA'})`)
+    } catch(eUpd) {
+      onProgress?.(`⚠️ Erro ao salvar análise: ${eUpd.message?.substring(0,60)}`)
+    }
   }
 
   return {

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { C, K, btn, card } from '../appConstants.js'
-import { supabase, getDocumentosJuridicos, salvarDocumentoJuridico,
+import { supabase, getDocumentosJuridicos, salvarDocumentoJuridico, limparPDFsDuplicados,
          reclassificarImovel, loadApiKeys } from '../lib/supabase.js'
 import { buscarDocumentosAuto, analisarTextoJuridicoGemini,
          analisarPDFBase64Gemini, calcularNovoScoreJuridico } from '../lib/agenteJuridico.js'
@@ -48,7 +48,7 @@ function ScoreBar({ label, value }) {
 }
 
 // ─── CARD DE DOCUMENTO COMPLETO ──────────────────────────────────────────────
-function CardDoc({ doc }) {
+function CardDoc({ doc, onAnalisarDoc }) {
   const [aberto, setAberto] = useState(false)
   const analise = doc.analise_estruturada || {}
   const metricas = analise.metricas_viabilidade || doc.metricas_viabilidade || {}
@@ -240,10 +240,10 @@ function CardDoc({ doc }) {
             </Box>
           )}
 
-          {/* Links */}
+          {/* Links e ações */}
           <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
             {doc.url_storage && (
-              <a href={doc.url_storage} target="_blank" rel="noreferrer"
+              <a href={`https://vovkfhyjjoruiljfjrxy.supabase.co/storage/v1/object/public/documentos-juridicos/${doc.url_storage}`} target="_blank" rel="noreferrer"
                 style={{ fontSize:11, padding:'5px 12px', borderRadius:7, textDecoration:'none', background:P.navy, color:'#fff', fontWeight:600 }}>
                 📄 Abrir PDF
               </a>
@@ -251,8 +251,14 @@ function CardDoc({ doc }) {
             {(doc.url_origem || doc.url) && (
               <a href={doc.url_origem || doc.url} target="_blank" rel="noreferrer"
                 style={{ fontSize:11, padding:'5px 12px', borderRadius:7, textDecoration:'none', background:P.surface, color:P.navy, border:`1px solid ${P.border}` }}>
-                🔗 Link original
+                🔗 Original
               </a>
+            )}
+            {(!doc.processado || !doc.analise_ia) && onAnalisarDoc && (
+              <button onClick={() => onAnalisarDoc(doc)}
+                style={{ fontSize:11, padding:'5px 12px', borderRadius:7, background:'#7C3AED', color:'#fff', border:'none', cursor:'pointer', fontWeight:600 }}>
+                🤖 Analisar com IA
+              </button>
             )}
           </div>
         </div>
@@ -466,6 +472,52 @@ export default function AbaJuridicaAgente({ imovel, isAdmin, onReclassificado })
   const recGeral = docs.some(d=>d.recomendacao_juridica==='desfavoravel') ? 'desfavoravel'
     : docs.every(d=>!d.recomendacao_juridica||d.recomendacao_juridica==='favoravel') && docs.length > 0 ? 'favoravel' : 'neutro'
 
+  // Analisar documento existente via IA
+  async function handleAnalisarDoc(doc) {
+    if (!doc?.url_origem && !doc?.url) return
+    setProgresso(`🤖 Analisando ${doc.nome || doc.tipo}...`)
+    try {
+      const { gKey, cKey } = await syncChaves()
+      const res = await processarDocumentoCompleto({
+        url: doc.url_origem || doc.url,
+        nome: doc.nome || doc.tipo,
+        tipo: doc.tipo || 'outro',
+        imovel,
+        geminiKey: gKey,
+        claudeKey: cKey,
+        onProgress: setProgresso
+      })
+      if (res?.analise_ia || res?.analise_estruturada) {
+        await salvarDocumentoJuridico({
+          id: doc.id,
+          imovel_id: imovel.id,
+          tipo: doc.tipo,
+          analise_ia: res.analise_ia,
+          resumo_executivo: res.resumo_executivo,
+          pontos_positivos: res.pontos_positivos,
+          alertas_criticos: res.alertas_criticos,
+          riscos_encontrados: res.riscos_encontrados,
+          score_juridico_sugerido: res.score_juridico_sugerido,
+          score_viabilidade: res.score_viabilidade,
+          responsabilidade_debitos: res.responsabilidade_debitos,
+          ocupacao_confirmada: res.ocupacao_confirmada,
+          recomendacao_juridica: res.recomendacao_juridica,
+          metricas_viabilidade: res.metricas_viabilidade,
+          analise_estruturada: res.analise_estruturada,
+          conteudo_texto: res.conteudo_texto,
+          processado: true, status: 'analisado',
+          analisado_em: new Date().toISOString(),
+        }).catch(e => console.warn('[AXIS handleAnalisarDoc]', e.message))
+        setProgresso(`✅ ${doc.nome || doc.tipo} analisado — recarregando...`)
+        await carregarDocs()
+      } else {
+        setProgresso(`⚠️ Sem análise — verifique a chave Gemini em Admin → API Keys`)
+      }
+    } catch(e) {
+      setProgresso(`❌ Erro: ${e.message?.substring(0,80)}`)
+    }
+  }
+
   return (
     <div>
       {/* Sub-abas */}
@@ -638,7 +690,7 @@ export default function AbaJuridicaAgente({ imovel, isAdmin, onReclassificado })
 
           {/* Lista de documentos */}
           {docs.length > 0
-            ? docs.map(doc => <CardDoc key={doc.id} doc={doc}/>)
+            ? docs.map(doc => <CardDoc key={doc.id} doc={doc} onAnalisarDoc={handleAnalisarDoc}/>)
             : !analisando && !buscandoAuto && (
               <div style={{textAlign:'center', padding:'32px', color:C.hint, fontSize:12}}>
                 <div style={{fontSize:32, marginBottom:8}}>📂</div>
