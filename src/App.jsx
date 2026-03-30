@@ -1376,7 +1376,7 @@ useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("param
       if(v&&!localStorage.getItem(nw)){localStorage.setItem(nw,v);localStorage.removeItem(old)}
     }
     const t=await stLoad("axis-trello")
-    if(t)setTrello(t); setL(true)
+    if(t)setTrello(t); React.startTransition(()=>setL(true))
     // Mostrar modal de API key se não tiver
     if(!localStorage.getItem("axis-api-key")) setTimeout(()=>setShowApiKey(true),1000)
     // Carregar imóveis: Supabase como fonte primária, localStorage como fallback
