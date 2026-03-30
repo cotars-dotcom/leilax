@@ -664,6 +664,44 @@ export async function getPacotesReforma() {
 }
 
 // == DOCUMENTOS JURÍDICOS ==
+// Limpar PDFs duplicados do storage — manter apenas o mais recente por tipo
+export async function limparPDFsDuplicados(imovelId) {
+  try {
+    const { data: files } = await supabase.storage
+      .from('documentos-juridicos')
+      .list(imovelId, { limit: 100, sortBy: { column: 'created_at', order: 'desc' } })
+    
+    if (!files?.length) return { deletados: 0 }
+    
+    // Agrupar por tipo (Edital, Matricula, etc.)
+    const grupos = {}
+    for (const f of files) {
+      const tipo = f.name.includes('Edital') ? 'edital'
+                 : f.name.includes('Matricula') || f.name.includes('matricula') ? 'matricula'
+                 : 'outro'
+      if (!grupos[tipo]) grupos[tipo] = []
+      grupos[tipo].push(f)
+    }
+    
+    // Deletar todos exceto o mais recente de cada tipo
+    const paraDeletear = []
+    for (const tipo of Object.keys(grupos)) {
+      const lista = grupos[tipo].sort((a,b) => new Date(b.created_at) - new Date(a.created_at))
+      paraDeletear.push(...lista.slice(1).map(f => `${imovelId}/${f.name}`))
+    }
+    
+    if (paraDeletear.length > 0) {
+      const { error } = await supabase.storage.from('documentos-juridicos').remove(paraDeletear)
+      if (error) throw error
+    }
+    
+    return { deletados: paraDeletear.length, mantidos: Object.keys(grupos).length }
+  } catch(e) {
+    console.warn('[AXIS] limparPDFsDuplicados:', e.message)
+    return { deletados: 0, erro: e.message }
+  }
+}
+
 export async function getDocumentosJuridicos(imovelId) {
   const { data, error } = await supabase
     .from('documentos_juridicos')

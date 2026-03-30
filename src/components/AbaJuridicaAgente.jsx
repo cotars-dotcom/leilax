@@ -325,7 +325,9 @@ export default function AbaJuridicaAgente({ imovel, isAdmin, onReclassificado })
       for (const res of resultsFull) {
         if (!res.sucesso) continue
         const a = res.analise_estruturada || res.analise
+        // Se já foi pré-registrado pelo processarDocumentoCompleto, atualiza; senão cria
         await salvarDocumentoJuridico({
+          ...(res.pre_registro_id ? { id: res.pre_registro_id } : {}),
           imovel_id:imovel.id, nome:res.nome||'Documento', tipo:res.tipo||'outro',
           url:res.url_origem, url_storage:res.url_storage, url_origem:res.url_origem,
           tamanho_bytes:res.tamanho_bytes||0,

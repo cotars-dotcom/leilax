@@ -265,6 +265,28 @@ export async function processarDocumentoCompleto({ url, nome, tipo, imovel, gemi
     onProgress?.('⚠️ Armazenamento falhou — análise continua')
   }
   
+  // 4a. Pré-registrar no banco ANTES da análise (garante persistência mesmo se análise falhar)
+  let preRegistroId = null
+  try {
+    const { salvarDocumentoJuridico } = await import('./supabase.js')
+    const preReg = await salvarDocumentoJuridico({
+      imovel_id: imovel.id,
+      tipo,
+      nome,
+      url: url,
+      url_origem: url,
+      url_storage: urlStorage,
+      tamanho_bytes: download.tamanho,
+      status: 'baixado',
+      processado: false,
+      analisado_em: new Date().toISOString(),
+    })
+    preRegistroId = preReg?.id
+    onProgress?.(`📋 Documento registrado (id: ${preRegistroId?.substring(0,8)})`)
+  } catch(eReg) {
+    onProgress?.(`⚠️ Pré-registro falhou: ${eReg.message?.substring(0,60)} — análise continua`)
+  }
+
   // 4. Análise IA estruturada
   let analise = null
   if (textoParaAnalise?.length > 100) {
@@ -328,6 +350,7 @@ Retorne APENAS JSON:
     sucesso: true,
     nome,
     tipo,
+    pre_registro_id: preRegistroId,
     url_origem: url,
     url_storage: urlStorage,
     caminho_storage: caminhoStorage,
