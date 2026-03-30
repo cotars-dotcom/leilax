@@ -58,6 +58,14 @@ MÉTRICAS DO BAIRRO ${metricasBairro.bairro} (FipeZAP/QuintoAndar 2026):
 - Preço contrato real: R$ ${(metricasBairro.preco_contrato_m2||0).toLocaleString('pt-BR')}/m²
 - Yield bruto: ${metricasBairro.yield_bruto||'—'}% a.a. | Classe IPEAD: ${metricasBairro.classe_ipead||'—'}
 USE preço contrato como preco_m2_mercado — é o que o mercado realmente fecha.` : ''}
+COMPARÁVEIS — REGRAS CRÍTICAS:
+Retorne 3 a 5 imóveis do MESMO TIPO que o imóvel analisado (campo "tipo" acima).
+Se tipo=Apartamento: só comparar com apartamentos similares (mesmo nº quartos, área ±40m², mesmo bairro ou vizinhos).
+Se tipo=Casa: só com casas.
+NUNCA incluir terrenos, lotes ou tipos diferentes como comparável.
+Para cada comparável, use preço de venda/anúncio ativo no ZAP/VivaReal/OLX ou estimativas do mercado.
+Calcule similaridade: mesmo tipo +3, área ±20% +3, mesmos quartos +2, mesmo bairro +1, vagas +1.
+
 CALCULE obrigatoriamente:
 - aluguel_mensal_estimado = preco_m2_mercado × area_m2 × (yield_bruto_anual_pct / 100) / 12
   Se não tiver yield, use: Popular=7.5%, Médio=6.0%, Alto=5.0%, Luxo=4.0%
@@ -126,7 +134,8 @@ Complete e corrija os dados. Retorne JSON com EXATAMENTE estes campos:
   "custo_reforma_estimado": 0,
   "escopo_reforma": "refresh_giro|leve_funcional|leve_reforcada_1_molhado|media|pesada",
   "prazo_liberacao_estimado_meses": 0,
-  "comparaveis": [{"descricao":"string","valor":0,"area_m2":0,"preco_m2":0,"quartos":0,"vagas":0,"tipo":"apartamento","fonte":"Gemini","similaridade":8}],
+  "comparaveis": [/* OBRIGATÓRIO: 3 a 5 imóveis do MESMO TIPO que o analisado (mesmo tipo, bairro/cidade, área similar ±40m²). NUNCA compare apartamento com terreno/casa. Preencher campos: descricao, valor, area_m2, preco_m2, quartos, vagas, tipo, fonte, similaridade, link(opcional) */
+    {"descricao":"string","valor":0,"area_m2":0,"preco_m2":0,"quartos":0,"vagas":0,"tipo":"apartamento","fonte":"Gemini/conhecimento","similaridade":8,"link":null}],
   "riscos_presentes": ["string"],
   "mercado_tendencia": "alta|estavel|queda",
   "mercado_demanda": "alta|media_alta|media|media_baixa|baixa",
