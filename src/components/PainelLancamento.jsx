@@ -175,11 +175,11 @@ export default function PainelLancamento({ imovel }) {
 
   // Projeções de lance — adapta para o leilão atual
   const isSegundoLeilao = (num_leilao || 1) >= 2
-  // 2º leilão: piso legal 35%, esperado ~50%, competitivo ~60%
-  // 1º leilão (projeção 2º): piso 50%, esperado 57%, competitivo 65%
-  const lance2p = avaliacao ? Math.round(avaliacao * (isSegundoLeilao ? 0.35 : 0.50)) : 0
-  const lance2e = avaliacao ? Math.round(avaliacao * (isSegundoLeilao ? 0.50 : 0.57)) : 0
-  const lance2c = avaliacao ? Math.round(avaliacao * (isSegundoLeilao ? 0.60 : 0.65)) : 0
+  // 2º leilão: piso legal 35% (art.891 CPC), esperado ~50% (TRT-3), competitivo ~65%
+  // Projeção 2º (quando no 1º): mesmos percentuais — 35%/50%/65%
+  const lance2p = avaliacao ? Math.round(avaliacao * 0.35) : 0
+  const lance2e = avaliacao ? Math.round(avaliacao * 0.50) : 0
+  const lance2c = avaliacao ? Math.round(avaliacao * 0.65) : 0
   const c2p = useMemo(() => calcularCenario(lance2p, vmercado, reforma, juridico), [lance2p, vmercado, reforma, juridico])
   const c2e = useMemo(() => calcularCenario(lance2e, vmercado, reforma, juridico), [lance2e, vmercado, reforma, juridico])
   const c2c = useMemo(() => calcularCenario(lance2c, vmercado, reforma, juridico), [lance2c, vmercado, reforma, juridico])
@@ -321,18 +321,18 @@ export default function PainelLancamento({ imovel }) {
           )}
 
           <CardCenario
-            label={isSegundoLeilao ? "Piso legal (35%)" : "Piso legal 2º leilão (50%)"}
-            sublabel={isSegundoLeilao ? "Mínimo art. 891 CPC — sem concorrência" : `R$ ${Math.round(avaliacao*0.50).toLocaleString('pt-BR')} — mínimo legal`}
+            label="Piso legal (35% av.)"
+            sublabel={`R$ ${lance2p.toLocaleString('pt-BR')} — mínimo art. 891 CPC`}
             lance={lance2p} cenario={c2p} avaliacao={avaliacao}
-            isDestaque={isSegundoLeilao && c2p.roi >= 50} />
+            isDestaque={c2p.roi >= 50} />
           <CardCenario
-            label={isSegundoLeilao ? "Esperado (50%)" : "Esperado 2º leilão (57%)"}
-            sublabel={isSegundoLeilao ? "Faixa histórica de arremate TRT" : "Média histórica TRT-MG para 2º leilão"}
+            label="Esperado (50% av.)"
+            sublabel={`R$ ${lance2e.toLocaleString('pt-BR')} — faixa histórica TRT-3 BH`}
             lance={lance2e} cenario={c2e} avaliacao={avaliacao}
-            isDestaque={!isSegundoLeilao && c2e.roi >= 30 && !c1.viavel} />
+            isDestaque={c2e.roi >= 30 && !c1.viavel} />
           <CardCenario
-            label={isSegundoLeilao ? "Competitivo (60%)" : "Competitivo 2º leilão (65%)"}
-            sublabel={isSegundoLeilao ? "Cenário com concorrência" : "Cenário com maior disputa"}
+            label="Competitivo (65% av.)"
+            sublabel={`R$ ${lance2c.toLocaleString('pt-BR')} — cenário com concorrência`}
             lance={lance2c} cenario={c2c} avaliacao={avaliacao} />
 
           {/* Comparativo 1º vs 2º */}
@@ -340,9 +340,9 @@ export default function PainelLancamento({ imovel }) {
             <div style={{ padding:'10px 12px', borderRadius:7, marginTop:6,
               background: c1.viavel ? `${C.emerald}08` : `${C.mustard}10`,
               border:`1px solid ${c1.viavel ? C.emerald : C.mustard}30`, fontSize:10.5 }}>
-              {c1.viavel
-                ? <span style={{color:C.emerald}}>✅ <strong>Recomendação:</strong> Lance no 1º leilão (ROI {pct(c1.roi)}) — não vale esperar o 2º ({pct(c2e.roi - c1.roi)} de diferença vs risco de concorrência).</span>
-                : <span style={{color:C.mustard}}>⏳ <strong>Recomendação:</strong> Aguardar 2º leilão. ROI do 1º ({pct(c1.roi)}) é inferior ao esperado no 2º ({pct(c2e.roi)}), diferença de +{pct(c2e.roi - c1.roi)}.</span>
+              {c1.viavel && c1.roi >= 25
+                ? <span style={{color:C.emerald}}>✅ <strong>Recomendação:</strong> Lance no 1º leilão — ROI {pct(c1.roi)} já é atrativo. Aguardar 2º melhora +{pct(c2e.roi - c1.roi)} mas há risco de concorrência.</span>
+                : <span style={{color:C.mustard}}>⏳ <strong>Recomendação:</strong> Aguardar 2º leilão. Lance atual (R$ {lancePrin.toLocaleString('pt-BR')}) dá ROI {pct(c1.roi)} — muito abaixo dos {pct(c2e.roi)} no cenário esperado do 2º (R$ {lance2e.toLocaleString('pt-BR')}). Economiza R$ {(lancePrin - lance2e).toLocaleString('pt-BR')} no lance.</span>
               }
             </div>
           )}
