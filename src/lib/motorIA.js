@@ -253,8 +253,8 @@ REGRAS DE PESQUISA:
    - IMPORTANTE: esses atributos afetam o valor de mercado real (NBR 14653)
      Apartamento sem elevador = -13% sobre o preço/m² do bairro
 
-2. PESQUISAR COMPARÁVEIS — TIPOLOGIA OBRIGATÓRIA: ${tipologia || tipo}:
-   ANTES DE BUSCAR: identifique a tipologia exata: "${tipologia || tipo}" com ${quartos || '?'} quartos, ${area_m2 || '?'}m²
+2. PESQUISAR COMPARÁVEIS — TIPOLOGIA OBRIGATÓRIA: ${tipo || 'Imóvel'}:
+   ANTES DE BUSCAR: identifique a tipologia exata: "${tipo || 'Imóvel'}"
    Busque no ZAP, VivaReal e OLX SOMENTE imóveis do MESMO TIPO:
    - Imóveis da mesma RUA (mais preciso)
    - Imóveis do mesmo BAIRRO com tipologia IGUAL (ex: apartamento 3q ~97m² Dona Clara BH)
