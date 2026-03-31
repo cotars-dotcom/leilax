@@ -608,6 +608,62 @@ function NovoImovel({onSave,onCancel,onNav,trello,parametrosBanco,criteriosBanco
     if (dominioMercado) {
       setStep('🏠 Portal de mercado detectado — analisando como oportunidade')
     }
+    // DETECÇÃO DE PÁGINA DE CONDOMÍNIO — múltiplos imóveis
+    try {
+      const { isCondominioPage, extrairLinksCondominio } = await import('./lib/scraperImovel.js')
+      if (isCondominioPage(urlTrimmed)) {
+        setLoading(true); setStep('🏢 Página de condomínio detectada — buscando imóveis individuais...')
+        const info = await extrairLinksCondominio(urlTrimmed)
+        setLoading(false)
+        if (info.links.length > 0) {
+          const confirmar = window.confirm(
+            `🏢 ${info.condominio || 'Condomínio'}\n` +
+            `📍 ${info.endereco || info.bairro || ''} ${info.cidade ? '— ' + info.cidade : ''}\n` +
+            `${info.precoMinimo > 0 ? '💰 A partir de R$ ' + info.precoMinimo.toLocaleString('pt-BR') + '\n' : ''}` +
+            `\n🔗 ${info.links.length} imóvel(is) encontrado(s).\n\n` +
+            `Analisar ${info.links.length === 1 ? 'este imóvel' : 'todos os ' + info.links.length + ' imóveis'} individualmente?\n` +
+            `(Cada um terá seu próprio card com score)`
+          )
+          if (confirmar) {
+            setLoading(true)
+            for (let i = 0; i < info.links.length; i++) {
+              setStep(`🏠 Analisando imóvel ${i + 1}/${info.links.length}...`)
+              try {
+                const openaiKey = localStorage.getItem("axis-openai-key") || ""
+                const claudeKeyReal = localStorage.getItem("axis-api-key") || ""
+                const { analisarImovelCompleto: _analisarImovelCompleto } = await import('./lib/motorIA.js')
+                const data = await _analisarImovelCompleto(info.links[i], claudeKeyReal, openaiKey, parametrosBanco, criteriosBanco, (msg) => setStep(`[${i+1}/${info.links.length}] ${msg}`), [], null, null)
+                data.fonte_url = info.links[i]
+                if (!data.tipo_transacao) data.tipo_transacao = 'mercado_direto'
+                // Validação mínima
+                const precoOk = parseFloat(data.valor_minimo || data.preco_pedido) > 0
+                const tituloOk = data.titulo && data.titulo.length > 5
+                if (precoOk || tituloOk) {
+                  const property = {...data, id:uid(), createdAt:new Date().toISOString()}
+                  await onSave(property)
+                  showToast(`✓ [${i+1}/${info.links.length}] ${data.titulo?.substring(0,40)||'Imóvel'} — Score ${(data.score_total||0).toFixed(1)}`)
+                } else {
+                  showToast(`⚠️ [${i+1}/${info.links.length}] Dados insuficientes — pulando`, '#E5484D')
+                }
+              } catch(e) {
+                showToast(`⚠️ [${i+1}/${info.links.length}] Erro: ${e.message?.substring(0,60)}`, '#E5484D')
+              }
+            }
+            setLoading(false); setStep('')
+            showToast(`✅ ${info.links.length} imóvel(is) do condomínio analisado(s)`)
+            return
+          } else { setLoading(false); return }
+        } else {
+          setLoading(false)
+          setError(
+            `🏢 Esta é uma página de condomínio (${info.condominio || 'sem nome'}) — não um anúncio individual.\n\n` +
+            `Não foi possível encontrar links de imóveis individuais.\n\n` +
+            `💡 No QuintoAndar, clique em um apartamento específico e copie o link no formato:\nquintoandar.com.br/imovel/XXXXX`
+          )
+          return
+        }
+      }
+    } catch(e) { console.warn('[AXIS] Detecção condomínio:', e.message) }
     const hasKey = localStorage.getItem("axis-api-key")
     const hasGemini = localStorage.getItem("axis-gemini-key")
     const hasDeepseek = localStorage.getItem("axis-deepseek-key")

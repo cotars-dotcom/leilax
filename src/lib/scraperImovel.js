@@ -302,3 +302,69 @@ function extrairBairroDeURL(url = '') {
   }
   return null
 }
+
+// ─── DETECÇÃO DE PÁGINA DE CONDOMÍNIO (múltiplos imóveis) ────────────────────
+
+/**
+ * Detecta se a URL é uma página de condomínio/empreendimento (lista de imóveis)
+ * e não um anúncio individual.
+ */
+export function isCondominioPage(url) {
+  if (!url) return false
+  const u = url.toLowerCase()
+  if (u.includes('quintoandar.com.br/condominio/')) return true
+  if (u.includes('/empreendimento/') || u.includes('/residencial/') || u.includes('/lancamento/')) return true
+  if (u.includes('#imoveis-disponiveis') || u.includes('#apartamentos')) return true
+  return false
+}
+
+/**
+ * Extrai links individuais de imóveis de uma página de condomínio.
+ * Retorna: { condominio, endereco, links[], precoMinimo, cidade, bairro }
+ */
+export async function extrairLinksCondominio(url) {
+  const result = { condominio: '', endereco: '', links: [], precoMinimo: 0, cidade: '', bairro: '' }
+  try {
+    const jinaUrl = `https://r.jina.ai/${url}`
+    const res = await fetch(jinaUrl, {
+      headers: { 'Accept': 'text/plain', 'X-Return-Format': 'markdown' },
+      signal: AbortSignal.timeout(25000)
+    })
+    if (!res.ok) throw new Error(`Jina ${res.status}`)
+    const texto = await res.text()
+
+    // Nome do condomínio
+    const tituloMatch = texto.match(/(?:^#\s*|Title:\s*)(.+)/m)
+    result.condominio = tituloMatch?.[1]?.replace(/\s*[-|].*$/, '').trim() || ''
+
+    // Endereço e bairro
+    const endMatch = texto.match(/(?:Rua|Av|Alameda|R\.)\s+[^,\n]+,\s*\d+[^,\n]*,?\s*([A-ZÀ-Ú][a-zà-ú\s]+)/i)
+    if (endMatch) { result.endereco = endMatch[0].trim(); result.bairro = endMatch[1]?.trim() || '' }
+
+    // Cidade
+    if (/contagem/i.test(texto)) result.cidade = 'Contagem'
+    else if (/belo horizonte|bh/i.test(texto)) result.cidade = 'Belo Horizonte'
+    else if (/betim/i.test(texto)) result.cidade = 'Betim'
+    else if (/nova lima/i.test(texto)) result.cidade = 'Nova Lima'
+
+    // Preço mínimo
+    const precoMatch = texto.match(/(?:a partir de|compra|valor)\s*:?\s*R?\$?\s*([\d.,]+)/i)
+    if (precoMatch) result.precoMinimo = parseFloat(precoMatch[1].replace(/\./g, '').replace(',', '.'))
+
+    // Links individuais QuintoAndar: /imovel/XXXXX
+    const baseUrl = new URL(url).origin
+    const qaLinks = texto.match(/\/imovel\/[a-zA-Z0-9_-]+/g) || []
+    for (const l of qaLinks) {
+      const full = `${baseUrl}${l}`
+      if (!result.links.includes(full)) result.links.push(full)
+    }
+    // Links genéricos /imovel/ ou /venda/
+    const vrLinks = texto.match(/https?:\/\/[^\s)"]+\/imovel\/[^\s)"]+/gi) || []
+    for (const l of vrLinks) {
+      const clean = l.replace(/[)"\s]+$/, '')
+      if (!result.links.includes(clean) && !clean.includes('/condominio/')) result.links.push(clean)
+    }
+  } catch(e) { console.warn('[AXIS] Erro extraindo links condomínio:', e.message) }
+  result.links = result.links.slice(0, 10)
+  return result
+}
