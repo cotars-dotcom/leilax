@@ -33,6 +33,7 @@ function PropCard({p,onNav,isPhone=false}) {
   const fmtM2 = v => v ? `R$ ${Math.round(v).toLocaleString('pt-BR')}/m²` : '—'
   const dataLeilao = p.data_leilao ? new Date(p.data_leilao).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit'}) : null
   const numLeilao = p.num_leilao ? `${p.num_leilao}º LEILÃO` : null
+  const eMercado = p.tipo_transacao === 'mercado_direto'
   const scoreDelta = p.preco_m2_imovel && p.preco_m2_mercado
     ? ((1 - p.preco_m2_imovel/p.preco_m2_mercado)*100).toFixed(0) : null
 
@@ -45,7 +46,8 @@ function PropCard({p,onNav,isPhone=false}) {
       <div style={{marginBottom:10,borderRadius:8,overflow:"hidden",height:isPhone?95:115,background:C.offwhite,position:"relative"}}>
         <img src={p.foto_principal} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}} onError={e=>{e.target.parentElement.style.display="none"}} />
         {sc>=7.5&&<div style={{position:'absolute',top:6,left:6,background:'#10B981',color:'#fff',fontSize:9,fontWeight:700,padding:'2px 7px',borderRadius:4}}>⭐ OPORTUNIDADE</div>}
-        {numLeilao&&<div style={{position:'absolute',top:6,right:6,background:p.num_leilao>=2?'#D97706':'#065F46',color:'#fff',fontSize:8,fontWeight:700,padding:'2px 6px',borderRadius:4}}>{numLeilao}</div>}
+        {numLeilao&&!eMercado&&<div style={{position:'absolute',top:6,right:6,background:p.num_leilao>=2?'#D97706':'#065F46',color:'#fff',fontSize:8,fontWeight:700,padding:'2px 6px',borderRadius:4}}>{numLeilao}</div>}
+        {eMercado&&<div style={{position:'absolute',top:6,right:6,background:'#1D4ED8',color:'#fff',fontSize:8,fontWeight:700,padding:'2px 6px',borderRadius:4}}>🏠 MERCADO</div>}
       </div>
     )}
 
@@ -58,10 +60,11 @@ function PropCard({p,onNav,isPhone=false}) {
       📍 {[p.bairro,p.cidade].filter(Boolean).join(', ')}/{p.estado} · {tipFmt} · {(p.area_privativa_m2||p.area_m2)||'—'}m²
     </div>
 
-    {dataLeilao&&<div style={{fontSize:10,color:K.t3,marginBottom:6}}>🗓️ Leilão: <strong style={{color:K.wh}}>{dataLeilao}</strong></div>}
+    {dataLeilao&&!eMercado&&<div style={{fontSize:10,color:K.t3,marginBottom:6}}>🗓️ Leilão: <strong style={{color:K.wh}}>{dataLeilao}</strong></div>}
 
     <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:8}}>
       <Bdg c={rc} ch={p.recomendacao||"—"}/>
+      {eMercado&&<Bdg c="#1D4ED8" ch="MERCADO"/>}
       <Bdg c={p.ocupacao==="Desocupado"?K.grn:p.ocupacao==="Ocupado"?K.red:K.t3} ch={p.ocupacao||"—"}/>
       {p.financiavel&&<Bdg c={K.blue} ch="Financiável"/>}
       {p.analise_dupla_ia&&<span style={{fontSize:"9px",fontWeight:"700",background:"linear-gradient(135deg,rgba(0,229,187,0.2),rgba(16,163,127,0.2))",border:"1px solid rgba(0,229,187,0.35)",color:"#00E5BB",padding:"2px 7px",borderRadius:"4px"}}>🤖 IA</span>}
@@ -71,8 +74,8 @@ function PropCard({p,onNav,isPhone=false}) {
     <div style={{display:"flex",flexDirection:isPhone?"column":"row",gap:8,alignItems:isPhone?"stretch":"flex-start"}}>
       <div style={{flex:1,display:"grid",gridTemplateColumns:"1fr 1fr",gap:5}}>
         <div style={{background:K.s2,borderRadius:6,padding:"7px 9px"}}>
-          <div style={{fontSize:"8.5px",color:K.t3,marginBottom:1}}>LANCE MÍN.</div>
-          <div style={{fontSize:"12px",fontWeight:"800",color:K.amb}}>{fmtM(p.valor_minimo)}</div>
+          <div style={{fontSize:"8.5px",color:K.t3,marginBottom:1}}>{eMercado ? 'PREÇO PEDIDO' : 'LANCE MÍN.'}</div>
+          <div style={{fontSize:"12px",fontWeight:"800",color:K.amb}}>{fmtM(eMercado ? (p.preco_pedido || p.valor_minimo) : p.valor_minimo)}</div>
         </div>
         <div style={{background:K.s2,borderRadius:6,padding:"7px 9px"}}>
           <div style={{fontSize:"8.5px",color:K.t3,marginBottom:1}}>DESCONTO</div>

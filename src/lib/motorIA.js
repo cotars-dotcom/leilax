@@ -1358,8 +1358,18 @@ DADOS DE BAIRRO (parcial):
     id: `${Date.now()}-${Math.random().toString(36).slice(2,7)}`,
     fonte_url: url,
     tipo_transacao: analise.tipo_transacao || tipoTransacaoDetectado,
-    preco_pedido: eMercadoDireto ? parseFloat(analise.valor_minimo || 0) : null,
-    status: 'analisado',
+    preco_pedido: eMercadoDireto ? parseFloat(analise.valor_minimo || analise.preco_pedido || 0) : null,
+    // Mercado direto: status 'estudo', leilão: status 'analisado'
+    status: eMercadoDireto ? 'estudo' : 'analisado',
+    // Limpar campos de leilão para imóveis de mercado
+    ...(eMercadoDireto ? {
+      num_leilao: null,
+      data_leilao: null,
+      leiloeiro: null,
+      lance_minimo: null,
+      comissao_leiloeiro_pct: null,
+      modalidade_leilao: 'mercado_direto',
+    } : {}),
     analise_dupla_ia: !!dadosGPT,
     fotos: fotosResult.fotos || [],
     foto_principal: fotosResult.foto_principal || null

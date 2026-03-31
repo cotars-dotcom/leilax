@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { C, card } from '../appConstants.js'
 import { isMercadoDireto } from '../lib/detectarFonte.js'
+import { calcularReformas3Cenarios } from '../lib/reformaUnificada.js'
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 const fmt = v => v ? `R$ ${Math.round(v).toLocaleString('pt-BR')}` : '—'
@@ -177,12 +178,11 @@ export default function PainelRentabilidade({ imovel }) {
   const lance2exp   = Math.round(avaliacao * 0.50)
   const lance2comp  = Math.round(avaliacao * 0.65)
 
-  // Custo de reforma por cenário
-  const reformaValor = {
-    basica:    parseFloat(custo_reforma_basica)   || area * 600,
-    media:     parseFloat(custo_reforma_media)    || area * 1500,
-    completa:  parseFloat(custo_reforma_completa) || area * 2420,
-  }[cenarioReforma]
+  // Custo de reforma por cenário — unificado via SINAPI
+  const reformas = calcularReformas3Cenarios(area, parseFloat(preco_m2_mercado) || 7000, {
+    custo_reforma_basica, custo_reforma_media, custo_reforma_completa,
+  })
+  const reformaValor = reformas[cenarioReforma]
 
   // Valor de mercado: usar homogeneizado se disponível
   const vmBase = parseFloat(valor_mercado_homogenizado || valor_mercado_estimado) || avaliacao * 1.05
@@ -293,9 +293,9 @@ export default function PainelRentabilidade({ imovel }) {
       <div style={{ marginBottom:10 }}>
         <div style={{ fontSize:10, color:C.muted, marginBottom:5 }}>Cenário de reforma:</div>
         <div style={{ display:'flex', gap:5 }}>
-          <TabBtn id="basica"   label={`🪣 Básica ${fmt(custo_reforma_basica || area*600)}`}/>
-          <TabBtn id="media"    label={`🔧 Média ${fmt(custo_reforma_media || area*1500)}`}/>
-          <TabBtn id="completa" label={`✨ Completa ${fmt(custo_reforma_completa || area*2420)}`}/>
+          <TabBtn id="basica"   label={`🪣 Básica ${fmt(reformas.basica)}`}/>
+          <TabBtn id="media"    label={`🔧 Média ${fmt(reformas.media)}`}/>
+          <TabBtn id="completa" label={`✨ Completa ${fmt(reformas.completa)}`}/>
         </div>
       </div>
 

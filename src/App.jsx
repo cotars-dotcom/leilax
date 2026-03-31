@@ -594,13 +594,18 @@ function NovoImovel({onSave,onCancel,onNav,trello,parametrosBanco,criteriosBanco
       return
     }
     const dominiosConhecidos = ['megaleiloes','zuk','caixa.gov','tjmg','trt','leilaoimovel','superbid','sold','99lotes','marcoantonioleiloeiro','lancemax','rerum','hgleiloes','leilaovip','remateweb','sandreleiloes','jlmleiloes','figueiredo','remateweb','dynamicleiloes']
+    const dominiosMercado = ['vivareal','zapimoveis','zap.com','olx.com','quintoandar','123i.com','chavesnamao','imovelweb','lugarescerto','mgf.com','loft.com','navent.com','mercadolivre']
     const urlLower = urlTrimmed.toLowerCase()
     const dominioReconhecido = dominiosConhecidos.some(d => urlLower.includes(d))
-    if (!dominioReconhecido) {
+    const dominioMercado = dominiosMercado.some(d => urlLower.includes(d))
+    if (!dominioReconhecido && !dominioMercado) {
       const continuar = window.confirm(
-        'URL não reconhecida como portal de leilão conhecido.\n\nDomínios suportados: Mega Leilões, Zuk, Caixa, TJMG, TRT, LeilãoImóvel, Superbid.\n\nDeseja analisar mesmo assim?'
+        'URL não reconhecida como portal de leilão ou imobiliário conhecido.\n\nDomínios suportados: Mega Leilões, Zuk, Caixa, TJMG, TRT, Superbid, QuintoAndar, ZAP, VivaReal, OLX, Loft.\n\nDeseja analisar mesmo assim?'
       )
       if (!continuar) return
+    }
+    if (dominioMercado) {
+      setStep('🏠 Portal de mercado detectado — analisando como oportunidade')
     }
     const hasKey = localStorage.getItem("axis-api-key")
     const hasGemini = localStorage.getItem("axis-gemini-key")
@@ -679,6 +684,7 @@ function NovoImovel({onSave,onCancel,onNav,trello,parametrosBanco,criteriosBanco
       if(trello?.listId&&trello?.boardId) {
         setStep("🔷 Enviando para o Trello...")
         try {
+          const { criarCardImovel } = await import('./lib/trelloService.js')
           await criarCardImovel(property,trello.listId,trello.boardId,trello.key,trello.token)
           setTrelloMsg("✓ Card criado no Trello com etiquetas")
         } catch(e){ setTrelloMsg(`⚠️ Salvo no app, erro Trello: ${e.message}`) }
@@ -701,7 +707,7 @@ function NovoImovel({onSave,onCancel,onNav,trello,parametrosBanco,criteriosBanco
   }
 
   return <div>
-    <Hdr title="Analisar Imóvel" sub="Cole o link do leilão — IA busca e analisa tudo automaticamente"/>
+    <Hdr title="Analisar Imóvel" sub="Cole o link do leilão ou portal imobiliário — IA busca e analisa tudo automaticamente"/>
     <div style={{padding:isPhone?"20px 16px":"24px 28px",maxWidth:"640px"}}>
       {trello?.listId
         ?<div style={{background:`${K.trello}15`,border:`1px solid ${K.trello}40`,borderRadius:"7px",padding:"12px 16px",marginBottom:"18px",display:"flex",alignItems:"center",gap:"10px"}}>
@@ -715,9 +721,9 @@ function NovoImovel({onSave,onCancel,onNav,trello,parametrosBanco,criteriosBanco
         </div>}
 
       <div style={{marginBottom:"16px"}}>
-        <div style={{fontSize:"10px",color:K.t3,textTransform:"uppercase",letterSpacing:"1px",marginBottom:"6px"}}>Link do Leilão *</div>
-        <input type="url" inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false} style={{...inp(),fontSize:isPhone?16:14,padding:isPhone?'14px 16px':'10px 14px'}} placeholder="https://venda-imoveis.caixa.gov.br/..." value={url} onChange={e=>setUrl(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")analyze()}}/>
-        <div style={{fontSize:"11px",color:K.t3,marginTop:"5px"}}>Portal CAIXA, sites de leiloeiros, qualquer anúncio público</div>
+        <div style={{fontSize:"10px",color:K.t3,textTransform:"uppercase",letterSpacing:"1px",marginBottom:"6px"}}>Link do Imóvel *</div>
+        <input type="url" inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false} style={{...inp(),fontSize:isPhone?16:14,padding:isPhone?'14px 16px':'10px 14px'}} placeholder="https://www.quintoandar.com.br/... ou https://venda-imoveis.caixa.gov.br/..." value={url} onChange={e=>setUrl(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")analyze()}}/>
+        <div style={{fontSize:"11px",color:K.t3,marginTop:"5px"}}>Leilão (CAIXA, Zuk, Mega) ou mercado (QuintoAndar, ZAP, VivaReal, OLX)</div>
 
       <div style={{marginTop:"12px"}}>
         <label style={{fontSize:"13px",color:K.t2,fontWeight:600,display:"block",marginBottom:"6px"}}>📎 Anexar arquivos (opcional)</label>
@@ -792,6 +798,7 @@ function PropCard({p,onNav}) {
   const fmtM2 = v => v ? `R$ ${Math.round(v).toLocaleString('pt-BR')}/m²` : '—'
   const dataLeilao = p.data_leilao ? new Date(p.data_leilao).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit'}) : null
   const numLeilao = p.num_leilao ? `${p.num_leilao}º LEILÃO` : null
+  const eMercado = p.tipo_transacao === 'mercado_direto'
   const scoreDelta = p.preco_m2_imovel && p.preco_m2_mercado
     ? ((1 - p.preco_m2_imovel/p.preco_m2_mercado)*100).toFixed(0)
     : null
@@ -806,7 +813,8 @@ function PropCard({p,onNav}) {
       <div style={{marginBottom:10,borderRadius:8,overflow:"hidden",height:isPhone?100:120,background:C.offwhite,position:"relative"}}>
         <img src={p.foto_principal} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}} onError={e=>{e.target.parentElement.style.display="none"}} />
         {sc >= 7.5 && <div style={{position:'absolute',top:6,left:6,background:'#10B981',color:'#fff',fontSize:9,fontWeight:700,padding:'2px 7px',borderRadius:4}}>⭐ OPORTUNIDADE</div>}
-        {numLeilao && <div style={{position:'absolute',top:6,right:6,background:p.num_leilao>=2?'#D97706':'#065F46',color:'#fff',fontSize:8,fontWeight:700,padding:'2px 6px',borderRadius:4}}>{numLeilao}</div>}
+        {numLeilao && !eMercado && <div style={{position:'absolute',top:6,right:6,background:p.num_leilao>=2?'#D97706':'#065F46',color:'#fff',fontSize:8,fontWeight:700,padding:'2px 6px',borderRadius:4}}>{numLeilao}</div>}
+        {eMercado && <div style={{position:'absolute',top:6,right:6,background:'#1D4ED8',color:'#fff',fontSize:8,fontWeight:700,padding:'2px 6px',borderRadius:4}}>🏠 MERCADO</div>}
       </div>
     )}
 
@@ -821,8 +829,8 @@ function PropCard({p,onNav}) {
       📍 {[p.bairro,p.cidade].filter(Boolean).join(', ')}/{p.estado} · {tipFmt} · {(p.area_privativa_m2||p.area_m2)||'—'}m²
     </div>
 
-    {/* Data do leilão */}
-    {dataLeilao && (
+    {/* Data do leilão — oculto para mercado */}
+    {dataLeilao && !eMercado && (
       <div style={{fontSize:10,color:K.t3,marginBottom:6,display:'flex',gap:8,flexWrap:'wrap'}}>
         <span>🗓️ Leilão: <strong style={{color:K.wh}}>{dataLeilao}</strong></span>
         {p.leiloeiro && <span>· {p.leiloeiro.split(' ').slice(0,2).join(' ')}</span>}
@@ -832,6 +840,7 @@ function PropCard({p,onNav}) {
     {/* Badges */}
     <div style={{display:"flex",gap:"4px",flexWrap:"wrap",marginBottom:9}}>
       <Bdg c={rc} ch={p.recomendacao||"—"}/>
+      {eMercado && <Bdg c="#1D4ED8" ch="MERCADO"/>}
       <Bdg c={p.ocupacao==="Desocupado"?K.grn:p.ocupacao==="Ocupado"?K.red:K.t3} ch={p.ocupacao||"—"}/>
       {p.financiavel&&<Bdg c={K.blue} ch="Financiável"/>}
       {p.analise_dupla_ia&&<span style={{fontSize:"9px",fontWeight:"700",background:"linear-gradient(135deg,rgba(0,229,187,0.2),rgba(16,163,127,0.2))",border:"1px solid rgba(0,229,187,0.35)",color:"#00E5BB",padding:"2px 7px",borderRadius:"4px",letterSpacing:".5px"}}>🤖 IA</span>}
@@ -842,8 +851,8 @@ function PropCard({p,onNav}) {
     <div style={{display:"flex",flexDirection:isPhone?"column":"row",gap:8,alignItems:isPhone?"stretch":"flex-start"}}>
       <div style={{flex:1,display:"grid",gridTemplateColumns:"1fr 1fr",gap:5}}>
         <div style={{background:K.s2,borderRadius:6,padding:"7px 9px"}}>
-          <div style={{fontSize:"8.5px",color:K.t3,marginBottom:1,textTransform:"uppercase",letterSpacing:.3}}>Lance mín.</div>
-          <div style={{fontSize:"12px",fontWeight:"800",color:K.amb}}>{fmtM(p.valor_minimo)}</div>
+          <div style={{fontSize:"8.5px",color:K.t3,marginBottom:1,textTransform:"uppercase",letterSpacing:.3}}>{eMercado ? 'Preço pedido' : 'Lance mín.'}</div>
+          <div style={{fontSize:"12px",fontWeight:"800",color:K.amb}}>{fmtM(eMercado ? (p.preco_pedido || p.valor_minimo) : p.valor_minimo)}</div>
         </div>
         <div style={{background:K.s2,borderRadius:6,padding:"7px 9px"}}>
           <div style={{fontSize:"8.5px",color:K.t3,marginBottom:1,textTransform:"uppercase",letterSpacing:.3}}>Desconto</div>
@@ -995,6 +1004,7 @@ function Lista({props,onNav,onDelete,trello,onUpdateProp}) {
     if(!confirm(`Enviar/atualizar ${list.length} imóvel(is) no Trello?`)) return
     setSyncingTrello(true);setSyncMsg(`🔄 Enviando ${list.length} imóveis para o Trello...`)
     let ok=0,fail=0
+    const { criarCardImovel } = await import('./lib/trelloService.js')
     for(const p of list){
       try{
         await criarCardImovel(p,trello.listId,trello.boardId,trello.key,trello.token)

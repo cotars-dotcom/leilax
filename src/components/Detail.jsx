@@ -1127,7 +1127,7 @@ for (const s of SCORES) {
     <Hdr title={<>{p.titulo||"Imóvel"}{p.codigo_axis&&<span style={{fontSize:"10.5px",fontWeight:700,padding:"2px 8px",borderRadius:4,background:"#002B8010",color:"#002B80",border:"1px solid #002B8020",fontFamily:"monospace",letterSpacing:"0.5px",marginLeft:10,verticalAlign:"middle"}}>{p.codigo_axis}</span>}{p.num_leilao&&!isMercadoDireto(p.fonte_url,p.tipo_transacao)&&<span style={{display:"inline-block",background:p.num_leilao>=2?"#FEF3C7":"#ECFDF5",color:p.num_leilao>=2?"#D97706":"#065F46",fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:4,marginLeft:6,verticalAlign:"middle"}}>{p.num_leilao}º LEILÃO{p.valor_minimo&&p.valor_avaliacao?` · mín. ${Math.round(p.valor_minimo/p.valor_avaliacao*100)}%`:p.num_leilao>=2?" · mín. 35%":""}</span>}
       {isMercadoDireto(p.fonte_url,p.tipo_transacao)&&<span style={{display:"inline-block",background:"#FFFBEB",color:"#92400E",fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:4,marginLeft:6,verticalAlign:"middle"}}>🏠 MERCADO DIRETO</span>}{p.trello_card_url&&<a href={p.trello_card_url} target="_blank" rel="noreferrer" style={{fontSize:11,color:"#0052CC",marginLeft:8,verticalAlign:"middle",textDecoration:"none"}}>Trello</a>}</>} sub={`${p.cidade}/${p.estado} · ${fmtD(p.createdAt)}`}
       actions={<>
-        {p.fonte_url&&<a href={p.fonte_url} target="_blank" rel="noopener noreferrer" title="Abrir edital original no portal do leiloeiro" style={{...btn("s"),textDecoration:"none",display:"inline-block",background:`${C.blue}08`,color:C.blue,border:`1px solid ${C.blue}30`}}>🔗 Edital</a>}
+        {p.fonte_url&&<a href={p.fonte_url} target="_blank" rel="noopener noreferrer" title={isMercadoDireto(p.fonte_url,p.tipo_transacao)?"Abrir anúncio no portal":"Abrir edital original no portal do leiloeiro"} style={{...btn("s"),textDecoration:"none",display:"inline-block",background:`${C.blue}08`,color:C.blue,border:`1px solid ${C.blue}30`}}>{isMercadoDireto(p.fonte_url,p.tipo_transacao)?'🔗 Anúncio':'🔗 Edital'}</a>}
         {isAdmin&&<>
               <button style={{...btn("s"),background:`${K.amb}15`,color:K.amb,border:`1px solid ${K.amb}30`}} onClick={handleReanalyze} disabled={reanalyzing}>
                 {reanalyzing?`⏳ ${reStep||'Reanalisando...'}`:
@@ -1289,7 +1289,7 @@ for (const s of SCORES) {
           {[["Tipo",p.tipologia||p.tipo],["Área privativa",(p.area_privativa_m2||p.area_m2)?`${p.area_privativa_m2||p.area_m2}m²`:"—"],
             ...(p.area_total_m2&&p.area_total_m2!==(p.area_privativa_m2||p.area_m2)?[["Área total (registral)",`${p.area_total_m2}m² · inclui área comum`]]:[]
             ),["Base de cálculo",(p.area_usada_calculo_m2||p.area_privativa_m2)?`${p.area_usada_calculo_m2||p.area_privativa_m2}m² (privativa)`:"—"],
-            ["Quartos",p.quartos],["Suítes",p.suites],["Vagas",p.vagas],["Andar",p.andar],["Condomínio",p.condominio_mensal?`R$ ${p.condominio_mensal.toLocaleString('pt-BR')}/mês`:null],["Padrão",p.padrao_acabamento],["Leiloeiro",p.leiloeiro],["Data leilão",p.data_leilao],["Nº leilão",p.num_leilao?`${p.num_leilao}º leilão`:null],["Liquidez",LIQUIDEZ_MAP[p.liquidez?.toLowerCase()]||p.liquidez],["Revenda est.",p.prazo_revenda_meses?`${p.prazo_revenda_meses} meses`:"—"]].filter(([,v])=>v&&v!==null&&v!=="—"&&v!=="0"&&v!==0).map(([l,v])=>(
+            ["Quartos",p.quartos],["Suítes",p.suites],["Vagas",p.vagas],["Andar",p.andar],["Condomínio",p.condominio_mensal?`R$ ${p.condominio_mensal.toLocaleString('pt-BR')}/mês`:null],["Padrão",p.padrao_acabamento],...(!isMercadoDireto(p.fonte_url,p.tipo_transacao)?[["Leiloeiro",p.leiloeiro],["Data leilão",p.data_leilao],["Nº leilão",p.num_leilao?`${p.num_leilao}º leilão`:null]]:[]),["Liquidez",LIQUIDEZ_MAP[p.liquidez?.toLowerCase()]||p.liquidez],["Revenda est.",p.prazo_revenda_meses?`${p.prazo_revenda_meses} meses`:"—"]].filter(([,v])=>v&&v!==null&&v!=="—"&&v!=="0"&&v!==0).map(([l,v])=>(
             <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:`1px solid ${K.bd}`}}>
               <span style={{fontSize:"12px",color:K.t3}}>{l}</span><span style={{fontSize:"12.5px",color:K.tx}}>{v}</span>
             </div>
@@ -1436,7 +1436,7 @@ for (const s of SCORES) {
         <div style={card()}>
           {p.custo_total_aquisicao?<>
             <div style={{fontWeight:"600",color:K.amb,marginBottom:"10px",fontSize:"13px"}}>🧾 Custo total real</div>
-            {[["Lance mínimo",fmtC(p.valor_minimo)],["Comissão leiloeiro",fmtC(p.valor_minimo*(p.comissao_leiloeiro_pct||5)/100)],["ITBI",fmtC(p.valor_minimo*(p.itbi_pct||2)/100)],["Regularização",fmtC(p.custo_regularizacao)]].filter(([,v])=>v&&v!=="R$ 0").map(([l,v])=>(
+            {[[isMercadoDireto(p.fonte_url,p.tipo_transacao)?"Preço pedido":"Lance mínimo",fmtC(p.preco_pedido||p.valor_minimo)],...(!isMercadoDireto(p.fonte_url,p.tipo_transacao)?[["Comissão leiloeiro",fmtC(p.valor_minimo*(p.comissao_leiloeiro_pct||5)/100)]]:[]),["ITBI",fmtC((p.preco_pedido||p.valor_minimo)*(p.itbi_pct||2)/100)],["Regularização",fmtC(p.custo_regularizacao)]].filter(([,v])=>v&&v!=="R$ 0").map(([l,v])=>(
               <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"4px 0",fontSize:"12px"}}>
                 <span style={{color:K.t3}}>{l}</span><span style={{color:K.tx}}>{v}</span>
               </div>

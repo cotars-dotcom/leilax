@@ -185,7 +185,7 @@ Retorne APENAS JSON válido com esta estrutura EXATA:
 
   // Fallback DeepSeek (barato e eficaz para análise de texto)
   const deepseekKey = typeof localStorage !== 'undefined' ? localStorage.getItem('axis-deepseek-key') : null
-  if (deepseekKey && !geminiKey) {
+  if (deepseekKey) {
     try {
       const r = await fetch('https://api.deepseek.com/chat/completions', {
         method: 'POST',
@@ -237,6 +237,120 @@ Retorne APENAS JSON válido com esta estrutura EXATA:
   }
 
   return null
+}
+
+// ─── ANÁLISE HEURÍSTICA POR REGEX (fallback sem API) ───────────────────────
+function analisarDocumentoPorRegex(texto, nomeArq) {
+  if (!texto || texto.length < 100) return null
+
+  const t = texto.replace(/\s+/g, ' ')
+  const lower = t.toLowerCase()
+
+  // Detectar tipo de documento
+  let tipo = 'outro'
+  if (/edital|leil[aã]o|arrematação|hasta p[uú]blica/i.test(t)) tipo = 'edital'
+  else if (/matr[ií]cula|registro de im[oó]veis|r\.?\s*g\.?\s*i/i.test(t)) tipo = 'matricula'
+  else if (/certid[aã]o|d[eé]bito|iptu|condom[ií]nio/i.test(t)) tipo = 'certidao'
+  else if (/processo|autos|execu[çc][aã]o|penhora/i.test(t)) tipo = 'processo'
+
+  // Extrair padrões
+  const extrair = (regex, grupo = 1) => { const m = t.match(regex); return m ? m[grupo]?.trim() : null }
+
+  const processo = extrair(/(\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4})/) // CNJ
+  const matricula = extrair(/matr[ií]cula\s*(?:n[.ºo°]*\s*)?(\d{3,8})/i)
+  const cartorio = extrair(/(\d+[ºo°]?\s*(?:of[ií]cio|cart[oó]rio|registro)\s*de\s*im[oó]veis[^,.]*)/i)
+  const vara = extrair(/((?:\d+[ªa]?\s*)?vara\s*(?:c[ií]vel|do trabalho|federal|de execu[çc][õo]es)[^,.]{0,60})/i)
+  const exequente = extrair(/(?:exequente|autor|credor)[:\s]*([A-ZÀ-Ú][A-Za-zÀ-ÿ\s.]{3,60})/i)
+  const executado = extrair(/(?:executado|r[eé]u|devedor)[:\s]*([A-ZÀ-Ú][A-Za-zÀ-ÿ\s.]{3,60})/i)
+
+  // Valores monetários
+  const extrairValor = (regex) => {
+    const m = t.match(regex)
+    if (!m) return null
+    const v = m[1].replace(/\./g, '').replace(',', '.')
+    return parseFloat(v) || null
+  }
+  const valorAvaliacao = extrairValor(/avalia[çc][aã]o[^R]*R\$\s*([\d.,]+)/i)
+    || extrairValor(/valor\s*(?:de\s*)?avalia[çc][aã]o[^R]*R\$\s*([\d.,]+)/i)
+
+  // Data do leilão
+  const dataLeilao = extrair(/(?:data|realiza[çc][aã]o)[^:]*:\s*(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})/i)
+
+  // Área
+  const areaMatch = extrair(/(\d{2,5}[.,]\d{1,2})\s*m[²2]/i)
+  const area = areaMatch ? parseFloat(areaMatch.replace(',', '.')) : null
+
+  // Débitos
+  const debitos = []
+  if (/d[eé]bito|inadimpl[eê]ncia|atraso/i.test(t)) {
+    const iptu = extrairValor(/iptu[^R]*R\$\s*([\d.,]+)/i)
+    if (iptu) debitos.push(`IPTU: R$ ${iptu.toLocaleString('pt-BR')}`)
+    const cond = extrairValor(/condom[ií]nio[^R]*R\$\s*([\d.,]+)/i)
+    if (cond) debitos.push(`Condomínio: R$ ${cond.toLocaleString('pt-BR')}`)
+  }
+
+  // Gravames
+  const gravames = []
+  if (/penhora/i.test(t)) gravames.push('Penhora identificada')
+  if (/hipoteca/i.test(t)) gravames.push('Hipoteca identificada')
+  if (/aliena[çc][aã]o\s*fiduci[aá]ria/i.test(t)) gravames.push('Alienação fiduciária identificada')
+  if (/indisponibilidade/i.test(t)) gravames.push('Indisponibilidade de bens')
+
+  // Ocupação
+  let ocupacao = 'incerto'
+  if (/desocupado|vago|livre/i.test(t)) ocupacao = 'desocupado'
+  else if (/ocupado|morador|inquilino|posse/i.test(t)) ocupacao = 'ocupado'
+
+  // Responsabilidade débitos
+  let respDebitos = 'incerto'
+  if (/sub[- ]?roga[çc][aã]o|exonera|quitados?\s*(?:com|pelo)\s*(?:produto|preço)/i.test(t)) respDebitos = 'sub_rogado'
+  else if (/arrematante\s*responsável|por conta do\s*arrematante/i.test(t)) respDebitos = 'arrematante'
+
+  // Riscos
+  const riscos = []
+  if (gravames.length) riscos.push({ categoria: 'titulo', descricao: gravames.join('; '), gravidade: gravames.length > 1 ? 'alto' : 'medio', acao_recomendada: 'Verificar situação registrária atualizada' })
+  if (debitos.length) riscos.push({ categoria: 'debito', descricao: debitos.join('; '), gravidade: 'medio', acao_recomendada: 'Verificar responsabilidade pelos débitos no edital' })
+  if (ocupacao === 'ocupado') riscos.push({ categoria: 'ocupacao', descricao: 'Imóvel ocupado — pode exigir ação de imissão na posse', gravidade: 'alto', acao_recomendada: 'Avaliar custo e prazo de desocupação' })
+
+  // Score heurístico
+  let score = 6.0
+  if (gravames.length > 1) score -= 1.5
+  else if (gravames.length === 1) score -= 0.5
+  if (ocupacao === 'ocupado') score -= 1.0
+  if (debitos.length > 1) score -= 0.5
+  if (processo) score += 0.3  // pelo menos tem informação
+
+  return {
+    tipo_documento: tipo,
+    titulo_documento: `Análise heurística: ${nomeArq}`,
+    resumo_executivo: `Análise parcial por heurística (sem IA). ${riscos.length} risco(s) identificado(s). ${gravames.length ? 'Gravames: ' + gravames.join(', ') + '.' : 'Sem gravames detectados.'} Ocupação: ${ocupacao}.`,
+    informacoes_principais: {
+      processo_numero: processo,
+      vara: vara,
+      exequente: exequente,
+      executado: executado,
+      matricula_numero: matricula,
+      cartorio: cartorio,
+      area_m2: area,
+      debitos_declarados: debitos.join('; ') || null,
+      gravames: gravames.join('; ') || null,
+    },
+    metricas_viabilidade: {
+      score_geral: Math.max(1, Math.min(10, score)),
+      justificativa: 'Score estimado por heurística — reanalisar com IA para precisão',
+    },
+    riscos_identificados: riscos,
+    pontos_positivos: processo ? ['Número do processo identificado — rastreável'] : [],
+    alertas_criticos: gravames.length > 1 ? ['Múltiplos gravames detectados — análise jurídica detalhada recomendada'] : [],
+    responsabilidade_debitos: respDebitos,
+    ocupacao_confirmada: ocupacao,
+    prazo_liberacao_estimado_meses: ocupacao === 'ocupado' ? 12 : ocupacao === 'desocupado' ? 0 : 6,
+    recomendacao_juridica: score >= 6 ? 'neutro' : 'desfavoravel',
+    parecer_final: `Análise heurística (regex) — ${riscos.length} risco(s) detectado(s). Score estimado: ${Math.max(1, Math.min(10, score)).toFixed(1)}/10. Recomenda-se reanálise com IA (configure Gemini ou Claude) para parecer completo.`,
+    score_juridico_sugerido: Math.max(1, Math.min(10, score)),
+    score_juridico_delta: 0.0,
+    _parcial: true,
+  }
 }
 
 // ─── PIPELINE COMPLETO: URL → Storage → Análise → Banco ───────────────────
@@ -416,6 +530,18 @@ Retorne APENAS JSON:
         onProgress?.(`⚠️ GPT-4o Vision falhou (${r.status}) — ${err.error?.message?.substring(0,60) || ''}`)
       }
     } catch(e) { onProgress?.(`⚠️ GPT-4o Vision erro: ${e.message?.substring(0,60)}`) }
+  }
+
+  // ── FALLBACK: Análise heurística por regex (sem API) ────────────────────
+  if (!analise && textoParaAnalise?.length > 100) {
+    try {
+      onProgress?.(`🔍 Fallback: análise heurística de ${nome} (sem API)...`)
+      analise = analisarDocumentoPorRegex(textoParaAnalise, nome)
+      if (analise) {
+        analise._modelo = 'regex_fallback'
+        onProgress?.(`⚠️ ${nome} — análise parcial (heurística, sem IA)`)
+      }
+    } catch(e) { console.warn('[AXIS] Regex fallback:', e.message) }
   }
 
   if (analise) {
