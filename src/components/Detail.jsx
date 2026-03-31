@@ -15,7 +15,7 @@ import { isMercadoDireto } from '../lib/detectarFonte.js'
 import CenariosReforma from './CenariosReforma.jsx'
 import { ReformaProvider } from '../hooks/useReforma.jsx'
 import CustosReaisEditor from './CustosReaisEditor.jsx'
-import { exportarPDFImovel } from './ExportarPDF.jsx'
+// ExportarPDF: loaded dynamically via import() in share menu
 
 const ESCOPOS_INFO = {
   refresh_giro: {
@@ -897,6 +897,8 @@ function AbaArremates({ imovel }) {
 export default function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze,isAdmin,onArchive,isMobile,isPhone}) {
   const [sending,setSending]=useState(false)
   const [modoAoVivo, setModoAoVivo]=useState(false)
+  const [showShareMenu, setShowShareMenu] = useState(false)
+  const [shareStatus, setShareStatus] = useState(null)
   const [msg,setMsg]=useState("")
   const [abaDetalhe,setAbaDetalhe]=useState('resumo')
   const [reanalyzing,setReanalyzing]=useState(false)
@@ -1204,27 +1206,71 @@ for (const s of SCORES) {
               </button>
             </>}
         {isAdmin&&<button style={btn("trello")} onClick={sendTrello} disabled={sending}>{sending?"Enviando...":"🔷 Trello"}</button>}
-        <button onClick={() => exportarPDFImovel(p)} style={{...btn("s"),background:'#7C3AED12',color:'#7C3AED',border:'1px solid #7C3AED30'}}>📄 PDF</button>
+        {/* Share/Export menu */}
+        <div style={{position:'relative',display:'inline-block'}}>
+          <button onClick={() => setShowShareMenu(!showShareMenu)}
+            style={{...btn("s"),background:'#7C3AED12',color:'#7C3AED',border:'1px solid #7C3AED30'}}>
+            📤 Relatório
+          </button>
+          {showShareMenu && <>
+            <div onClick={() => setShowShareMenu(false)} style={{position:'fixed',inset:0,zIndex:40}} />
+            <div style={{position:'absolute',top:'100%',right:0,zIndex:50,marginTop:4,background:C.white,borderRadius:10,
+              border:`1px solid ${C.borderW}`,boxShadow:'0 8px 30px rgba(0,0,0,0.15)',padding:6,minWidth:210}}>
+              {typeof navigator !== 'undefined' && navigator.share && (
+                <button onClick={async () => {
+                  const { compartilharRelatorio } = await import('./ExportarPDF.jsx')
+                  setShareStatus('⏳')
+                  const r = await compartilharRelatorio(p)
+                  setShareStatus(r === 'shared' ? '✅ Enviado!' : r === 'cancelled' ? '' : '📥 Baixado!')
+                  setTimeout(() => { setShareStatus(null); setShowShareMenu(false) }, 1500)
+                }} style={{display:'flex',alignItems:'center',gap:8,width:'100%',padding:'10px 12px',
+                  border:'none',background:'none',cursor:'pointer',borderRadius:8,fontSize:13,color:C.navy,fontWeight:600,
+                  textAlign:'left'}}>
+                  <span style={{fontSize:18}}>📱</span>
+                  <div><div>Compartilhar</div><div style={{fontSize:10,color:C.muted,fontWeight:400}}>WhatsApp, Email, Telegram...</div></div>
+                </button>
+              )}
+              <button onClick={async () => {
+                const { downloadRelatorio } = await import('./ExportarPDF.jsx')
+                await downloadRelatorio(p)
+                setShareStatus('📥 Baixado!')
+                setTimeout(() => { setShareStatus(null); setShowShareMenu(false) }, 1500)
+              }} style={{display:'flex',alignItems:'center',gap:8,width:'100%',padding:'10px 12px',
+                border:'none',background:'none',cursor:'pointer',borderRadius:8,fontSize:13,color:C.navy,fontWeight:600,
+                textAlign:'left'}}>
+                <span style={{fontSize:18}}>📊</span>
+                <div><div>Baixar Relatório</div><div style={{fontSize:10,color:C.muted,fontWeight:400}}>HTML interativo com abas</div></div>
+              </button>
+              <button onClick={async () => {
+                const { exportarPDFImovel } = await import('./ExportarPDF.jsx')
+                exportarPDFImovel(p)
+                setShowShareMenu(false)
+              }} style={{display:'flex',alignItems:'center',gap:8,width:'100%',padding:'10px 12px',
+                border:'none',background:'none',cursor:'pointer',borderRadius:8,fontSize:13,color:C.navy,fontWeight:600,
+                textAlign:'left'}}>
+                <span style={{fontSize:18}}>🖨️</span>
+                <div><div>Imprimir / PDF</div><div style={{fontSize:10,color:C.muted,fontWeight:400}}>Salvar como PDF pelo navegador</div></div>
+              </button>
+              <button onClick={() => {
+                import('../lib/supabase.js').then(({ exportarAnaliseJSON }) => { exportarAnaliseJSON(p) })
+                setShowShareMenu(false)
+              }} style={{display:'flex',alignItems:'center',gap:8,width:'100%',padding:'10px 12px',
+                border:'none',background:'none',cursor:'pointer',borderRadius:8,fontSize:13,color:'#666',
+                textAlign:'left',borderTop:`1px solid ${C.borderW}`}}>
+                <span style={{fontSize:16}}>{'{ }'}</span>
+                <div><div>Dados JSON</div><div style={{fontSize:10,color:C.muted}}>Dados completos</div></div>
+              </button>
+              {shareStatus && (
+                <div style={{padding:'6px 12px',textAlign:'center',fontSize:12,fontWeight:600,color:'#065F46'}}>{shareStatus}</div>
+              )}
+            </div>
+          </>}
+        </div>
         <button onClick={() => setModoAoVivo(true)} style={{
-          padding:'5px 12px', borderRadius:8,
-          background:'#E5484D', color:'#fff',
-          border:'none', fontSize:11.5, fontWeight:700,
-          cursor:'pointer', display:'flex', alignItems:'center', gap:5,
-        }}>
-          <span style={{ width:7, height:7, borderRadius:'50%',
-            background:'#fff', display:'inline-block',
-            animation:'pulse 1s infinite' }} />
+          padding:'5px 12px', borderRadius:8, background:'#E5484D', color:'#fff',
+          border:'none', fontSize:11.5, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', gap:5 }}>
+          <span style={{ width:7, height:7, borderRadius:'50%', background:'#fff', display:'inline-block', animation:'pulse 1s infinite' }} />
           Ao Vivo
-        </button>
-        <button onClick={() => { import('../lib/supabase.js').then(({ exportarRelatorioHTML }) => { exportarRelatorioHTML(p) }) }}
-          title="Baixar relatório HTML"
-          style={{ padding:'6px 12px', borderRadius:7, border:`1px solid ${K.bd}`, background:K.s2, color:K.t2, fontSize:12, cursor:'pointer', display:'flex', alignItems:'center', gap:5 }}>
-          ↓ HTML
-        </button>
-        <button onClick={() => { import('../lib/supabase.js').then(({ exportarAnaliseJSON }) => { exportarAnaliseJSON(p) }) }}
-          title="Baixar dados JSON completos"
-          style={{ padding:'6px 12px', borderRadius:7, border:`1px solid ${K.bd}`, background:K.s2, color:K.t2, fontSize:12, cursor:'pointer', display:'flex', alignItems:'center', gap:5 }}>
-          ↓ JSON
         </button>
         {isAdmin&&onArchive&&<button style={{...btn("s"),background:`${C.mustardL}`,color:C.mustard,border:`1px solid ${C.mustard}40`}} onClick={()=>onArchive(p.id)}>📦 Arquivar</button>}
         {isAdmin&&<button style={{...btn("d"),padding:"5px 12px",fontSize:"12px"}} onClick={()=>{if(confirm("Excluir?"))onDelete(p.id)}}>🗑</button>}
