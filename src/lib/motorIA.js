@@ -1446,6 +1446,131 @@ DADOS DE BAIRRO (parcial):
     try { fotosResult = await extrairFotosImovel(url, claudeKey) || { fotos: [], foto_principal: null } } catch {}
   }
 
+  // ── ANÁLISE DE FOTOS VIA GEMINI VISION — detectar atributos visuais ──
+  if (fotosResult.fotos?.length > 0) {
+    const gemKeyVision = typeof localStorage !== 'undefined' ? localStorage.getItem('axis-gemini-key') : null
+    if (gemKeyVision) {
+      try {
+        progress('🔍 Analisando fotos do imóvel (Gemini Vision)...')
+        // Pegar até 4 fotos para análise
+        const fotosParaAnalisar = fotosResult.fotos.slice(0, 4)
+        // Baixar e converter para base64
+        const imageParts = []
+        for (const fotoUrl of fotosParaAnalisar) {
+          try {
+            const imgRes = await fetch(fotoUrl, { signal: AbortSignal.timeout(10000) })
+            if (!imgRes.ok) continue
+            const blob = await imgRes.blob()
+            if (blob.size < 5000 || blob.size > 10_000_000) continue // Skip tiny/huge
+            const base64 = await new Promise((resolve, reject) => {
+              const reader = new FileReader()
+              reader.onload = () => resolve(reader.result.split(',')[1])
+              reader.onerror = reject
+              reader.readAsDataURL(blob)
+            })
+            imageParts.push({
+              inline_data: { mime_type: blob.type || 'image/jpeg', data: base64 }
+            })
+          } catch(imgErr) { /* skip failed images */ }
+        }
+
+        if (imageParts.length > 0) {
+          const visionPrompt = `Analise estas ${imageParts.length} fotos de um imóvel (apartamento/casa) e identifique os atributos VISÍVEIS.
+Retorne APENAS JSON válido:
+{
+  "piscina": true/false/null,
+  "elevador": true/false/null,
+  "area_lazer": true/false/null,
+  "area_gourmet": true/false/null,
+  "churrasqueira": true/false/null,
+  "portaria": true/false/null,
+  "playground": true/false/null,
+  "academia": true/false/null,
+  "salao_festas": true/false/null,
+  "mobiliado": true/false/"semi"/null,
+  "estado_conservacao": "bom/regular/ruim/reformado",
+  "padrao_acabamento_visual": "popular/medio/alto/luxo",
+  "observacoes": "descrição breve do que vê nas fotos"
+}
+Regras: true = claramente visível. false = claramente ausente (ex: prédio baixo sem elevador). null = impossível determinar pela foto.`
+
+          const visionRes = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${gemKeyVision}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [{ parts: [...imageParts, { text: visionPrompt }] }],
+                generationConfig: { temperature: 0.1, maxOutputTokens: 1000 }
+              }),
+              signal: AbortSignal.timeout(30000)
+            }
+          )
+          if (visionRes.ok) {
+            const visionData = await visionRes.json()
+            const visionTxt = visionData.candidates?.[0]?.content?.parts?.[0]?.text || ''
+            const visionClean = visionTxt.replace(/```json|```/g, '').trim()
+            const visionMatch = visionClean.match(/\{[\s\S]*\}/)
+            if (visionMatch) {
+              const attrs = JSON.parse(visionMatch[0])
+              progress(`📷 Vision detectou: ${Object.entries(attrs).filter(([k,v]) => v === true).map(([k]) => k).join(', ') || 'nenhum atributo confirmado'}`)
+
+              // Corrigir atributos — Vision tem prioridade sobre texto (fotos não mentem)
+              if (attrs.piscina === true && analise.piscina !== true) {
+                analise.piscina = true
+                analise.elevador = analise.elevador ?? true // piscina implica elevador
+                analise._correcoes_vision = [...(analise._correcoes_vision || []), 'Piscina detectada nas fotos']
+              }
+              if (attrs.elevador === true && analise.elevador !== true) {
+                analise.elevador = true
+                analise._correcoes_vision = [...(analise._correcoes_vision || []), 'Elevador detectado nas fotos']
+              }
+              if (attrs.area_lazer === true && analise.area_lazer !== true) {
+                analise.area_lazer = true
+                analise._correcoes_vision = [...(analise._correcoes_vision || []), 'Área lazer detectada nas fotos']
+              }
+              if (attrs.area_gourmet === true || attrs.churrasqueira === true) {
+                if (analise.salao_festas !== true) analise.salao_festas = true
+                if (analise.area_lazer !== true) analise.area_lazer = true
+              }
+              if (attrs.portaria === true && !analise.portaria_24h) {
+                analise.portaria_24h = true
+              }
+              if (attrs.mobiliado && !analise.mobiliado) {
+                analise.mobiliado = attrs.mobiliado
+              }
+              if (attrs.padrao_acabamento_visual && !analise.padrao_acabamento) {
+                analise.padrao_acabamento = attrs.padrao_acabamento_visual
+              }
+              // Salvar observações da Vision
+              analise._vision_observacoes = attrs.observacoes
+              analise._vision_estado = attrs.estado_conservacao
+            }
+          }
+        }
+      } catch(visionErr) {
+        console.warn('[AXIS] Gemini Vision fotos:', visionErr.message)
+        progress('⚠️ Análise visual das fotos falhou — continuando com dados de texto')
+      }
+    }
+  }
+
+  // ── RECALCULAR HOMOGENEIZAÇÃO após Vision (Vision pode ter corrigido atributos) ──
+  if (analise._correcoes_vision?.length > 0) {
+    progress('🔄 Recalculando homogeneização com atributos visuais...')
+    let fh = 1.0
+    if (analise.elevador === false) fh *= 0.85
+    if (analise.piscina === false) fh *= 0.97
+    if (analise.area_lazer === false) fh *= 0.95
+    if ((analise.vagas || 0) === 0) fh *= 0.90
+    analise.fator_homogenizacao = fh < 1.0 ? parseFloat(fh.toFixed(4)) : null
+    // Recalcular valor de mercado homogeneizado
+    if (dadosBairroCalib?.precoAnuncioM2 && analise.area_m2) {
+      analise.valor_mercado_homogenizado = Math.round(dadosBairroCalib.precoAnuncioM2 * analise.area_m2 * (fh < 1 ? fh : 1))
+    }
+    analise.score_total = calcularScore(analise, parametros)
+  }
+
   // Validação pós-análise: corrigir área, preço/m², alertas contraditórios
   progress('🔍 Validando dados da análise...')
   const analiseValidada = validarECorrigirAnalise(analise)
