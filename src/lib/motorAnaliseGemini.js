@@ -241,7 +241,11 @@ async function chamarGeminiModelo(prompt, geminiKey, modelo) {
   if (!res.ok) {
     const body = await res.text()
     console.error('[AXIS Gemini]', modelo, 'HTTP', res.status, body.substring(0, 300))
-    throw new Error(`Gemini ${res.status}: ${body.substring(0, 200)}`)
+    const errMsg = body.substring(0, 200)
+    if (res.status === 404) throw new Error(`Modelo ${modelo} não encontrado (404)`)
+    if (res.status === 401 || res.status === 403) throw new Error(`Chave Gemini inválida (${res.status})`)
+    if (res.status === 429) throw new Error(`Quota Gemini excedida (429) — aguarde 1 min`)
+    throw new Error(`Gemini ${res.status}: ${errMsg}`)
   }
   const data = await res.json()
   const txt = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
@@ -254,21 +258,38 @@ async function chamarGeminiModelo(prompt, geminiKey, modelo) {
 
 // Cascata de modelos Gemini: 2.0-flash → 1.5-flash → 1.5-pro
 async function chamarGemini(prompt, geminiKey) {
-  const MODELOS = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro']
+  // Cascade expandida: tenta variantes de nome do modelo
+  const MODELOS = [
+    'gemini-2.0-flash',
+    'gemini-2.0-flash-exp',
+    'gemini-1.5-flash',
+    'gemini-1.5-flash-latest',
+    'gemini-1.5-pro',
+  ]
   let ultimoErro = null
+  let tentativas = 0
   for (const modelo of MODELOS) {
     try {
-      console.log('[AXIS Gemini] Tentando modelo:', modelo)
+      console.log('[AXIS Gemini] Tentando modelo:', modelo, `(${++tentativas}/${MODELOS.length})`)
       const resultado = await chamarGeminiModelo(prompt, geminiKey, modelo)
       console.log('[AXIS Gemini] Sucesso com:', modelo)
       return { resultado, modeloUsado: modelo }
     } catch(e) {
       console.warn('[AXIS Gemini] Falhou com', modelo, ':', e.message.substring(0, 100))
       ultimoErro = e
+      const msg = e.message || ''
       // Se chave inválida, não tentar outros modelos
-      if (e.message.includes('API_KEY_INVALID') || e.message.includes('401')) break
+      if (msg.includes('API_KEY_INVALID') || msg.includes('401') || msg.includes('403')) {
+        ultimoErro = new Error('Chave Gemini inválida — verifique em Admin > API Keys')
+        break
+      }
+      // Se 429 rate limit, esperar e tentar o mesmo modelo
+      if (msg.includes('429')) {
+        await new Promise(r => setTimeout(r, 2000))
+        continue
+      }
       // Se 404 (modelo não existe), tentar o próximo
-      if (e.message.includes('404')) continue
+      if (msg.includes('404')) continue
     }
   }
   throw ultimoErro || new Error('Todos os modelos Gemini falharam')
@@ -535,9 +556,12 @@ export async function analisarComDeepSeek(url, deepseekKey, parametros, onProgre
         max_tokens: 4096,
         temperature: 0.1
       }),
-      signal: AbortSignal.timeout(60000)
+      signal: AbortSignal.timeout(90000)
     })
-    if (!r.ok) throw new Error(`DeepSeek ${r.status}`)
+    if (!r.ok) {
+      const body = await r.text().catch(() => '')
+      throw new Error(`DeepSeek ${r.status}: ${body.substring(0, 100)}`)
+    }
     const data = await r.json()
     const txt = data.choices?.[0]?.message?.content || ''
     const clean = txt.replace(/```json|```/g, '').trim()

@@ -1136,6 +1136,9 @@ export async function analisarImovelCompleto(url, claudeKey, openaiKey, parametr
       }
     } catch(e) { console.warn('[AXIS motorIA] sync chaves:', e.message) }
   }
+  // Validate key format
+  if (geminiKey && geminiKey.length < 20) { console.warn('[AXIS] Gemini key muito curta'); geminiKey = null }
+  if (deepseekKey && deepseekKey.length < 20) { console.warn('[AXIS] DeepSeek key muito curta'); deepseekKey = null }
   // ─── CASCATA IA: Gemini Flash → DeepSeek V3 → Claude Sonnet ─────────────────
 
   let geminiErro = null, deepseekErro = null
@@ -1280,14 +1283,18 @@ DADOS DE BAIRRO (parcial):
 
     // Sugestão baseada no que deu errado
     let sugestao = ''
-    if (geminiErro?.includes('inválida') || geminiErro?.includes('401')) {
-      sugestao = 'Sua chave Gemini parece inválida. Gere uma nova em aistudio.google.com → API Keys.'
+    if (geminiErro?.includes('inválida') || geminiErro?.includes('401') || geminiErro?.includes('403')) {
+      sugestao = 'Sua chave Gemini parece inválida. Gere uma nova em aistudio.google.com → Get API Key.'
     } else if (geminiErro?.includes('429') || geminiErro?.includes('Quota')) {
-      sugestao = 'Quota do Gemini excedida — aguarde alguns minutos ou verifique limites no Google AI Studio.'
+      sugestao = 'Quota do Gemini excedida — aguarde 1 minuto ou verifique limites no Google AI Studio.'
+    } else if (geminiErro?.includes('404') || geminiErro?.includes('não disponível')) {
+      sugestao = 'Nenhum modelo Gemini disponível para sua chave. Gere uma nova chave em aistudio.google.com → Get API Key → Create API Key.'
     } else if (geminiErro?.includes('JSON') || geminiErro?.includes('resposta')) {
       sugestao = 'Gemini retornou dados inválidos. Tente novamente — pode ser instabilidade temporária.'
     } else if (!geminiKey) {
-      sugestao = 'Configure uma chave Gemini (grátis) em Admin > API Keys — é o motor principal.'
+      sugestao = 'Configure uma chave Gemini (grátis) em Admin > API Keys — é o motor principal e custa R$ 0,01/análise.'
+    } else if (deepseekErro?.includes('abort')) {
+      sugestao = 'DeepSeek não respondeu a tempo. Verifique sua conexão ou tente novamente.'
     } else {
       sugestao = 'Tente novamente em alguns segundos. Se persistir, verifique as chaves em Admin > API Keys.'
     }
