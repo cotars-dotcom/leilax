@@ -23,7 +23,7 @@ const URLS_BANIDAS = [
   /trt\.jus\.br/i, /tjmg\.jus\.br/i, /trf.*\.jus\.br/i, /caixa\.gov/i,
   /cnj\.jus\.br/i, /jus\.br\/.*logo/i,
   // Formatos não-foto
-  /\.(gif|svg|ico|webp|bmp)(\?|$)/i,
+  /\.(gif|svg|ico|bmp)(\?|$)/i,
   // Padrões de UI em URLs
   /\/img\/icon/i, /\/img\/logo/i, /\/assets\/img\/[a-z-]+\.(png|jpg)/i,
   /\/static\/media\/logo/i, /\/public\/logo/i,
@@ -61,14 +61,14 @@ const PADROES_FOTO_IMOVEL = [
   /\/lote\/foto/i,
   /\/property\/photo/i,
   // Nomes de arquivo que sugerem foto de imóvel
-  /foto[-_]?\d+\.(jpg|jpeg|png)/i,
-  /img[-_]?\d+\.(jpg|jpeg|png)/i,
-  /photo[-_]?\d+\.(jpg|jpeg|png)/i,
-  /imagem[-_]?\d+\.(jpg|jpeg|png)/i,
-  /imovel[-_]?\d+\.(jpg|jpeg|png)/i,
-  /apartamento.*\.(jpg|jpeg|png)/i,
-  /casa.*\.(jpg|jpeg|png)/i,
-  /lote[-_]?\d+\.(jpg|jpeg|png)/i,
+  /foto[-_]?\d+\.(jpg|jpeg|png|webp)/i,
+  /img[-_]?\d+\.(jpg|jpeg|png|webp)/i,
+  /photo[-_]?\d+\.(jpg|jpeg|png|webp)/i,
+  /imagem[-_]?\d+\.(jpg|jpeg|png|webp)/i,
+  /imovel[-_]?\d+\.(jpg|jpeg|png|webp)/i,
+  /apartamento.*\.(jpg|jpeg|png|webp)/i,
+  /casa.*\.(jpg|jpeg|png|webp)/i,
+  /lote[-_]?\d+\.(jpg|jpeg|png|webp)/i,
 ]
 
 function isUrlBanida(url) {
@@ -93,7 +93,7 @@ function filtrarFotos(urls) {
 
     if (isFotoImovel(url)) {
       prioritarias.push(url)
-    } else if (url.match(/\.(jpg|jpeg|png)(\?|$)/i)) {
+    } else if (url.match(/\.(jpg|jpeg|png|webp)(\?|$)/i)) {
       // Só aceitar jpg/png genérico se tiver dimensão razoável no nome ou contexto
       secundarias.push(url)
     }
@@ -208,7 +208,7 @@ function extrairImgsHTML(html, dominio) {
     if (isUrlBanida(src)) continue
     if (isFotoImovel(src)) candidatos.push(src)
     // Para img genérica: só aceitar se não for de outro domínio (CDN do leiloeiro)
-    else if (src.includes(dominio) && src.match(/\.(jpg|jpeg|png)(\?|$)/i)) {
+    else if (src.includes(dominio) && src.match(/\.(jpg|jpeg|png|webp)(\?|$)/i)) {
       candidatos.push(src)
     }
   }
@@ -239,6 +239,61 @@ async function lerViaJina(url, onProgress) {
     console.warn('[AXIS fotos Jina]', e.message)
     return null
   }
+}
+
+// Jina HTML format — pega URLs reais de imagem que JS-render esconde
+async function lerViaJinaHTML(url, onProgress) {
+  try {
+    onProgress?.('Buscando fotos via Jina HTML...')
+    const r = await fetch(`https://r.jina.ai/${url}`, {
+      headers: { 'Accept': 'text/html', 'X-Return-Format': 'html' },
+      signal: AbortSignal.timeout(25000)
+    })
+    if (!r.ok) return null
+    return await r.text()
+  } catch(e) {
+    console.warn('[AXIS fotos Jina HTML]', e.message)
+    return null
+  }
+}
+
+// Extrair fotos de portais protegidos (VivaReal/ZAP) do HTML Jina
+function extrairFotosPortalHTML(htmlJina, dominio) {
+  if (!htmlJina) return []
+  const fotos = []
+  
+  // VivaReal: resizedimgs.vivareal.com com dimensão >= 400px
+  const resizedMatches = htmlJina.match(/https:\/\/resizedimgs\.vivareal\.com\/img\/vr-listing\/[^\s"'<>]+/gi) || []
+  for (const url of resizedMatches) {
+    const clean = url.replace(/&amp;/g, '&')
+    // Filtrar avatars (72x56) e manter só fotos grandes
+    if (clean.includes('72x56') || clean.includes('dimension=72')) continue
+    if (!fotos.includes(clean)) fotos.push(clean)
+  }
+  
+  // ZAP: resizedimgs.zapimoveis.com
+  const zapMatches = htmlJina.match(/https:\/\/resizedimgs\.zapimoveis\.com\/[^\s"'<>]+/gi) || []
+  for (const url of zapMatches) {
+    const clean = url.replace(/&amp;/g, '&')
+    if (!clean.includes('72x56') && !fotos.includes(clean)) fotos.push(clean)
+  }
+  
+  // QuintoAndar: imgix
+  const qaMatches = htmlJina.match(/https:\/\/[^\s"'<>]*quintoandar\.imgix\.net[^\s"'<>]+/gi) || []
+  for (const url of qaMatches) {
+    if (!fotos.includes(url)) fotos.push(url)
+  }
+  
+  // Deduplicate by hash (same image, different dimensions)
+  const hashes = new Set()
+  return fotos.filter(url => {
+    const hashMatch = url.match(/\/([a-f0-9]{20,})\//)
+    if (hashMatch) {
+      if (hashes.has(hashMatch[1])) return false
+      hashes.add(hashMatch[1])
+    }
+    return true
+  }).slice(0, 12)
 }
 
 // Extrair URLs de imagem do markdown do Jina
@@ -322,6 +377,23 @@ export async function buscarFotosImovel(imovel, geminiKey = null, onProgress = n
     if (ogUrl && !isUrlBanida(ogUrl)) {
       progress('✅ Foto principal via og:image')
       return { fotos: [ogUrl], foto_principal: ogUrl, fonte: 'og-image' }
+    }
+  }
+
+  // PASSO 3.5: Jina HTML format — para portais protegidos (VivaReal, ZAP, QuintoAndar)
+  // Pega o HTML renderizado que contém URLs reais das CDNs de imagem
+  const isPortalProtegido = /vivareal|zapimoveis|quintoandar|olx\.com/i.test(dominio)
+  if (isPortalProtegido || (!htmlText || htmlText.includes('Cloudflare'))) {
+    progress('Buscando fotos via Jina HTML (portal protegido)...')
+    const jinaHTML = await lerViaJinaHTML(url, progress)
+    if (jinaHTML) {
+      const fotosPortal = extrairFotosPortalHTML(jinaHTML, dominio)
+      if (fotosPortal.length > 0) {
+        // Converter webp → jpg para melhor compatibilidade (Vision aceita ambos)
+        const fotosClean = fotosPortal.map(u => u.replace(/&amp;/g, '&'))
+        progress(`✅ ${fotosClean.length} fotos extraídas do portal via Jina HTML`)
+        return { fotos: fotosClean, foto_principal: fotosClean[0], fonte: `jina-html-${dominio}` }
+      }
     }
   }
 
