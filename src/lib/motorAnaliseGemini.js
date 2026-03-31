@@ -618,3 +618,85 @@ export async function analisarComDeepSeek(url, deepseekKey, parametros, onProgre
     throw new Error(`DeepSeek falhou: ${e.message}`)
   }
 }
+
+// ─── MOTOR GPT-4o-mini ───────────────────────────────────────────────────────
+export async function analisarComGPT(url, openaiKey, parametros, onProgress) {
+  const progress = onProgress || (() => {})
+  
+  // Scrape
+  progress('📄 GPT: Lendo página...')
+  const { scrapeUrlJina, extrairCamposTexto } = await import('./scraperImovel.js')
+  let textoScrapeado = ''
+  try {
+    textoScrapeado = await scrapeUrlJina(url)
+  } catch(e) { /* fallback below */ }
+  
+  const camposBasicos = extrairCamposTexto(textoScrapeado, url)
+  
+  // Build prompt (reuse same logic as Gemini)
+  const _eMercado = isMercadoDireto(camposBasicos?.fonte_url || url, null)
+  const prompt = buildPromptGemini(camposBasicos, textoScrapeado, null, null, null, null, _eMercado)
+  
+  progress('🧠 GPT-4o-mini processando...')
+  const r = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${openaiKey}` },
+    body: JSON.stringify({
+      model: 'gpt-4o-mini',
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 4096,
+      temperature: 0.1,
+    }),
+    signal: AbortSignal.timeout(90000)
+  })
+  if (!r.ok) {
+    const body = await r.text().catch(() => '')
+    throw new Error(`GPT ${r.status}: ${body.substring(0, 100)}`)
+  }
+  const data = await r.json()
+  const txt = data.choices?.[0]?.message?.content || ''
+  const clean = txt.replace(/```json|```/g, '').trim()
+  const match = clean.match(/\{[\s\S]*\}/)
+  if (!match) throw new Error('GPT JSON inválido')
+  
+  const analise = JSON.parse(match[0])
+  analise._modelo_usado = 'gpt-4o-mini'
+  analise.fonte_url = url
+  
+  // Merge regex fields
+  analise.valor_minimo = camposBasicos.valor_minimo > 0 ? camposBasicos.valor_minimo : analise.valor_minimo
+  analise.valor_avaliacao = camposBasicos.valor_avaliacao || analise.valor_avaliacao
+  analise.area_m2 = camposBasicos.area_m2 || analise.area_m2
+  analise.quartos = camposBasicos.quartos || analise.quartos
+  analise.vagas = camposBasicos.vagas || analise.vagas
+  analise.elevador = analise.elevador ?? camposBasicos.elevador ?? null
+  analise.piscina = analise.piscina ?? camposBasicos.piscina ?? null
+  analise.area_lazer = analise.area_lazer ?? camposBasicos.area_lazer ?? null
+  analise.salao_festas = analise.salao_festas ?? camposBasicos.salao_festas ?? null
+  analise.portaria_24h = analise.portaria_24h ?? camposBasicos.portaria_24h ?? null
+  analise.condominio_mensal = analise.condominio_mensal || camposBasicos.condominio_mensal || null
+  analise.banheiros = analise.banheiros || camposBasicos.banheiros || null
+  
+  // Mercado direto
+  if (isMercadoDireto(url, analise.tipo_transacao)) {
+    analise.tipo_transacao = 'mercado_direto'
+    analise.preco_pedido = analise.preco_pedido || analise.valor_minimo || 0
+  }
+  
+  // Gerar links para comparáveis
+  if (analise.comparaveis?.length) {
+    analise.comparaveis = analise.comparaveis.map(c => {
+      if (c.link) return c
+      const bairro = (c.bairro || analise.bairro || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '-')
+      const cid = (c.cidade || analise.cidade || 'contagem').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '-')
+      c.link = `https://www.vivareal.com.br/venda/minas-gerais/${cid}/${bairro ? bairro + '/' : ''}apartamento_residencial/?quartos=${c.quartos || ''}`
+      c._link_gerado = true
+      if (!c.bairro) c.bairro = analise.bairro
+      if (!c.cidade) c.cidade = analise.cidade
+      return c
+    })
+  }
+  
+  progress('✅ GPT-4o-mini concluído')
+  return analise
+}

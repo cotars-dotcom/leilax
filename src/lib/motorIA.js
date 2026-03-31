@@ -1180,8 +1180,26 @@ export async function analisarImovelCompleto(url, claudeKey, openaiKey, parametr
   if (!geminiKey && !deepseekKey) {
     progress('Usando Claude Sonnet (sem Gemini/DeepSeek configurados)...')
   }
+
+  // Tier 3: GPT-4o-mini (~R$ 0,03) — se Gemini e DeepSeek falharam
+  let gptErro = null
+  if (openaiKey && !forceClassic && (geminiErro || deepseekErro)) {
+    try {
+      progress('🧠 GPT-4o-mini analisando imóvel (~R$ 0,03)...')
+      const { analisarComGPT } = await import('./motorAnaliseGemini.js')
+      const analiseGPT = await analisarComGPT(url, openaiKey, parametros, progress)
+      logUsoGemini(imovelId, analiseGPT.titulo || imovelTitulo, 'gpt-4o-mini').catch(() => {})
+      progress('✅ Análise GPT-4o-mini concluída')
+      return analiseGPT
+    } catch(gptErr) {
+      gptErro = gptErr.message || 'erro desconhecido'
+      console.warn('[AXIS] GPT-4o-mini falhou:', gptErro)
+      progress('⚠️ GPT-4o-mini falhou, usando Claude Sonnet...')
+    }
+  }
+
   // ─── FIM CASCATA ────────────────────────────────────────────────────────────
-  // Tier 2: Claude Sonnet (fallback — só se Gemini não disponível ou falhou)
+  // Tier 4: Claude Sonnet (fallback final)
   const cidade = 'Brasil'
   // Inferir tipo do título para orientar a busca de comparáveis no GPT
   const tituloLower = (imovelTitulo||url||'').toLowerCase()
@@ -1276,6 +1294,9 @@ DADOS DE BAIRRO (parcial):
       deepseekKey
         ? (deepseekErro ? `DeepSeek ✗ (${deepseekErro.substring(0, 60)})` : 'DeepSeek ✗ (não tentou)')
         : 'DeepSeek — sem chave',
+      openaiKey
+        ? (gptErro ? `GPT-4o-mini ✗ (${gptErro.substring(0, 60)})` : 'GPT ✗ (não tentou)')
+        : 'GPT — sem chave',
       claudeKey
         ? (is401 ? 'Claude ✗ (chave inválida/expirada)' : `Claude ✗ (${claudeErr.message?.substring(0, 60)})`)
         : 'Claude — sem chave',
