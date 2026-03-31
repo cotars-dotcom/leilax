@@ -112,27 +112,41 @@ const GLOSS = [
     formula:'Prazo estimado = Mediana do ciclo histórico por vara × fator de risco',
     ex:'TRT-3 BH: mediana 240 dias · sucesso 88% · embargo 8% (n=198 processos)' },
   { t:'Gemini Flash', cat:'IA', icon:'🤖', cor:P.navy,
-    def:'Modelo de IA da Google usado como motor principal. Lê o edital via Jina.ai, extrai dados e gera a análise estruturada com score, síntese e estratégia.',
-    formula:'Custo: $0.075/M tokens input + $0.30/M output',
-    ex:'Análise típica: ~5.500 tokens total → US$0,0005 ≈ R$0,003 por análise' },
+    def:'Modelo Gemini 2.0 Flash da Google — motor principal. Para sites SPA (QuintoAndar), usa Google Search Grounding para buscar dados direto na web.',
+    formula:'Custo: ~R$0,03 por análise (com grounding ~R$0,05)',
+    ex:'Análise VivaReal: Jina scrape + Gemini → 25s. QuintoAndar (SPA): Gemini Grounding → 40s' },
+  { t:'Mercado Direto', cat:'Análise', icon:'🏠', cor:P.blue,
+    def:'Imóvel de portal (VivaReal, QuintoAndar, ZAP, OLX). Sem comissão leiloeiro (0%), sem advogado leilão, ITBI 3%. Base de aquisição = preço pedido.',
+    formula:'Custo total = Preço pedido + ITBI 3% + Doc 0,5% + Registro',
+    ex:'Preço pedido R$235k → Custo total ≈ R$243k (vs leilão: R$235k + comissão 5% + adv 2% ≈ R$260k)' },
+  { t:'Homogeneização', cat:'Mercado', icon:'📐', cor:P.emerald,
+    def:'Ajuste do valor de mercado conforme NBR 14653/IBAPE. Sem elevador -15%, sem piscina -3%, sem vaga -10%. Aplicado sobre preço de anúncio.',
+    formula:'Valor homog. = Valor mercado × fator_homogenizacao',
+    ex:'Mercado R$600k · sem elevador (-15%) · sem piscina (-3%) → Homog. R$492k (fator 0,82)' },
+  { t:'SPA/Grounding', cat:'IA', icon:'🔍', cor:P.purple,
+    def:'Sites SPA (React/Next) como QuintoAndar não retornam dados pelo scraper. O Gemini usa Google Search Retrieval para buscar o anúncio real na web.',
+    formula:'Jina falha → verificarQualidadeScrape() → chamarGeminiComGrounding()',
+    ex:'QuintoAndar: Jina retorna HTML vazio → Gemini busca "apartamento rua X contagem" no Google → dados reais extraídos' },
 ]
 
 // ─── FLUXO ────────────────────────────────────────────────────────────────────
 const FLUXO = [
-  { n:1, titulo:'URL do edital',   icon:'🔗', cor:P.blue,   custo:'grátis',  tempo:'<1s',
-    desc:'Cole o link do portal de leilão — Marco Antônio, Superbid, Caixa, TJMG, TRT...' },
-  { n:2, titulo:'Scrape Jina.ai',  icon:'🕷️', cor:'#555',   custo:'grátis',  tempo:'2–5s',
-    desc:'Jina.ai converte o edital em texto limpo sem custo. Suporta qualquer portal.' },
-  { n:3, titulo:'Extração Regex',  icon:'⚙️', cor:'#888',   custo:'grátis',  tempo:'<1s',
-    desc:'25 campos extraídos automaticamente: preço, área, quartos, vagas, processo...' },
-  { n:4, titulo:'Banco de Dados',  icon:'🗄️', cor:P.emerald, custo:'grátis', tempo:'<1s',
-    desc:'Preço/m², yield e tendência do bairro consultados nas tabelas internas — sem API externa.' },
-  { n:5, titulo:'Gemini 1.5-Flash',icon:'🤖', cor:P.purple, custo:'~R$0,01', tempo:'15–25s',
-    desc:'IA analisa scores 6D, comparáveis de mercado, riscos jurídicos, síntese e estratégia.' },
-  { n:6, titulo:'Score AXIS',      icon:'🎯', cor:P.navy,   custo:'grátis',  tempo:'<1s',
-    desc:'Calcula nota 0–10 com os 6 pesos. Classifica automaticamente: COMPRAR / AGUARDAR / EVITAR.' },
-  { n:7, titulo:'Agente Leilão',   icon:'🔨', cor:P.mustard, custo:'grátis', tempo:'<1s',
-    desc:'Motor interno (sem API) projeta 2º leilão, MAO e ROI em 4 cenários de reforma.' },
+  { n:1, titulo:'URL do imóvel',    icon:'🔗', cor:P.blue,   custo:'grátis',  tempo:'<1s',
+    desc:'Cole o link de qualquer portal — leilão (Marco Antônio, Superbid, Caixa) ou mercado (VivaReal, QuintoAndar, ZAP).' },
+  { n:2, titulo:'Scrape Jina.ai',   icon:'🕷️', cor:'#555',   custo:'grátis',  tempo:'2–5s',
+    desc:'Jina.ai extrai texto. Se SPA detectado (QuintoAndar, Loft), tenta HTML e verifica qualidade do conteúdo.' },
+  { n:3, titulo:'Extração Regex',   icon:'⚙️', cor:'#888',   custo:'grátis',  tempo:'<1s',
+    desc:'25+ campos: preço, área, quartos, vagas, bairro, cidade, ocupação, elevador, piscina, condomínio, processo...' },
+  { n:4, titulo:'Banco de Dados',   icon:'🗄️', cor:P.emerald, custo:'grátis', tempo:'<1s',
+    desc:'Preço/m², yield, tendência, classe IPEAD e jurimetria consultados nas tabelas internas (21 bairros BH).' },
+  { n:5, titulo:'Gemini 2.0 Flash', icon:'🤖', cor:P.purple, custo:'~R$0,03', tempo:'15–40s',
+    desc:'IA analisa scores 6D, comparáveis, riscos, síntese e estratégia. Se SPA: usa Google Search Grounding.' },
+  { n:6, titulo:'Homogeneização',   icon:'📐', cor:P.emerald, custo:'grátis',  tempo:'<1s',
+    desc:'Ajusta valor de mercado por atributos (elevador, piscina, vagas) conforme NBR 14653.' },
+  { n:7, titulo:'Score AXIS',       icon:'🎯', cor:P.navy,   custo:'grátis',  tempo:'<1s',
+    desc:'Nota 0–10 com 6 pesos + calibração mercado (IPEAD, yield, tendência). COMPRAR / AGUARDAR / EVITAR.' },
+  { n:8, titulo:'Reforma SINAPI',   icon:'🔨', cor:P.mustard, custo:'grátis', tempo:'<1s',
+    desc:'6 cenários de reforma (SINAPI-MG 2026) com ROI, yield por cenário e alerta de sobrecapitalização.' },
   { n:8, titulo:'Salvar no Banco', icon:'💾', cor:P.emerald, custo:'grátis', tempo:'<1s',
     desc:'Todos os dados ficam no Supabase — sincronizados entre todos os dispositivos do grupo.' },
 ]
@@ -277,9 +291,9 @@ function SvgMAO() {
 // ─── SVG: CASCATA IA ──────────────────────────────────────────────────────────
 function SvgCascata() {
   const modelos = [
-    { label:'Gemini 1.5-Flash', sub:'Motor principal', custo:'~R$0,01', cor:P.blue,    p:90 },
+    { label:'Gemini 2.0 Flash', sub:'Motor principal', custo:'~R$0,03', cor:P.blue,    p:85 },
     { label:'DeepSeek V3',      sub:'Fallback 1',      custo:'~R$0,08', cor:P.purple,  p:8  },
-    { label:'Claude Sonnet',    sub:'Último recurso',  custo:'~R$2,20', cor:'#E07B54', p:2  },
+    { label:'GPT-4o-mini',      sub:'Fallback 2',      custo:'~R$0,10', cor:'#10A37F',  p:5  },
   ]
   return (
     <svg viewBox="0 0 380 90" style={{width:'100%',maxWidth:380,height:'auto'}} xmlns="http://www.w3.org/2000/svg">
@@ -373,13 +387,15 @@ export default function ManualAxis({ isMobile }) {
           <Box style={{ marginBottom:14 }}>
             <div style={{ fontSize:14, fontWeight:700, color:P.navy, marginBottom:8 }}>O que é o AXIS?</div>
             <div style={{ fontSize:12.5, color:P.text, lineHeight:1.8 }}>
-              O AXIS é uma plataforma SaaS para análise de imóveis em <strong>leilão judicial</strong>.
-              Cole um link de edital e em <strong>menos de 60 segundos</strong> você recebe:
-              score multidimensional, MAO automático, ROI por cenário, análise jurídica e
-              estudo completo de leilão — com base em dados reais de BH e região.
+              O AXIS é uma plataforma de inteligência patrimonial para análise de imóveis em
+              <strong> leilão judicial</strong> e <strong>mercado direto</strong> (VivaReal, QuintoAndar, ZAP).
+              Cole um link e em <strong>menos de 60 segundos</strong> você recebe:
+              score multidimensional, MAO automático, ROI por cenário de reforma (SINAPI-MG 2026),
+              análise jurídica, estimativa de aluguel homogeneizada e
+              relatório exportável com fotos — tudo com base em dados reais de BH e região.
             </div>
             <div style={{ display:'flex', gap:6, marginTop:10, flexWrap:'wrap' }}>
-              {['Score 6D','Gemini + Claude','SINAPI reforma','MAO automático','Jurimetria real','Custo ~R$0,01'].map(f => (
+              {['Score 6D','Gemini 2.0 + Grounding','SINAPI reforma','MAO automático','Mercado direto','Leilão judicial','Export WhatsApp','Custo ~R$0,03'].map(f => (
                 <Tag key={f} text={f} cor={P.navy}/>
               ))}
             </div>
@@ -387,10 +403,10 @@ export default function ManualAxis({ isMobile }) {
 
           <div style={{ display:'grid', gridTemplateColumns: isMobile?'1fr':'1fr 1fr', gap:10, marginBottom:14 }}>
             {[
-              {icon:'🏆',t:'Diferencial',cor:P.navy,txt:'Único sistema que combina Score 6D + IA dual + SINAPI + MAO automático + jurimetria real de varas TJMG/TRT-3.'},
-              {icon:'💰',t:'Custo ~R$0,01',cor:P.emerald,txt:'Gemini Flash como motor principal. Fallback automático para DeepSeek V3 ou Claude Sonnet se necessário.'},
-              {icon:'🔄',t:'Cascata de IA',cor:P.purple,txt:'Gemini 1.5-Flash → DeepSeek V3 → Claude Sonnet. Modelo mais barato que funciona assume automaticamente.'},
-              {icon:'👥',t:'Multi-usuário',cor:P.blue,txt:'Dados no Supabase — acessíveis em qualquer dispositivo. Admin cria convites. Cada imóvel visível para o grupo.'},
+              {icon:'🏆',t:'Diferencial',cor:P.navy,txt:'Score 6D + IA dual + SINAPI + MAO automático + homogeneização NBR 14653 + jurimetria real. Suporta leilão E mercado direto.'},
+              {icon:'💰',t:'Custo ~R$0,03',cor:P.emerald,txt:'Gemini 2.0 Flash como motor principal. Fallback: DeepSeek → GPT-4o-mini → Claude. Para sites SPA (QuintoAndar): Gemini Grounding busca via Google.'},
+              {icon:'🔄',t:'Cascata de IA',cor:P.purple,txt:'Gemini 2.0-flash → DeepSeek V3 → GPT-4o-mini → Claude Sonnet. Detecção automática de SPA com Google Search Grounding.'},
+              {icon:'📄',t:'Export completo',cor:P.blue,txt:'Relatório HTML com fotos base64 embutidas — funciona no WhatsApp, email e offline. Abas interativas no browser, flat mode sem JS.'},
             ].map(({icon,t,cor,txt}) => (
               <Box key={t} style={{ borderLeft:`3px solid ${cor}` }}>
                 <div style={{ fontSize:18, marginBottom:4 }}>{icon}</div>
@@ -418,7 +434,7 @@ export default function ManualAxis({ isMobile }) {
             <div style={{ fontSize:12, fontWeight:700, color:P.navy, marginBottom:8 }}>Cascata de modelos de IA</div>
             <SvgCascata/>
             <div style={{ marginTop:8, fontSize:11, color:P.gray, lineHeight:1.5 }}>
-              Na prática 90%+ das análises rodam com Gemini Flash (~R$0,01). DeepSeek e Claude são backups automáticos.
+              Na prática 85%+ das análises rodam com Gemini 2.0 Flash (~R$0,03). Para sites SPA (QuintoAndar, Loft) que bloqueiam scraping, o Gemini usa <strong>Google Search Grounding</strong> para buscar dados diretamente na web. DeepSeek, GPT-4o-mini e Claude são backups automáticos.
             </div>
           </Box>
         </div>
