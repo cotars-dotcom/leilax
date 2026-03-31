@@ -666,7 +666,7 @@ function CardComparavel({item:c, K, isPhone}) {
           ? <a href={c.link} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()}
               style={{fontSize:12.5,fontWeight:600,color:K.wh,textDecoration:'none',display:'flex',alignItems:'center',gap:4}}>
               <span style={{whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{c.descricao||'Comparável'}</span>
-              <span style={{fontSize:9,color:K.teal,flexShrink:0}}>↗</span>
+              <span style={{fontSize:9,color:K.teal,flexShrink:0}}>{c._link_gerado ? '🔍' : '↗'}</span>
             </a>
           : <div style={{fontSize:12.5,fontWeight:600,color:K.wh,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{c.descricao||'Comparável'}</div>
         }
@@ -694,17 +694,21 @@ function CardComparavel({item:c, K, isPhone}) {
       {[['Área',c.area_m2?`${c.area_m2}m²`:'—'],['Quartos',c.quartos??'—'],['Vagas',c.vagas??'—'],
         ['Tipo',c.tipo??'—'],['Andar',c.andar??'—'],['Cond./mês',c.condominio_mes?fmtV(c.condominio_mes):'—']
       ].map(([label,val],i)=><div key={i}><div style={{fontSize:10,color:K.t3,textTransform:"uppercase",letterSpacing:.5}}>{label}</div><div style={{fontSize:12.5,fontWeight:600,color:K.wh}}>{val}</div></div>)}
-      {c.link
+      {c.link && !c._link_gerado
         ? <a href={c.link} target="_blank" rel="noreferrer" style={{gridColumn:"1/-1",fontSize:11,color:K.teal,textDecoration:"none"}}>🔗 Ver anúncio →</a>
         : (() => {
-            const bairro = c.descricao?.match(/\w+$/)?.[0] || ''
+            // Extrair bairro da descrição do comparável
+            const descParts = (c.descricao || '').split(',').map(s => s.trim())
+            const bairro = descParts.length >= 2 ? descParts[descParts.length - 2] : descParts[0] || ''
+            const bairroSlug = bairro.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,'-')
             const area = c.area_m2 || ''
             const q = c.quartos || ''
-            const cidSlug = (c.cidade||'belo-horizonte').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,'-')
-            const aMin = area>0?`&areaMin=${Math.round(area*0.85)}&areaMax=${Math.round(area*1.15)}`:''
-            const zapUrl = `https://www.zapimoveis.com.br/venda/apartamentos/mg+${cidSlug}/?quartos=${q}${aMin}`
-            const vivaUrl = `https://www.vivareal.com.br/venda/minas-gerais/${cidSlug}/apartamento_residencial/?quartos=${q}${aMin}`
-            const olxUrl = `https://mg.olx.com.br/belo-horizonte-e-regiao/imoveis?q=apartamento+${q}+quartos`
+            const cid = c.cidade || 'Contagem'
+            const cidSlug = cid.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,'-')
+            const aMin = area>0?`&areaMin=${Math.round(area*0.8)}&areaMax=${Math.round(area*1.2)}`:''
+            const zapUrl = `https://www.zapimoveis.com.br/venda/apartamentos/mg+${cidSlug}/${bairroSlug ? bairroSlug + '/' : ''}?quartos=${q}${aMin}`
+            const vivaUrl = `https://www.vivareal.com.br/venda/minas-gerais/${cidSlug}/${bairroSlug ? bairroSlug + '/' : ''}apartamento_residencial/?quartos=${q}${aMin}`
+            const olxUrl = `https://mg.olx.com.br/belo-horizonte-e-regiao/imoveis?q=apartamento+${q}+quartos+${bairro.replace(/\s+/g,'+')}`
             return <div style={{gridColumn:'1/-1',display:'flex',gap:6,flexWrap:'wrap',marginTop:4}}>
               <a href={zapUrl} target="_blank" rel="noreferrer" style={{fontSize:10,color:'#F97316',textDecoration:'none',padding:'3px 8px',background:'#FFF7ED',borderRadius:4,border:'1px solid #FED7AA'}}>🔍 ZAP</a>
               <a href={vivaUrl} target="_blank" rel="noreferrer" style={{fontSize:10,color:'#7C3AED',textDecoration:'none',padding:'3px 8px',background:'#F5F3FF',borderRadius:4,border:'1px solid #DDD6FE'}}>🔍 Viva Real</a>
@@ -1544,6 +1548,13 @@ for (const s of SCORES) {
                         {op.vagas > 0 && <span>🚗 {op.vagas}v</span>}
                         {op.desconto_percentual > 0 && <span style={{color:'#065F46',fontWeight:600}}>↓{op.desconto_percentual}%</span>}
                       </div>
+                      {/* Link externo */}
+                      {op.fonte_url && (
+                        <a href={op.fonte_url} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}
+                          style={{fontSize:9,color:'#0D9488',textDecoration:'none',marginTop:2,display:'block'}}>
+                          🔗 Ver anúncio original →
+                        </a>
+                      )}
                     </div>
                     <div style={{textAlign:'right',flexShrink:0}}>
                       <div style={{fontSize:14,fontWeight:800,color:op._isLeilao ? '#D97706' : '#1D4ED8'}}>

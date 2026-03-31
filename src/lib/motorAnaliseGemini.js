@@ -173,8 +173,8 @@ Complete e corrija os dados. Retorne JSON com EXATAMENTE estes campos:
   "custo_reforma_estimado": 0,
   "escopo_reforma": "refresh_giro|leve_funcional|leve_reforcada_1_molhado|media|pesada",
   "prazo_liberacao_estimado_meses": 0,
-  "comparaveis": [/* OBRIGATÓRIO: 3 a 5 imóveis do MESMO TIPO que o analisado (mesmo tipo, bairro/cidade, área similar ±40m²). NUNCA compare apartamento com terreno/casa. Preencher campos: descricao, valor, area_m2, preco_m2, quartos, vagas, tipo, fonte, similaridade, link(opcional) */
-    {"descricao":"string","valor":0,"area_m2":0,"preco_m2":0,"quartos":0,"vagas":0,"tipo":"apartamento","fonte":"Gemini/conhecimento","similaridade":8,"link":null}],
+  "comparaveis": [/* OBRIGATÓRIO: 3 a 5 imóveis do MESMO TIPO que o analisado (mesmo tipo, bairro/cidade, área similar ±40m²). NUNCA compare apartamento com terreno/casa. Preencher TODOS os campos. O campo 'bairro' é OBRIGATÓRIO para gerar links de busca. */
+    {"descricao":"string","valor":0,"area_m2":0,"preco_m2":0,"quartos":0,"vagas":0,"tipo":"apartamento","fonte":"Gemini/conhecimento","similaridade":8,"link":null,"bairro":"nome_do_bairro","cidade":"nome_da_cidade"}],
   "riscos_presentes": ["string"],
   "mercado_tendencia": "alta|estavel|queda",
   "mercado_demanda": "alta|media_alta|media|media_baixa|baixa",
@@ -463,6 +463,27 @@ export async function analisarComGemini(url, geminiKey, parametros, onProgress, 
     if (!analise.modalidade_leilao) analise.modalidade_leilao = null
   }
 
+  // PASSO 5b: Gerar links de busca para comparáveis sem link
+  if (analise.comparaveis?.length) {
+    const cidadeComp = (analise.cidade || 'belo-horizonte').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '-')
+    analise.comparaveis = analise.comparaveis.map(c => {
+      if (c.link) return c // já tem link
+      const bairro = (c.bairro || analise.bairro || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '-')
+      const cid = (c.cidade || analise.cidade || 'belo-horizonte').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '-')
+      const q = c.quartos || ''
+      const areaMin = c.area_m2 > 0 ? Math.round(c.area_m2 * 0.8) : ''
+      const areaMax = c.area_m2 > 0 ? Math.round(c.area_m2 * 1.2) : ''
+      const areaParam = areaMin ? `&areaMin=${areaMin}&areaMax=${areaMax}` : ''
+      // Gerar link VivaReal como principal
+      c.link = `https://www.vivareal.com.br/venda/minas-gerais/${cid}/${bairro ? bairro + '/' : ''}apartamento_residencial/?quartos=${q}${areaParam}`
+      c._link_gerado = true // flag para UI saber que não é link direto
+      // Garantir bairro e cidade
+      if (!c.bairro) c.bairro = analise.bairro
+      if (!c.cidade) c.cidade = analise.cidade
+      return c
+    })
+  }
+
   // PASSO 6: Calcular reforma com SINAPI
   try {
     if (analise.bairro && analise.preco_m2_mercado && analise.area_m2) {
@@ -577,6 +598,21 @@ export async function analisarComDeepSeek(url, deepseekKey, parametros, onProgre
       analise.preco_pedido = analise.preco_pedido || analise.valor_minimo || 0
     }
     progress('✅ Análise DeepSeek concluída (~R$ 0,08)')
+    // Gerar links para comparáveis sem link
+    if (analise.comparaveis?.length) {
+      analise.comparaveis = analise.comparaveis.map(c => {
+        if (c.link) return c
+        const bairro = (c.bairro || analise.bairro || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '-')
+        const cid = (c.cidade || analise.cidade || 'belo-horizonte').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '-')
+        const q = c.quartos || ''
+        const aParam = c.area_m2 > 0 ? `&areaMin=${Math.round(c.area_m2 * 0.8)}&areaMax=${Math.round(c.area_m2 * 1.2)}` : ''
+        c.link = `https://www.vivareal.com.br/venda/minas-gerais/${cid}/${bairro ? bairro + '/' : ''}apartamento_residencial/?quartos=${q}${aParam}`
+        c._link_gerado = true
+        if (!c.bairro) c.bairro = analise.bairro
+        if (!c.cidade) c.cidade = analise.cidade
+        return c
+      })
+    }
     return analise
   } catch(e) {
     throw new Error(`DeepSeek falhou: ${e.message}`)
