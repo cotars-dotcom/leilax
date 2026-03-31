@@ -1246,7 +1246,7 @@ function BancoArquivados({ session, isAdmin, isPhone }) {
               opacity: 0.92,
             }}>
               {imovel.foto_principal && (
-                <img src={imovel.foto_principal} alt=""
+                <img src={imovel.foto_principal} alt="" referrerPolicy="no-referrer"
                   style={{ width: '100%', height: 140, objectFit: 'cover' }}
                   onError={e => { e.target.style.display = 'none' }}
                 />
