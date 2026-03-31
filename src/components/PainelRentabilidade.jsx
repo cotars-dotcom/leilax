@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { C, card } from '../appConstants.js'
 import { isMercadoDireto } from '../lib/detectarFonte.js'
-import { calcularReformas3Cenarios } from '../lib/reformaUnificada.js'
+import { useReforma } from '../hooks/useReforma.jsx'
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 const fmt = v => v ? `R$ ${Math.round(v).toLocaleString('pt-BR')}` : '—'
@@ -155,14 +155,13 @@ function CardLance({ titulo, lance, avaliacao, vmercado, flip, loc, prob, destaq
 
 // ─── Componente principal ─────────────────────────────────────────────────────
 export default function PainelRentabilidade({ imovel }) {
-  const [cenarioReforma, setCenarioReforma] = useState('media')
+  const { cenarioSimplificado: cenarioReforma, selecionarCenario: setCenarioReforma, reformas } = useReforma()
   const [mostrarAtributos, setMostrarAtributos] = useState(false)
 
   const {
     valor_minimo, valor_avaliacao, num_leilao,
     valor_mercado_estimado, aluguel_mensal_estimado, aluguel_sem_reforma,
-    aluguel_com_reforma, custo_reforma_basica, custo_reforma_media,
-    custo_reforma_completa, fator_homogenizacao, valor_mercado_homogenizado,
+    aluguel_com_reforma, fator_homogenizacao, valor_mercado_homogenizado,
     elevador, piscina, area_lazer, salao_festas, vagas,
     area_m2, area_privativa_m2, preco_m2_mercado, preco_pedido,
   } = imovel
@@ -178,10 +177,7 @@ export default function PainelRentabilidade({ imovel }) {
   const lance2exp   = Math.round(avaliacao * 0.50)
   const lance2comp  = Math.round(avaliacao * 0.65)
 
-  // Custo de reforma por cenário — unificado via SINAPI
-  const reformas = calcularReformas3Cenarios(area, parseFloat(preco_m2_mercado) || 7000, {
-    custo_reforma_basica, custo_reforma_media, custo_reforma_completa,
-  })
+  // Custo de reforma por cenário — via context useReforma (unificado)
   const reformaValor = reformas[cenarioReforma]
 
   // Valor de mercado: usar homogeneizado se disponível

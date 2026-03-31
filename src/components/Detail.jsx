@@ -12,6 +12,7 @@ import PainelLancamento from './PainelLancamento.jsx'
 import PainelRentabilidade from './PainelRentabilidade.jsx'
 import { isMercadoDireto } from '../lib/detectarFonte.js'
 import CenariosReforma from './CenariosReforma.jsx'
+import { ReformaProvider } from '../hooks/useReforma.jsx'
 import CustosReaisEditor from './CustosReaisEditor.jsx'
 import { exportarPDFImovel } from './ExportarPDF.jsx'
 
@@ -1175,7 +1176,7 @@ for (const s of SCORES) {
       ))}
     </div>
     <div style={{padding:isPhone?"16px":"20px 28px"}}>
-      {msg&&<div style={{background:`${K.teal}10`,border:`1px solid ${K.teal}30`,borderRadius:"6px",padding:"10px",marginBottom:"14px",fontSize:"12px",color:K.teal}}>{msg}</div>}
+      {msg&&<div style={{background: msg.includes('⚠️') || msg.includes('Erro') ? `${K.amb}10` : `${K.teal}10`, border:`1px solid ${msg.includes('⚠️') || msg.includes('Erro') ? K.amb : K.teal}30`,borderRadius:"6px",padding:"10px",marginBottom:"14px",fontSize:"12px",color: msg.includes('⚠️') || msg.includes('Erro') ? K.amb : K.teal, whiteSpace:"pre-line",lineHeight:1.5}}>{msg}</div>}
       {reanalyzing&&reStep&&<div style={{background:`${K.amb}10`,border:`1px solid ${K.amb}30`,borderRadius:"7px",padding:"12px 16px",marginBottom:"14px",display:"flex",alignItems:"center",gap:"10px"}}>
         <div style={{width:8,height:8,borderRadius:"50%",background:K.amb,animation:"pulse 1s infinite",flexShrink:0}}/>
         <span style={{fontSize:"13px",color:K.amb,fontWeight:600}}>{reStep}</span>
@@ -1320,6 +1321,8 @@ for (const s of SCORES) {
       </div>
       {/* Análise de Leilão */}
       <PainelLeilao imovel={p} isAdmin={isAdmin} />
+      {/* ═══ ReformaProvider: sincroniza cenário de reforma entre painéis ═══ */}
+      <ReformaProvider imovel={p}>
         {/* Mostrar PainelLancamento só para leilões */}
         {!isMercadoDireto(p.fonte_url, p.tipo_transacao) && <PainelLancamento imovel={p}/>}
         {/* Mercado direto: badge de oportunidade */}
@@ -1349,6 +1352,7 @@ for (const s of SCORES) {
         <PainelRentabilidade imovel={p}/>
       {/* Cenários de Reforma */}
       <CenariosReforma imovel={p} isAdmin={isAdmin} />
+      </ReformaProvider>
       {/* Calculadora ROI */}
       <div style={{...card(),marginBottom:"14px"}}>
         <CalculadoraROI imovel={p} />

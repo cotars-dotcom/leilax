@@ -7,6 +7,7 @@ const LazyBuscaGPT = lazy(() => import('./components/BuscaGPT.jsx'))
 import { useAuth } from "./lib/AuthContext.jsx"
 import Login from "./pages/Login.jsx"
 import { supabase, getImoveis, deleteImovel } from "./lib/supabase.js"
+import { detectarTipoTransacao } from "./lib/detectarFonte.js"
 const LazyTarefas = lazy(() => import('./pages/Tarefas.jsx'))
 // motorIA carregado dinamicamente no momento do uso para reduzir bundle inicial
 // trelloService carregado dinamicamente para reduzir bundle inicial
@@ -644,6 +645,10 @@ function NovoImovel({onSave,onCancel,onNav,trello,parametrosBanco,criteriosBanco
         const { analisarImovelCompleto: _analisarImovelCompleto } = await import('./lib/motorIA.js')
         const data = await _analisarImovelCompleto(url.trim(), claudeKeyReal, openaiKey, parametrosBanco, criteriosBanco, (msg) => setStep(msg), anexos, null, null)
       data.fonte_url = url.trim()
+      // Detectar tipo de transação (leilão vs mercado direto) pela URL
+      if (!data.tipo_transacao) {
+        data.tipo_transacao = detectarTipoTransacao(url.trim())
+      }
       // Analisar documentos (edital, RGI, débitos) se fornecidos
       const docUrls = urlsDocumentos.split('\n').map(u=>u.trim()).filter(Boolean)
       if (docUrls.length > 0) {
@@ -710,14 +715,11 @@ function NovoImovel({onSave,onCancel,onNav,trello,parametrosBanco,criteriosBanco
     <Hdr title="Analisar Imóvel" sub="Cole o link do leilão ou portal imobiliário — IA busca e analisa tudo automaticamente"/>
     <div style={{padding:isPhone?"20px 16px":"24px 28px",maxWidth:"640px"}}>
       {trello?.listId
-        ?<div style={{background:`${K.trello}15`,border:`1px solid ${K.trello}40`,borderRadius:"7px",padding:"12px 16px",marginBottom:"18px",display:"flex",alignItems:"center",gap:"10px"}}>
+        &&<div style={{background:`${K.trello}15`,border:`1px solid ${K.trello}40`,borderRadius:"7px",padding:"12px 16px",marginBottom:"18px",display:"flex",alignItems:"center",gap:"10px"}}>
           <span style={{fontSize:"18px"}}>🔷</span>
           <div><div style={{fontSize:"12.5px",color:K.wh,fontWeight:"600"}}>Trello conectado</div>
           <div style={{fontSize:"11px",color:K.t3}}>{trello.boardName} → {trello.listName}</div></div>
           <span style={{marginLeft:"auto",fontSize:"9px",background:`${K.grn}20`,color:K.grn,padding:"2px 8px",borderRadius:"3px",fontWeight:"700"}}>ATIVO</span>
-        </div>
-        :<div style={{background:`${K.amb}10`,border:`1px solid ${K.amb}30`,borderRadius:"7px",padding:"12px 16px",marginBottom:"18px",fontSize:"12px",color:K.amb}}>
-          ⚠️ Trello não configurado. Configure em <b>⚙️ Config</b> na barra lateral.
         </div>}
 
       <div style={{marginBottom:"16px"}}>
@@ -768,7 +770,7 @@ function NovoImovel({onSave,onCancel,onNav,trello,parametrosBanco,criteriosBanco
           <button style={{padding:"7px 14px",borderRadius:7,fontSize:12,cursor:"pointer",background:"transparent",border:`1px solid ${C.borderW}`,color:C.muted}} onClick={()=>{setDuplicado(null);analyze()}}>Reanalisar mesmo assim</button>
         </div>
       </div>}
-      {error&&<div style={{background:`${K.red}15`,border:`1px solid ${K.red}40`,borderRadius:"6px",padding:"12px",marginBottom:"14px",fontSize:"12.5px",color:K.red}}>⚠️ {error}</div>}
+      {error&&<div style={{background:`${K.red}15`,border:`1px solid ${K.red}40`,borderRadius:"6px",padding:"12px",marginBottom:"14px",fontSize:"12.5px",color:K.red,whiteSpace:"pre-line",lineHeight:1.6}}>⚠️ {error}</div>}
       {error&&(error.includes('credit balance')||error.includes('balance is too low')||error.includes('insufficient')||error.includes('billing'))&&<div style={{background:'rgba(245,166,35,0.1)',border:'1px solid rgba(245,166,35,0.3)',borderRadius:8,padding:'12px 14px',marginBottom:14}}><div style={{color:'#F5A623',fontWeight:700,marginBottom:4,fontSize:13}}>💳 Saldo insuficiente</div><div style={{color:'rgba(221,228,240,0.7)',fontSize:12,lineHeight:1.6}}>Acesse <b style={{color:'#fff'}}>platform.claude.com → Plans & Billing</b> para adicionar créditos.<br/>O app volta a funcionar automaticamente após adicionar saldo.</div></div>}
       {trelloMsg&&<div style={{background:`${K.teal}10`,border:`1px solid ${K.teal}30`,borderRadius:"6px",padding:"10px",marginBottom:"14px",fontSize:"12px",color:K.teal}}>{trelloMsg}</div>}
 
@@ -879,6 +881,20 @@ function PropCard({p,onNav}) {
         {p.valor_avaliacao&&<span>Aval. <strong style={{color:K.wh}}>{fmtM(p.valor_avaliacao)}</strong></span>}
         {p.preco_m2_imovel&&<span>Imóvel <strong style={{color:K.teal}}>{fmtM2(p.preco_m2_imovel)}</strong></span>}
         {p.preco_m2_mercado&&<span>Mercado <strong style={{color:K.t2}}>{fmtM2(p.preco_m2_mercado)}</strong></span>}
+      </div>
+    )}
+
+    {/* Homogeneização e atributos do prédio */}
+    {(p.fator_homogenizacao || p.elevador === false || p.piscina === false) && (
+      <div style={{marginTop:4,display:'flex',gap:6,flexWrap:'wrap',fontSize:9,color:K.t3}}>
+        {p.fator_homogenizacao && p.fator_homogenizacao < 1 && (
+          <span style={{padding:'1px 5px',borderRadius:3,background:'#FEF9C3',border:'1px solid #FDE047',color:'#92400E',fontWeight:600}}>
+            Homog. {(p.fator_homogenizacao * 100).toFixed(0)}%
+          </span>
+        )}
+        {p.elevador === false && <span style={{padding:'1px 5px',borderRadius:3,background:'#FEF2F2',color:'#991B1B'}}>s/ elevador</span>}
+        {p.piscina === false && <span style={{padding:'1px 5px',borderRadius:3,background:'#FEF2F2',color:'#991B1B'}}>s/ piscina</span>}
+        {(p.vagas || 0) >= 2 && <span style={{padding:'1px 5px',borderRadius:3,background:'#EFF6FF',color:'#1D4ED8'}}>🅿 {p.vagas}v</span>}
       </div>
     )}
 

@@ -5,7 +5,7 @@
  */
 import { useState, useMemo } from 'react'
 import { C, K, fmtC, card } from '../appConstants.js'
-import { calcularReformas3Cenarios } from '../lib/reformaUnificada.js'
+import { useReforma } from '../hooks/useReforma.jsx'
 
 const fmt  = v => v != null && v > 0 ? `R$ ${Math.round(v).toLocaleString('pt-BR')}` : '—'
 const pct  = v => v != null ? `${parseFloat(v).toFixed(1)}%` : '—'
@@ -133,7 +133,6 @@ export default function PainelLancamento({ imovel }) {
     valor_minimo, valor_avaliacao, valor_mercado_estimado,
     preco_m2_mercado, preco_m2_imovel,
     area_privativa_m2, area_m2,
-    custo_reforma_calculado,
     custo_juridico_estimado,
     num_leilao, aluguel_mensal_estimado,
   } = imovel
@@ -141,16 +140,11 @@ export default function PainelLancamento({ imovel }) {
   const area = parseFloat(area_privativa_m2 || area_m2) || 0
   const avaliacao = parseFloat(valor_avaliacao) || 0
   const lancePrin = parseFloat(valor_minimo) || 0
-  // Seletor de reforma — padrão: médio (unificado via SINAPI)
-  const [cenarioReforma, setCenarioReformaLocal] = useState('media')
-  const reformas = calcularReformas3Cenarios(area, parseFloat(imovel.preco_m2_mercado) || 0, {
-    custo_reforma_basica: imovel.custo_reforma_basica,
-    custo_reforma_media: imovel.custo_reforma_media,
-    custo_reforma_completa: imovel.custo_reforma_completa,
-  })
-  const custo_reforma_basica = reformas.basica
-  const custo_reforma_media = reformas.media
-  const custo_reforma_completa = reformas.completa
+  // Reforma unificada via context useReforma (sincronizado com PainelRentabilidade e CenariosReforma)
+  const { cenarioSimplificado: cenarioReforma, selecionarCenario: setCenarioReformaLocal, reformas: reformasCtx } = useReforma()
+  const custo_reforma_basica = reformasCtx.basica
+  const custo_reforma_media = reformasCtx.media
+  const custo_reforma_completa = reformasCtx.completa
   const reformaMap = { basica: custo_reforma_basica, media: custo_reforma_media, completa: custo_reforma_completa }
   const reforma = reformaMap[cenarioReforma]
   const juridico = parseFloat(custo_juridico_estimado) || 0

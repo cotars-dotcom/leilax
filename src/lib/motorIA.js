@@ -1091,6 +1091,8 @@ export async function analisarImovelCompleto(url, claudeKey, openaiKey, parametr
   }
   // ─── CASCATA IA: Gemini Flash → DeepSeek V3 → Claude Sonnet ─────────────────
 
+  let geminiErro = null, deepseekErro = null
+
   if (geminiKey && !forceClassic) {
     try {
       progress('🤖 Gemini 1.5-Flash analisando imóvel (~R$ 0,01)...')
@@ -1103,7 +1105,8 @@ export async function analisarImovelCompleto(url, claudeKey, openaiKey, parametr
       progress(`✅ Análise Gemini concluída — modelo: ${analiseGemini._modelo_usado || 'gemini'} (~R$ 0,01)`)
       return analiseGemini
     } catch(geminiErr) {
-      console.warn('[AXIS] Gemini falhou:', geminiErr.message)
+      geminiErro = geminiErr.message || 'erro desconhecido'
+      console.warn('[AXIS] Gemini falhou:', geminiErro)
       progress('⚠️ Gemini falhou, tentando DeepSeek V3...')
     }
   }
@@ -1118,7 +1121,8 @@ export async function analisarImovelCompleto(url, claudeKey, openaiKey, parametr
       progress('✅ Análise DeepSeek V3 concluída')
       return analiseDeepSeek
     } catch(dsErr) {
-      console.warn('[AXIS] DeepSeek falhou:', dsErr.message)
+      deepseekErro = dsErr.message || 'erro desconhecido'
+      console.warn('[AXIS] DeepSeek falhou:', deepseekErro)
       progress('⚠️ DeepSeek falhou, usando Claude Sonnet...')
     }
   }
@@ -1213,17 +1217,36 @@ DADOS DE BAIRRO (parcial):
     analise = await analisarComClaude(url, claudeKey, parametros, criterios, dadosGPT, anexos, contextoCompleto)
   } catch(claudeErr) {
     console.error('[AXIS] Claude falhou:', claudeErr.message)
-    // Se Claude falha E Gemini+DeepSeek também falharam, dar mensagem clara
+    // Montar diagnóstico real de cada motor — mostrar POR QUE falhou, não só se a chave existe
     const is401 = claudeErr.message?.includes('401') || claudeErr.message?.includes('inválida')
-    const motoresDisponiveis = [
-      geminiKey ? 'Gemini ✓' : 'Gemini ✗',
-      deepseekKey ? 'DeepSeek ✓' : 'DeepSeek ✗',
-      claudeKey ? (is401 ? 'Claude (chave inválida)' : 'Claude (erro)') : 'Claude ✗',
-    ].join(' · ')
+    const motoresStatus = [
+      geminiKey
+        ? (geminiErro ? `Gemini ✗ (${geminiErro.substring(0, 60)})` : 'Gemini ✗ (não tentou)')
+        : 'Gemini — sem chave',
+      deepseekKey
+        ? (deepseekErro ? `DeepSeek ✗ (${deepseekErro.substring(0, 60)})` : 'DeepSeek ✗ (não tentou)')
+        : 'DeepSeek — sem chave',
+      claudeKey
+        ? (is401 ? 'Claude ✗ (chave inválida/expirada)' : `Claude ✗ (${claudeErr.message?.substring(0, 60)})`)
+        : 'Claude — sem chave',
+    ].join('\n')
+
+    // Sugestão baseada no que deu errado
+    let sugestao = ''
+    if (geminiErro?.includes('inválida') || geminiErro?.includes('401')) {
+      sugestao = 'Sua chave Gemini parece inválida. Gere uma nova em aistudio.google.com → API Keys.'
+    } else if (geminiErro?.includes('429') || geminiErro?.includes('Quota')) {
+      sugestao = 'Quota do Gemini excedida — aguarde alguns minutos ou verifique limites no Google AI Studio.'
+    } else if (geminiErro?.includes('JSON') || geminiErro?.includes('resposta')) {
+      sugestao = 'Gemini retornou dados inválidos. Tente novamente — pode ser instabilidade temporária.'
+    } else if (!geminiKey) {
+      sugestao = 'Configure uma chave Gemini (grátis) em Admin > API Keys — é o motor principal.'
+    } else {
+      sugestao = 'Tente novamente em alguns segundos. Se persistir, verifique as chaves em Admin > API Keys.'
+    }
+
     throw new Error(
-      is401
-        ? `Chave Claude inválida e os outros motores falharam.\nMotores: ${motoresDisponiveis}\n\nConfigure uma chave Gemini (grátis) em Admin > API Keys — é o motor principal.`
-        : `Todos os motores de IA falharam: ${claudeErr.message}\nMotores: ${motoresDisponiveis}`
+      `Todos os motores de IA falharam.\n\n${motoresStatus}\n\n💡 ${sugestao}`
     )
   }
 

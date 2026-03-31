@@ -1,91 +1,16 @@
 import { useState, useMemo } from 'react'
 import { C, K, fmtC, btn, card } from '../appConstants.js'
-
-const ESCOPOS = [
-  {
-    id: 'sem_reforma',
-    label: 'Sem Reforma',
-    descricao: 'Vende no estado atual — sem investimento em obras',
-    fator_valorizacao: 1.00,
-    inclui: [],
-    cor: C.hint
-  },
-  {
-    id: 'refresh_giro',
-    label: 'Refresh de Giro',
-    descricao: 'Pintura, reparos, metais, luminárias — mínimo para girar',
-    fator_valorizacao: 1.04,
-    inclui: ['Pintura geral', 'Pequenos reparos', 'Metais/louças pontuais', 'Limpeza'],
-    cor: '#3B8BD4'
-  },
-  {
-    id: 'leve_funcional',
-    label: 'Leve Funcional',
-    descricao: 'Refresh + piso laminado/porcelanato parcial + elétrica/hidráulica',
-    fator_valorizacao: 1.08,
-    inclui: ['Pintura + Reparos', 'Piso laminado', 'Elétrica parcial', 'Hidráulica parcial'],
-    cor: C.emerald
-  },
-  {
-    id: 'leve_reforcada_1_molhado',
-    label: 'Leve Reforçada',
-    descricao: 'Leve funcional + 1 banheiro ou cozinha completa',
-    fator_valorizacao: 1.12,
-    inclui: ['Tudo do Leve', '1 área molhada completa', 'Porcelanato médio', 'Ferragens'],
-    cor: C.mustard
-  },
-  {
-    id: 'media',
-    label: 'Reforma Média',
-    descricao: 'Todos molhados + esquadrias + elétrica/hidráulica completa',
-    fator_valorizacao: 1.18,
-    inclui: ['Todos molhados', 'Esquadrias', 'Elétrica+Hidráulica total', 'Acabamento médio'],
-    cor: '#A378DD'
-  },
-  {
-    id: 'pesada',
-    label: 'Reforma Pesada',
-    descricao: 'Reforma total + estrutura + projeto + ART',
-    fator_valorizacao: 1.28,
-    inclui: ['Tudo + estrutura', 'Projeto arquitetônico', 'ART', 'Acabamento alto'],
-    cor: '#D05538'
-  }
-]
-
-// Custo/m² por escopo e classe (SINAPI-MG 2026)
-const CUSTO_M2 = {
-  sem_reforma:             { A_prime: 0,    B_medio_alto: 0,   C_intermediario: 0,   D_popular: 0 },
-  refresh_giro:            { A_prime: 420,  B_medio_alto: 375, C_intermediario: 335, D_popular: 280 },
-  leve_funcional:          { A_prime: 710,  B_medio_alto: 645, C_intermediario: 585, D_popular: 520 },
-  leve_reforcada_1_molhado:{ A_prime: 1175, B_medio_alto: 1070,C_intermediario: 975, D_popular: 870 },
-  media:                   { A_prime: 1600, B_medio_alto: 1450,C_intermediario: 1300,D_popular: 1100 },
-  pesada:                  { A_prime: 2500, B_medio_alto: 2200,C_intermediario: 1900,D_popular: 1600 }
-}
-
-function detectarClasse(preco_m2) {
-  if (!preco_m2) return 'C_intermediario'
-  if (preco_m2 >= 12000) return 'A_prime'
-  if (preco_m2 >= 8000)  return 'B_medio_alto'
-  if (preco_m2 >= 5000)  return 'C_intermediario'
-  return 'D_popular'
-}
-
-const LIQUIDEZ_BONUS = {
-  sem_reforma:              0,
-  refresh_giro:             0.05,
-  leve_funcional:           0.12,
-  leve_reforcada_1_molhado: 0.18,
-  media:                    0.25,
-  pesada:                   0.20  // diminishing returns
-}
-
-const PRAZO_OBRA_MESES = {
-  sem_reforma: 0, refresh_giro: 0.5, leve_funcional: 1.5,
-  leve_reforcada_1_molhado: 2.5, media: 4, pesada: 7
-}
+import { useReforma } from '../hooks/useReforma.jsx'
+import {
+  ESCOPOS,
+  CUSTO_M2_SINAPI,
+  LIQUIDEZ_BONUS,
+  PRAZO_OBRA_MESES,
+  detectarClasse,
+} from '../lib/reformaUnificada.js'
 
 export default function CenariosReforma({ imovel, isAdmin }) {
-  const [escopoSel, setEscopoSel] = useState(imovel?.escopo_reforma || 'refresh_giro')
+  const { escopoDetalhado: escopoSel, selecionarEscopo: setEscopoSel, area, preco_m2, classe } = useReforma()
   const [mostrarDetalhe, setMostrarDetalhe] = useState(false)
 
   const p = imovel || {}
@@ -93,12 +18,9 @@ export default function CenariosReforma({ imovel, isAdmin }) {
   const semDados = lance === 0
   const avaliacao = parseFloat(p.valor_avaliacao) || lance * 1.3
   const vmercado = parseFloat(p.valor_mercado_estimado) || avaliacao * 1.2
-  const area = parseFloat(p.area_m2) || 80
-  const preco_m2 = parseFloat(p.preco_m2_mercado) || parseFloat(p.preco_m2_asking_bairro) || 7000
   const aluguelBase = parseFloat(p.aluguel_mensal_estimado) || Math.round(vmercado * 0.005)
   const prazoLib = parseFloat(p.prazo_liberacao_estimado_meses) || 0
 
-  const classe = detectarClasse(preco_m2)
   const classeLabel = { A_prime:'A — Prime', B_medio_alto:'B — Médio-Alto', C_intermediario:'C — Intermediário', D_popular:'D — Popular' }[classe]
 
   // Parâmetros de transação
@@ -110,9 +32,9 @@ export default function CenariosReforma({ imovel, isAdmin }) {
 
   const cenarios = useMemo(() => {
     return ESCOPOS.map(esc => {
-      const custoReforma = CUSTO_M2[esc.id][classe] * area
+      const custoReforma = (CUSTO_M2_SINAPI[esc.id]?.[classe] || 0) * area
       const custoTotal = lance + comissao + itbi + doc + adv + reg + custoReforma
-      const prazo = prazoLib + PRAZO_OBRA_MESES[esc.id]
+      const prazo = prazoLib + (PRAZO_OBRA_MESES[esc.id] || 0)
 
       // Valor pós-reforma = mercado × fator_valorizacao
       const valorPosReforma = Math.round(vmercado * esc.fator_valorizacao)
@@ -120,8 +42,6 @@ export default function CenariosReforma({ imovel, isAdmin }) {
       const valorVendaReal = Math.min(valorPosReforma, vmercado * 1.30)
 
       // ROI Flip
-      // IRPF: isento se único imóvel PF e venda ≤ R$440k (Lei 11.196/2005)
-      // Acima de R$440k: 15% sobre ganho de capital (custo sem correção monetária)
       const ganhoCapital = Math.max(0, valorVendaReal - custoTotal)
       const irpf = valorVendaReal <= 440000 ? 0 : Math.max(0, ganhoCapital * 0.15)
       const corretagem = valorVendaReal * 0.06
@@ -129,7 +49,7 @@ export default function CenariosReforma({ imovel, isAdmin }) {
       const roi = custoTotal > 0 ? (lucro / custoTotal) * 100 : 0
 
       // Impacto na liquidez
-      const liquidezBonus = LIQUIDEZ_BONUS[esc.id]
+      const liquidezBonus = LIQUIDEZ_BONUS[esc.id] || 0
       const prazoVendaBase = parseFloat(p.mercado_tempo_venda_meses) || 6
       const prazoVendaPos = Math.max(1, Math.round(prazoVendaBase * (1 - liquidezBonus)))
 
@@ -160,7 +80,7 @@ export default function CenariosReforma({ imovel, isAdmin }) {
         valororiacao: Math.round((esc.fator_valorizacao - 1) * 100)
       }
     })
-  }, [lance, vmercado, area, classe, prazoLib, aluguelBase])
+  }, [lance, vmercado, area, classe, prazoLib, aluguelBase, avaliacao, comissao, itbi, doc, adv])
 
   const sel = cenarios.find(c => c.id === escopoSel) || cenarios[0]
   const semReforma = cenarios[0]

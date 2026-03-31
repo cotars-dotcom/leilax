@@ -83,6 +83,15 @@ export async function salvarPDFNoStorage(blob, imovelId, nomeArquivo, contentTyp
 // ─── ANÁLISE JURÍDICA ESTRUTURADA COMPLETA ────────────────────────────────
 export async function analisarDocumentoCompleto(texto, nomeArq, imovel, geminiKey, claudeKey) {
   if (!texto || texto.length < 50) return null
+
+  // Fallback: tentar env var se chave não foi passada diretamente
+  const gKey = geminiKey
+    || (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GEMINI_API_KEY)
+    || (typeof localStorage !== 'undefined' && localStorage.getItem('axis-gemini-key'))
+    || ''
+  const cKey = claudeKey
+    || (typeof localStorage !== 'undefined' && localStorage.getItem('axis-api-key'))
+    || ''
   
   const prompt = `Você é especialista em direito imobiliário e leilões judiciais no Brasil (Minas Gerais).
 Faça uma análise jurídica COMPLETA e ESTRUTURADA deste documento.
@@ -156,10 +165,10 @@ Retorne APENAS JSON válido com esta estrutura EXATA:
 }`
 
   // Tentar Gemini primeiro
-  if (geminiKey) {
+  if (gKey) {
     try {
       const r = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${gKey}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -211,11 +220,11 @@ Retorne APENAS JSON válido com esta estrutura EXATA:
   }
 
   // Fallback Claude Haiku
-  if (claudeKey) {
+  if (cKey) {
     try {
       const r = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
-        headers: { 'Content-Type':'application/json', 'x-api-key':claudeKey, 'anthropic-version':'2023-06-01' },
+        headers: { 'Content-Type':'application/json', 'x-api-key':cKey, 'anthropic-version':'2023-06-01' },
         body: JSON.stringify({
           model: 'claude-haiku-4-5-20251001',
           max_tokens: 3000,
@@ -355,6 +364,18 @@ function analisarDocumentoPorRegex(texto, nomeArq) {
 
 // ─── PIPELINE COMPLETO: URL → Storage → Análise → Banco ───────────────────
 export async function processarDocumentoCompleto({ url, nome, tipo, imovel, geminiKey, claudeKey, openaiKey, onProgress }) {
+  // Fallback: env vars e localStorage se chaves não passadas
+  geminiKey = geminiKey
+    || (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GEMINI_API_KEY)
+    || (typeof localStorage !== 'undefined' && localStorage.getItem('axis-gemini-key'))
+    || ''
+  claudeKey = claudeKey
+    || (typeof localStorage !== 'undefined' && localStorage.getItem('axis-api-key'))
+    || ''
+  openaiKey = openaiKey
+    || (typeof localStorage !== 'undefined' && localStorage.getItem('axis-openai-key'))
+    || ''
+
   onProgress?.(`🔍 Iniciando processamento de ${nome}...`)
   
   // 1. Baixar PDF

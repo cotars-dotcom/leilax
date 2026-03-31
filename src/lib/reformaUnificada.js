@@ -1,16 +1,18 @@
 /**
  * AXIS — Custos de Reforma Unificados (SINAPI-MG 2026)
- * 
- * Fonte de verdade para cenários de reforma usados em:
+ *
+ * FONTE DE VERDADE para custos de reforma em toda a plataforma.
+ * Usado por:
+ *   - useReforma.js (context centralizado)
  *   - CenariosReforma.jsx (6 escopos detalhados)
- *   - PainelRentabilidade.jsx (3 cenários simplificados: basica/media/completa)
- *   - PainelLancamento.jsx (3 cenários simplificados: basica/media/completa)
- * 
+ *   - PainelRentabilidade.jsx (3 cenários: basica/media/completa)
+ *   - PainelLancamento.jsx (3 cenários: basica/media/completa)
+ *
  * Resolve o conflito de valores entre painéis — todos usam SINAPI como fallback.
  */
 
-// Custo/m² por escopo e classe (SINAPI-MG 2026) — espelho do CenariosReforma.jsx
-const CUSTO_M2_SINAPI = {
+// Custo/m² por escopo e classe (SINAPI-MG 2026) — tabela única
+export const CUSTO_M2_SINAPI = {
   sem_reforma:              { A_prime: 0,    B_medio_alto: 0,    C_intermediario: 0,    D_popular: 0 },
   refresh_giro:             { A_prime: 420,  B_medio_alto: 375,  C_intermediario: 335,  D_popular: 280 },
   leve_funcional:           { A_prime: 710,  B_medio_alto: 645,  C_intermediario: 585,  D_popular: 520 },
@@ -20,14 +22,14 @@ const CUSTO_M2_SINAPI = {
 }
 
 // Mapeamento dos 3 cenários simplificados para escopos SINAPI
-const MAPA_SIMPLIFICADO = {
+export const MAPA_SIMPLIFICADO = {
   basica:   'refresh_giro',
   media:    'leve_reforcada_1_molhado',
   completa: 'pesada',
 }
 
-// Fator de valorização por escopo
-const FATOR_VALORIZACAO = {
+// Fator de valorização por escopo (pós-reforma / mercado)
+export const FATOR_VALORIZACAO = {
   sem_reforma: 1.00,
   refresh_giro: 1.04,
   leve_funcional: 1.08,
@@ -38,6 +40,78 @@ const FATOR_VALORIZACAO = {
   basica: 1.04,
   completa: 1.28,
 }
+
+// Bonus de liquidez por escopo (reduz prazo de venda)
+export const LIQUIDEZ_BONUS = {
+  sem_reforma:              0,
+  refresh_giro:             0.05,
+  leve_funcional:           0.12,
+  leve_reforcada_1_molhado: 0.18,
+  media:                    0.25,
+  pesada:                   0.20,  // diminishing returns
+}
+
+// Prazo de obra estimado em meses
+export const PRAZO_OBRA_MESES = {
+  sem_reforma: 0,
+  refresh_giro: 0.5,
+  leve_funcional: 1.5,
+  leve_reforcada_1_molhado: 2.5,
+  media: 4,
+  pesada: 7,
+}
+
+// 6 escopos detalhados — metadados para CenariosReforma.jsx
+export const ESCOPOS = [
+  {
+    id: 'sem_reforma',
+    label: 'Sem Reforma',
+    descricao: 'Vende no estado atual — sem investimento em obras',
+    fator_valorizacao: 1.00,
+    inclui: [],
+    cor: '#8E8EA0',
+  },
+  {
+    id: 'refresh_giro',
+    label: 'Refresh de Giro',
+    descricao: 'Pintura, reparos, metais, luminárias — mínimo para girar',
+    fator_valorizacao: 1.04,
+    inclui: ['Pintura geral', 'Pequenos reparos', 'Metais/louças pontuais', 'Limpeza'],
+    cor: '#3B8BD4',
+  },
+  {
+    id: 'leve_funcional',
+    label: 'Leve Funcional',
+    descricao: 'Refresh + piso laminado/porcelanato parcial + elétrica/hidráulica',
+    fator_valorizacao: 1.08,
+    inclui: ['Pintura + Reparos', 'Piso laminado', 'Elétrica parcial', 'Hidráulica parcial'],
+    cor: '#05A86D',
+  },
+  {
+    id: 'leve_reforcada_1_molhado',
+    label: 'Leve Reforçada',
+    descricao: 'Leve funcional + 1 banheiro ou cozinha completa',
+    fator_valorizacao: 1.12,
+    inclui: ['Tudo do Leve', '1 área molhada completa', 'Porcelanato médio', 'Ferragens'],
+    cor: '#D4A017',
+  },
+  {
+    id: 'media',
+    label: 'Reforma Média',
+    descricao: 'Todos molhados + esquadrias + elétrica/hidráulica completa',
+    fator_valorizacao: 1.18,
+    inclui: ['Todos molhados', 'Esquadrias', 'Elétrica+Hidráulica total', 'Acabamento médio'],
+    cor: '#A378DD',
+  },
+  {
+    id: 'pesada',
+    label: 'Reforma Pesada',
+    descricao: 'Reforma total + estrutura + projeto + ART',
+    fator_valorizacao: 1.28,
+    inclui: ['Tudo + estrutura', 'Projeto arquitetônico', 'ART', 'Acabamento alto'],
+    cor: '#D05538',
+  },
+]
 
 export function detectarClasse(preco_m2) {
   if (!preco_m2) return 'C_intermediario'
@@ -50,12 +124,6 @@ export function detectarClasse(preco_m2) {
 /**
  * Calcula o custo de reforma SINAPI para um cenário simplificado (basica/media/completa).
  * Se houver valor do banco, retorna ele. Senão, calcula pelo SINAPI.
- * 
- * @param {string} cenario — 'basica' | 'media' | 'completa'
- * @param {number} area — área em m²
- * @param {number} preco_m2_mercado — preço/m² do mercado (para detectar classe)
- * @param {object} valoresBanco — { custo_reforma_basica, custo_reforma_media, custo_reforma_completa }
- * @returns {number} custo total da reforma
  */
 export function calcularCustoReformaSINAPI(cenario, area, preco_m2_mercado, valoresBanco = {}) {
   // 1. Se tem valor do banco, usar ele (fonte primária)
@@ -82,10 +150,17 @@ export function calcularReformas3Cenarios(area, preco_m2_mercado, valoresBanco =
 }
 
 /**
- * Retorna o fator de valorização para um cenário.
+ * Calcula custo de reforma para um escopo detalhado (os 6 nomes SINAPI).
  */
-export function fatorValorizacao(cenario) {
-  return FATOR_VALORIZACAO[cenario] || 1.08
+export function calcularCustoEscopo(escopoId, area, preco_m2_mercado) {
+  const classe = detectarClasse(preco_m2_mercado)
+  const custoM2 = CUSTO_M2_SINAPI[escopoId]?.[classe] || 0
+  return Math.round((area || 80) * custoM2)
 }
 
-export { CUSTO_M2_SINAPI, MAPA_SIMPLIFICADO }
+/**
+ * Retorna o fator de valorização para um cenário ou escopo.
+ */
+export function fatorValorizacao(cenarioOuEscopo) {
+  return FATOR_VALORIZACAO[cenarioOuEscopo] || 1.08
+}
