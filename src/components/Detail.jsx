@@ -896,6 +896,7 @@ export default function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze
   const [salvandoObs, setSalvandoObs] = useState(false)
   const [avaliacoes, setAvaliacoes] = useState([])
   const [minhaAvaliacao, setMinhaAvaliacao] = useState(null)
+  const [oportunidadesLeilao, setOportunidadesLeilao] = useState([])
 
   useEffect(() => {
     if (!p?.id) return
@@ -904,6 +905,52 @@ export default function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze
       getAvaliacoes(p.id).then(setAvaliacoes).catch(() => {})
     })
   }, [p?.id])
+
+  // Buscar oportunidades de leilão similares (para mercado direto)
+  useEffect(() => {
+    if (!p?.id || !isMercadoDireto(p.fonte_url, p.tipo_transacao)) return
+    const tipo = (p.tipo || p.tipologia || 'apartamento').toLowerCase()
+    const area = parseFloat(p.area_privativa_m2 || p.area_m2) || 0
+    const cidade = (p.cidade || 'Belo Horizonte').trim()
+    import('../lib/supabase.js').then(async ({ supabase: sb }) => {
+      try {
+        let query = sb.from('imoveis')
+          .select('id,titulo,bairro,cidade,area_m2,area_privativa_m2,quartos,vagas,valor_minimo,valor_avaliacao,preco_m2_imovel,score_total,recomendacao,foto_principal,fonte_url,tipo_transacao,num_leilao,data_leilao,desconto_percentual')
+          .neq('id', p.id)
+          .or('tipo_transacao.eq.leilao,tipo_transacao.is.null')
+          .ilike('cidade', `%${cidade}%`)
+          .gt('valor_minimo', 0)
+          .order('score_total', { ascending: false })
+          .limit(20)
+        const { data } = await query
+        if (!data?.length) return
+        // Filtrar e ranquear por similaridade
+        const scored = data.map(im => {
+          let sim = 0
+          const areaIm = parseFloat(im.area_privativa_m2 || im.area_m2) || 0
+          // Mesmo tipo? (+3)
+          const tipoIm = (im.titulo || '').toLowerCase()
+          if (tipo.includes('apart') && tipoIm.includes('apart')) sim += 3
+          else if (tipo.includes('casa') && tipoIm.includes('casa')) sim += 3
+          // Área similar ±30%? (+3)
+          if (area > 0 && areaIm > 0 && Math.abs(areaIm - area) / area < 0.30) sim += 3
+          // Mesmos quartos? (+2)
+          if (p.quartos && im.quartos && p.quartos === im.quartos) sim += 2
+          // Mesmo bairro? (+2)
+          if (p.bairro && im.bairro && p.bairro.toLowerCase() === im.bairro.toLowerCase()) sim += 2
+          // Preço menor que o pedido? (+1)
+          if (im.valor_minimo < (p.preco_pedido || p.valor_minimo)) sim += 1
+          // Economia
+          const economia = (p.preco_pedido || p.valor_minimo || 0) - (im.valor_minimo || 0)
+          return { ...im, _similaridade: sim, _economia: economia, _area: areaIm }
+        })
+        .filter(im => im._similaridade >= 3)
+        .sort((a, b) => b._similaridade - a._similaridade || b._economia - a._economia)
+        .slice(0, 3)
+        setOportunidadesLeilao(scored)
+      } catch(e) { console.warn('[AXIS] Oportunidades leilão:', e.message) }
+    })
+  }, [p?.id, p?.fonte_url, p?.tipo_transacao])
 
   // Enriquecer aba Mercado com dados reais do banco quando disponível
   useEffect(() => {
@@ -1391,6 +1438,62 @@ for (const s of SCORES) {
                   <div style={{fontSize:13,fontWeight:700,color:'#78350F'}}>{v}</div>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+        {/* Oportunidades de leilão similares */}
+        {isMercadoDireto(p.fonte_url, p.tipo_transacao) && oportunidadesLeilao.length > 0 && (
+          <div style={{...card(),marginBottom:14,padding:'14px',background:'#FFF1F2',border:'1.5px solid #FDA4AF'}}>
+            <div style={{fontSize:12,fontWeight:700,color:'#9F1239',marginBottom:10}}>
+              🏆 Oportunidades em Leilão — Imóveis Similares
+            </div>
+            <div style={{fontSize:11,color:'#881337',marginBottom:10,lineHeight:1.5}}>
+              Encontramos {oportunidadesLeilao.length} imóve{oportunidadesLeilao.length > 1 ? 'is' : 'l'} em leilão com características similares na mesma cidade, com preços potencialmente menores.
+            </div>
+            {oportunidadesLeilao.map((op, i) => {
+              const areaOp = parseFloat(op.area_privativa_m2 || op.area_m2) || 0
+              return (
+                <div key={op.id} onClick={() => onNav && onNav('detail', { id: op.id })}
+                  style={{padding:'10px 12px',borderRadius:8,marginBottom:6,cursor:'pointer',
+                    background:'#fff',border:'1px solid #FECDD3',transition:'all .15s'}}
+                  onMouseEnter={e => e.currentTarget.style.borderColor = '#F43F5E'}
+                  onMouseLeave={e => e.currentTarget.style.borderColor = '#FECDD3'}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8}}>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:12,fontWeight:700,color:C.navy,marginBottom:2,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+                        {op.titulo || 'Imóvel em leilão'}
+                      </div>
+                      <div style={{fontSize:10,color:C.muted,marginBottom:4}}>
+                        📍 {op.bairro || '—'}, {op.cidade}
+                        {op.num_leilao && <span style={{marginLeft:6,padding:'1px 5px',borderRadius:3,background:'#FEF3C7',color:'#92400E',fontSize:9,fontWeight:600}}>{op.num_leilao}º leilão</span>}
+                      </div>
+                      <div style={{display:'flex',gap:8,flexWrap:'wrap',fontSize:10,color:C.hint}}>
+                        {areaOp > 0 && <span>📐 {areaOp}m²</span>}
+                        {op.quartos > 0 && <span>🛏 {op.quartos}q</span>}
+                        {op.vagas > 0 && <span>🚗 {op.vagas}v</span>}
+                        {op.desconto_percentual > 0 && <span style={{color:'#065F46',fontWeight:600}}>↓ {op.desconto_percentual}% desc.</span>}
+                        {op.score_total > 0 && <span>⭐ {op.score_total.toFixed(1)}</span>}
+                      </div>
+                    </div>
+                    <div style={{textAlign:'right',flexShrink:0}}>
+                      <div style={{fontSize:14,fontWeight:800,color:'#E11D48'}}>
+                        R$ {Math.round(op.valor_minimo / 1000)}k
+                      </div>
+                      {op._economia > 0 && (
+                        <div style={{fontSize:10,fontWeight:700,color:'#065F46',marginTop:2}}>
+                          💰 -{Math.round(op._economia / 1000)}k
+                        </div>
+                      )}
+                      <div style={{fontSize:9,color:C.hint,marginTop:1}}>
+                        {op.preco_m2_imovel ? `R$ ${Math.round(op.preco_m2_imovel).toLocaleString('pt-BR')}/m²` : ''}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+            <div style={{fontSize:9,color:'#9F1239',marginTop:6,lineHeight:1.4}}>
+              ⚠️ Leilão envolve riscos adicionais (ocupação, débitos, prazo). Clique no imóvel para ver análise completa.
             </div>
           </div>
         )}

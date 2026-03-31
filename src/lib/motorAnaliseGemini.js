@@ -394,6 +394,17 @@ export async function analisarComGemini(url, geminiKey, parametros, onProgress, 
     _modelo_usado: _modeloGemini,
   }
 
+  // Mercado direto: setar preco_pedido e tipo_transacao
+  const _eMercadoFinal = isMercadoDireto(url, analise.tipo_transacao)
+  if (_eMercadoFinal) {
+    analise.tipo_transacao = 'mercado_direto'
+    analise.preco_pedido = analise.preco_pedido || analise.valor_minimo || 0
+    // Limpar campos de leilão que não se aplicam
+    if (!analise.num_leilao) analise.num_leilao = null
+    if (!analise.data_leilao) analise.data_leilao = null
+    if (!analise.modalidade_leilao) analise.modalidade_leilao = null
+  }
+
   // PASSO 6: Calcular reforma com SINAPI
   try {
     if (analise.bairro && analise.preco_m2_mercado && analise.area_m2) {
@@ -498,6 +509,12 @@ export async function analisarComDeepSeek(url, deepseekKey, parametros, onProgre
     
     const analise = JSON.parse(match[0])
     analise._modelo_usado = 'deepseek-v3'
+    analise.fonte_url = url
+    // Mercado direto: setar preco_pedido e tipo_transacao
+    if (isMercadoDireto(url, analise.tipo_transacao)) {
+      analise.tipo_transacao = 'mercado_direto'
+      analise.preco_pedido = analise.preco_pedido || analise.valor_minimo || 0
+    }
     progress('✅ Análise DeepSeek concluída (~R$ 0,08)')
     return analise
   } catch(e) {

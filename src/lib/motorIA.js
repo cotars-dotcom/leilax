@@ -742,6 +742,13 @@ export function validarECorrigirAnalise(analise) {
       ((analise.valor_mercado_estimado - analise.valor_minimo) / analise.valor_mercado_estimado * 100).toFixed(1)
     )
   }
+  // Para mercado direto: calcular desconto do preço pedido vs mercado
+  const precoPedido = analise.preco_pedido || analise.valor_minimo
+  if (precoPedido > 0 && analise.valor_mercado_estimado > 0) {
+    analise.desconto_sobre_mercado_pct_calculado = parseFloat(
+      ((analise.valor_mercado_estimado - precoPedido) / analise.valor_mercado_estimado * 100).toFixed(1)
+    )
+  }
 
   // 0. Normalizar scores que vieram em escala 0-100 para 0-10
   const camposScore = ['score_localizacao','score_desconto','score_juridico',
