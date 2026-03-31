@@ -135,7 +135,14 @@ body{font-family:'Segoe UI','Inter',system-ui,sans-serif;font-size:13px;color:#1
 <div class="wrap">
 
 <!-- Header -->
-${p.foto_principal ? `<img src="${p.foto_principal}" style="width:100%;max-height:200px;object-fit:cover;border-radius:10px;margin-bottom:12px" referrerpolicy="no-referrer" onerror="this.style.display='none'" />` : ''}
+${p.foto_principal ? `<div style="margin-bottom:12px;border-radius:10px;overflow:hidden;max-height:220px;background:#f3f4f6">
+  <img src="${p.foto_principal}" style="width:100%;max-height:220px;object-fit:cover;display:block" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://wsrv.nl/?url='+encodeURIComponent('${p.foto_principal}')+'&w=600&q=75&output=jpg';this.parentElement.style.display=this.naturalWidth<10?'none':'block'" />
+</div>` : ''}
+${(p.fotos?.length > 1) ? `<div style="display:flex;gap:6px;overflow-x:auto;margin-bottom:12px;padding-bottom:4px">
+  ${p.fotos.slice(1, 5).filter(f => f && !f.includes('{action}')).map(f =>
+    `<img src="${f}" style="height:90px;width:120px;border-radius:6px;flex-shrink:0;object-fit:cover" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://wsrv.nl/?url='+encodeURIComponent('${f}')+'&w=300&q=70&output=jpg'" />`
+  ).join('')}
+</div>` : ''}
 <div class="hdr">
   <div>
     <h1>${p.titulo || 'Imóvel'}</h1>
@@ -180,7 +187,7 @@ ${p.foto_principal ? `<img src="${p.foto_principal}" style="width:100%;max-heigh
     </div>
     <div class="card" style="text-align:center">
       <div style="font-size:9px;color:#666;text-transform:uppercase">Aluguel est.</div>
-      <div style="font-size:18px;font-weight:800;color:#7C3AED">${p.aluguel_mensal_estimado ? fmt(p.aluguel_mensal_estimado) + '/m' : '—'}</div>
+      <div style="font-size:18px;font-weight:800;color:#7C3AED">${p.aluguel_mensal_estimado ? fmt(p.aluguel_mensal_estimado) + '/mês' : '—'}</div>
     </div>
   </div>
 
@@ -443,8 +450,68 @@ function selReforma(i){
 
 // ── ACTIONS ─────────────────────────────────────────────────────────────
 
+// Converter URL de imagem para base64 data URI (para funcionar offline/WhatsApp)
+async function imageUrlToBase64(url, timeout = 8000) {
+  try {
+    const res = await fetch(url, { 
+      signal: AbortSignal.timeout(timeout),
+      headers: { 'Accept': 'image/webp,image/jpeg,image/png,*/*' }
+    })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const blob = await res.blob()
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result)
+      reader.onerror = () => reject(new Error('FileReader failed'))
+      reader.readAsDataURL(blob)
+    })
+  } catch(e) {
+    // Fallback: tentar via proxy de imagem
+    try {
+      const proxyUrl = `https://wsrv.nl/?url=${encodeURIComponent(url)}&w=600&q=75&output=jpg`
+      const res2 = await fetch(proxyUrl, { signal: AbortSignal.timeout(timeout) })
+      if (!res2.ok) throw new Error('proxy failed')
+      const blob2 = await res2.blob()
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result)
+        reader.onerror = () => reject(new Error('proxy reader failed'))
+        reader.readAsDataURL(blob2)
+      })
+    } catch(e2) {
+      console.warn('[AXIS Export] Imagem não convertida:', url.substring(0, 80), e2.message)
+      return null
+    }
+  }
+}
+
 async function gerarBlob(p) {
-  const html = gerarHTML(p)
+  // Converter fotos para base64 (paralelo, com timeout)
+  const fotosOriginais = [p.foto_principal, ...(p.fotos || [])].filter(Boolean)
+  const fotosUnicas = [...new Set(fotosOriginais)].slice(0, 6) // max 6 fotos
+  
+  let fotosBase64 = {}
+  if (fotosUnicas.length > 0) {
+    const conversoes = await Promise.allSettled(
+      fotosUnicas.map(async url => ({ url, base64: await imageUrlToBase64(url) }))
+    )
+    for (const r of conversoes) {
+      if (r.status === 'fulfilled' && r.value.base64) {
+        fotosBase64[r.value.url] = r.value.base64
+      }
+    }
+  }
+
+  // Gerar HTML com fotos embutidas
+  let html = gerarHTML(p)
+  
+  // Substituir URLs de imagem por base64
+  for (const [url, base64] of Object.entries(fotosBase64)) {
+    // Escapar caracteres especiais da URL para regex
+    const escaped = url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    html = html.replace(new RegExp(escaped, 'g'), base64)
+  }
+
   return new Blob([html], { type: 'text/html' })
 }
 
