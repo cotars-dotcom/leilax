@@ -10,7 +10,7 @@
  *   5. gerarAnalise() interno (zero) → ROI + leilão
  */
 
-import { scrapeUrlJina, extrairCamposTexto } from './scraperImovel.js'
+import { scrapeUrlJina, extrairCamposTexto, verificarQualidadeScrape } from './scraperImovel.js'
 import { calcularScore, validarECorrigirAnalise } from './motorIA.js'
 import { getMercadoComFallback, getJurimetriaVara, getMetricasBairro } from './supabase.js'
 import { detectarRegiao, getMercado } from '../data/mercado_regional.js'
@@ -295,6 +295,104 @@ async function chamarGemini(prompt, geminiKey) {
   throw ultimoErro || new Error('Todos os modelos Gemini falharam')
 }
 
+// ─── GEMINI COM GOOGLE SEARCH GROUNDING (para sites SPA) ─────────────────────
+// Quando o Jina falha em extrair dados (SPAs como QuintoAndar), usa o Gemini
+// com Google Search Retrieval para buscar os dados reais do anúncio na web.
+async function chamarGeminiComGrounding(url, geminiKey, camposBasicos, contextoMercado) {
+  const modelo = 'gemini-2.0-flash' // grounding só funciona com 2.0+
+  const prompt = `Você é um analista imobiliário expert em BH/MG.
+
+Preciso que você busque informações REAIS sobre este imóvel na web:
+URL: ${url}
+
+${camposBasicos.titulo ? `Título detectado: ${camposBasicos.titulo}` : ''}
+${camposBasicos.cidade ? `Cidade: ${camposBasicos.cidade}` : ''}
+${camposBasicos.bairro ? `Bairro: ${camposBasicos.bairro}` : ''}
+
+IMPORTANTE: O scraper não conseguiu extrair os dados da página (provavelmente um SPA/React).
+Use o Google Search para encontrar os dados REAIS do anúncio: preço, área, quartos, vagas, endereço, condomínio, fotos.
+
+Retorne APENAS JSON válido com estes campos:
+{
+  "titulo": "string — título do anúncio",
+  "valor_minimo": number — preço pedido em reais (sem centavos),
+  "preco_pedido": number — mesmo que valor_minimo para mercado direto,
+  "valor_avaliacao": number — estimativa de valor real de mercado,
+  "valor_mercado_estimado": number — preço/m² × área,
+  "area_m2": number,
+  "area_privativa_m2": number,
+  "quartos": number,
+  "suites": number,
+  "vagas": number,
+  "bairro": "string",
+  "cidade": "string",
+  "estado": "MG",
+  "tipo": "Apartamento|Casa|Cobertura|Sala Comercial",
+  "endereco": "string",
+  "condominio_mensal": number ou null,
+  "andar": number ou null,
+  "preco_m2_imovel": number,
+  "preco_m2_mercado": number,
+  "aluguel_mensal_estimado": number,
+  "elevador": boolean ou null,
+  "piscina": boolean ou null,
+  "area_lazer": boolean ou null,
+  "ocupacao": "desocupado|ocupado|incerto",
+  "fotos": ["url1", "url2"],
+  "foto_principal": "url",
+  "score_localizacao": number 0-10,
+  "score_desconto": number 0-10,
+  "score_juridico": number 0-10,
+  "score_ocupacao": number 0-10,
+  "score_liquidez": number 0-10,
+  "score_mercado": number 0-10,
+  "justificativa": "string breve",
+  "sintese_executiva": "string 2-3 frases",
+  "recomendacao": "COMPRAR|AGUARDAR|EVITAR",
+  "positivos": ["string"],
+  "negativos": ["string"],
+  "comparaveis": [{"descricao":"string","valor":number,"preco_m2":number,"area_m2":number,"quartos":number,"link":"url"}]
+}
+
+${contextoMercado ? `MERCADO LOCAL: ${JSON.stringify(contextoMercado)}` : ''}
+Retorne APENAS o JSON, sem markdown, sem explicação.`
+
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${geminiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        tools: [{ google_search_retrieval: { dynamic_retrieval_config: { mode: 'MODE_DYNAMIC', dynamic_threshold: 0.3 } } }],
+        generationConfig: { temperature: 0.1, maxOutputTokens: 8192 },
+      }),
+      signal: AbortSignal.timeout(90000) // mais tempo para grounding
+    }
+  )
+
+  if (!res.ok) {
+    const body = await res.text()
+    throw new Error(`Gemini Grounding ${res.status}: ${body.substring(0, 200)}`)
+  }
+
+  const data = await res.json()
+  const txt = data.candidates?.[0]?.content?.parts
+    ?.filter(p => p.text)
+    ?.map(p => p.text)
+    ?.join('') || ''
+  
+  if (!txt || txt.length < 10) throw new Error('Gemini Grounding retornou resposta vazia')
+  const clean = txt.replace(/```json|```/g, '').trim()
+  const jsonMatch = clean.match(/\{[\s\S]*\}/)
+  if (!jsonMatch) throw new Error('Gemini Grounding não retornou JSON válido')
+  
+  const resultado = JSON.parse(jsonMatch[0])
+  resultado._modelo_usado = `${modelo}+grounding`
+  resultado._grounding = true
+  return resultado
+}
+
 // ─── MOTOR PRINCIPAL ─────────────────────────────────────────────────────────
 export async function analisarComGemini(url, geminiKey, parametros, onProgress, imovelContexto = null) {
   const erros = []
@@ -303,21 +401,29 @@ export async function analisarComGemini(url, geminiKey, parametros, onProgress, 
   // PASSO 1: Scrape com Jina (grátis)
   onProgress?.('Coletando dados do imóvel (Jina AI)...')
   let textoScrapeado = ''
+  let _scrapeQualidade = { ok: true, reason: 'OK' }
   try {
     textoScrapeado = await scrapeUrlJina(url)
+    _scrapeQualidade = verificarQualidadeScrape(textoScrapeado, url)
+    if (!_scrapeQualidade.ok) {
+      erros.push(`Scrape baixa qualidade: ${_scrapeQualidade.detail}`)
+      onProgress?.(`⚠️ Conteúdo da página insuficiente (${_scrapeQualidade.reason}) — tentando busca direta...`)
+    }
   } catch(e) {
     erros.push(`Jina scrape falhou: ${e.message}`)
+    _scrapeQualidade = { ok: false, reason: 'FAILED', detail: e.message }
     // Tentar fetch direto como fallback
     try {
       const r = await fetch(url, { signal: AbortSignal.timeout(15000) })
       textoScrapeado = await r.text()
-      textoScrapeado = textoScrapeado.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ')
+      textoScrapeado = textoScrapeado.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<style[\s\S]*?<\/style>/gi, '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ')
+      _scrapeQualidade = verificarQualidadeScrape(textoScrapeado, url)
     } catch(e2) {
       erros.push(`Fetch direto também falhou: ${e2.message}`)
       // Último recurso: extrair info da própria URL
-      // URLs como vivareal.com.br/imovel/apartamento-3-quartos-dona-clara contêm dados úteis
       const urlPath = url.replace(/https?:\/\/[^/]+\//, '').replace(/[?#].*/,'').replace(/[-_/]/g, ' ')
       textoScrapeado = `URL do imóvel: ${url}\nDados extraídos da URL: ${urlPath}`
+      _scrapeQualidade = { ok: false, reason: 'URL_ONLY', detail: 'Apenas dados da URL' }
       onProgress?.('⚠️ Scrape falhou — analisando com dados da URL e IA')
     }
   }
@@ -346,67 +452,80 @@ export async function analisarComGemini(url, geminiKey, parametros, onProgress, 
     ])
   } catch(e) { /* banco opcional */ }
 
-  // PASSO 4: Gemini Flash-Lite para campos complexos + scores + síntese
-  onProgress?.('Gemini analisando imóvel (~$0.002)...')
+  // PASSO 4: Gemini Flash para campos complexos + scores + síntese
+  // Se scrape teve qualidade ruim, tentar GROUNDING primeiro (busca na web via Google)
   let analiseGemini = null
-  try {
-    const _eMercado = isMercadoDireto(camposBasicos.fonte_url || '', null)
-    const prompt = buildPromptGemini(camposBasicos, textoScrapeado, contextoMercado, imovelContexto, _jurimetria, _metricasBairro, _eMercado)
-    const { resultado: geminiResult, modeloUsado: geminiModelo } = await chamarGemini(prompt, geminiKey)
-    analiseGemini = geminiResult
-    _modeloGemini = geminiModelo
-  } catch(e) {
-    const errMsg = e.message || 'erro desconhecido'
-    console.error('[AXIS Gemini] Erro detalhado:', errMsg)
-    onProgress?.(`⚠️ Gemini erro: ${errMsg.substring(0, 120)}`)
-    erros.push(`Gemini falhou: ${errMsg}`)
-    _modeloGemini = 'regex_fallback' // Gemini realmente falhou
-    // LANÇAR EXCEÇÃO para que a cascata do motorIA tente DeepSeek/Claude
-    // (antes retornava silenciosamente, impedindo o fallback)
-    const geminiErrMsg = errMsg.includes('401') ? 'Chave Gemini inválida' :
-                         errMsg.includes('429') ? 'Quota Gemini excedida' :
-                         errMsg.includes('404') ? 'Modelo Gemini não disponível' :
-                         errMsg.includes('JSON') ? 'Gemini retornou resposta inválida' :
-                         `Gemini falhou: ${errMsg.substring(0,80)}`
-    // Só usar fallback silencioso se for reanálise (tem contexto) — para nova análise, propagar
-    if (!imovelContexto) {
-      throw new Error(geminiErrMsg)
+  const usarGrounding = !_scrapeQualidade.ok
+  
+  if (usarGrounding) {
+    // PASSO 4a: Tentar Gemini com Google Search Grounding
+    onProgress?.('🔍 Buscando dados via Google Search (Gemini Grounding)...')
+    try {
+      analiseGemini = await chamarGeminiComGrounding(url, geminiKey, camposBasicos, contextoMercado)
+      _modeloGemini = analiseGemini._modelo_usado || 'gemini-2.0-flash+grounding'
+      console.log('[AXIS] Grounding sucesso — dados encontrados via Google Search')
+    } catch(e) {
+      erros.push(`Gemini Grounding falhou: ${e.message}`)
+      console.warn('[AXIS] Grounding falhou:', e.message, '— tentando análise normal')
+      // Continuar com análise normal abaixo
     }
-    // Fallback inteligente apenas em reanálise: preservar dados existentes
-    if (imovelContexto && imovelContexto.score_total > 0) {
-      // Usar dados do imóvel já analisado — não degradar scores existentes
-      analiseGemini = {
-        ...imovelContexto,
-        ...camposBasicos,  // regex pode ter dados novos
-        // Preservar scores do banco (não sobrescrever com genéricos)
-        score_localizacao: imovelContexto.score_localizacao,
-        score_desconto: imovelContexto.score_desconto,
-        score_juridico: imovelContexto.score_juridico,
-        score_ocupacao: imovelContexto.score_ocupacao,
-        score_liquidez: imovelContexto.score_liquidez,
-        score_mercado: imovelContexto.score_mercado,
-        justificativa: imovelContexto.justificativa,
-        sintese_executiva: imovelContexto.sintese_executiva,
-        recomendacao: imovelContexto.recomendacao,
-        positivos: imovelContexto.positivos,
-        negativos: imovelContexto.negativos,
-        comparaveis: imovelContexto.comparaveis || [],
-        fotos: imovelContexto.fotos || [],
-        alertas: [...(imovelContexto.alertas || []), '[ATENCAO] Gemini indisponível — dados da análise anterior preservados'],
+  }
+
+  if (!analiseGemini) {
+    // PASSO 4b: Gemini normal (com texto scrapeado, mesmo que parcial)
+    onProgress?.('Gemini analisando imóvel (~$0.002)...')
+    try {
+      const _eMercado = isMercadoDireto(camposBasicos.fonte_url || url, null)
+      const prompt = buildPromptGemini(camposBasicos, textoScrapeado, contextoMercado, imovelContexto, _jurimetria, _metricasBairro, _eMercado)
+      const { resultado: geminiResult, modeloUsado: geminiModelo } = await chamarGemini(prompt, geminiKey)
+      analiseGemini = geminiResult
+      _modeloGemini = geminiModelo
+    } catch(e) {
+      const errMsg = e.message || 'erro desconhecido'
+      console.error('[AXIS Gemini] Erro detalhado:', errMsg)
+      onProgress?.(`⚠️ Gemini erro: ${errMsg.substring(0, 120)}`)
+      erros.push(`Gemini falhou: ${errMsg}`)
+      _modeloGemini = 'regex_fallback'
+      const geminiErrMsg = errMsg.includes('401') ? 'Chave Gemini inválida' :
+                           errMsg.includes('429') ? 'Quota Gemini excedida' :
+                           errMsg.includes('404') ? 'Modelo Gemini não disponível' :
+                           errMsg.includes('JSON') ? 'Gemini retornou resposta inválida' :
+                           `Gemini falhou: ${errMsg.substring(0,80)}`
+      if (!imovelContexto) {
+        throw new Error(geminiErrMsg)
       }
-    } else {
-      // Sem contexto: usar scores genéricos (nova análise sem Gemini)
-      analiseGemini = {
-        ...camposBasicos,
-        score_localizacao: 6.0, score_desconto: camposBasicos.desconto_percentual >= 30 ? 6.5 : 4.0,
-        score_juridico: 6.0, score_ocupacao: camposBasicos.ocupacao === 'desocupado' ? 8.0 : 5.0,
-        score_liquidez: 6.0, score_mercado: 6.0,
-        justificativa: 'Análise automática baseada nos dados do edital. Verifique os scores manualmente.',
-        sintese_executiva: 'Imóvel analisado automaticamente. Revise os dados antes de fazer uma oferta.',
-        recomendacao: 'AGUARDAR',
-        positivos: ['Desconto sobre avaliação judicial'],
-        negativos: ['Análise incompleta — Gemini indisponível'],
-        alertas: ['[ATENCAO] Análise automática sem IA — verifique os dados manualmente'],
+      if (imovelContexto && imovelContexto.score_total > 0) {
+        analiseGemini = {
+          ...imovelContexto,
+          ...camposBasicos,
+          score_localizacao: imovelContexto.score_localizacao,
+          score_desconto: imovelContexto.score_desconto,
+          score_juridico: imovelContexto.score_juridico,
+          score_ocupacao: imovelContexto.score_ocupacao,
+          score_liquidez: imovelContexto.score_liquidez,
+          score_mercado: imovelContexto.score_mercado,
+          justificativa: imovelContexto.justificativa,
+          sintese_executiva: imovelContexto.sintese_executiva,
+          recomendacao: imovelContexto.recomendacao,
+          positivos: imovelContexto.positivos,
+          negativos: imovelContexto.negativos,
+          comparaveis: imovelContexto.comparaveis || [],
+          fotos: imovelContexto.fotos || [],
+          alertas: [...(imovelContexto.alertas || []), '[ATENCAO] Gemini indisponível — dados da análise anterior preservados'],
+        }
+      } else {
+        analiseGemini = {
+          ...camposBasicos,
+          score_localizacao: 6.0, score_desconto: camposBasicos.desconto_percentual >= 30 ? 6.5 : 4.0,
+          score_juridico: 6.0, score_ocupacao: camposBasicos.ocupacao === 'desocupado' ? 8.0 : 5.0,
+          score_liquidez: 6.0, score_mercado: 6.0,
+          justificativa: 'Análise automática baseada nos dados do edital. Verifique os scores manualmente.',
+          sintese_executiva: 'Imóvel analisado automaticamente. Revise os dados antes de fazer uma oferta.',
+          recomendacao: 'AGUARDAR',
+          positivos: ['Desconto sobre avaliação judicial'],
+          negativos: ['Análise incompleta — Gemini indisponível'],
+          alertas: ['[ATENCAO] Análise automática sem IA — verifique os dados manualmente'],
+        }
       }
     }
   }

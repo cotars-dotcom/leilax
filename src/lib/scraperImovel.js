@@ -5,28 +5,91 @@
  */
 
 // ─── EXTRAÇÃO VIA JINA.AI (FREE) ─────────────────────────────────────────────
+
+// Indicadores de que o scrape retornou uma página de erro/SPA vazia
+const SPA_ERROR_INDICATORS = [
+  'page not found', '404', 'not found', 'access denied', 'forbidden',
+  'please enable javascript', 'loading...', 'carregando',
+  'this page requires javascript', 'react app', 'root div',
+  'noscript', 'we couldn\'t find', 'página não encontrada',
+  'erro ao carregar', 'unavailable', 'blocked',
+  'enable cookies', 'captcha', 'cloudflare',
+  'just a moment', 'checking your browser',
+]
+
+// Domínios que são SPAs conhecidos (React/Next) e falham com scraping simples
+const SPA_DOMAINS = [
+  'quintoandar.com.br', 'loft.com.br', '123i.com.br',
+  'chavesnamao.com.br', 'lugarcerto.com.br',
+]
+
+/**
+ * Verifica qualidade do conteúdo scrapeado.
+ * Retorna { ok, reason } — ok=false significa que o conteúdo é lixo/SPA
+ */
+export function verificarQualidadeScrape(texto, url = '') {
+  if (!texto || texto.length < 80) return { ok: false, reason: 'EMPTY', detail: 'Conteúdo vazio ou muito curto' }
+
+  const tl = texto.toLowerCase()
+
+  // Verificar indicadores de erro/SPA
+  const errorHits = SPA_ERROR_INDICATORS.filter(ind => tl.includes(ind))
+  if (errorHits.length >= 2) return { ok: false, reason: 'SPA_ERROR', detail: `Página de erro/SPA: ${errorHits.slice(0,3).join(', ')}` }
+
+  // Verificar se URL é de SPA conhecido
+  const isSPADomain = SPA_DOMAINS.some(d => url.toLowerCase().includes(d))
+
+  // Heurística: conteúdo real de imóvel deve ter pelo menos ALGUM dado útil
+  const temPreco = /r\$\s*[\d.,]+|[\d.]+,\d{2}|preço|valor/i.test(texto)
+  const temArea = /\d+\s*m[²2]|metros?\s*quadrados?/i.test(texto)
+  const temQuartos = /\d+\s*(quartos?|dorm|suítes?|qts?)/i.test(texto)
+  const temEndereco = /(rua|av|alameda|bairro|cidade|cep)/i.test(texto)
+  const sinaisUteis = [temPreco, temArea, temQuartos, temEndereco].filter(Boolean).length
+
+  // SPA domain + poucos sinais = falha quase certa
+  if (isSPADomain && sinaisUteis < 2) return { ok: false, reason: 'SPA_DOMAIN', detail: `SPA (${url.split('/')[2]}) com dados insuficientes` }
+
+  // Texto muito longo mas sem dados = provavel HTML/JS bruto
+  if (texto.length > 5000 && sinaisUteis === 0) return { ok: false, reason: 'JUNK', detail: 'Conteúdo longo sem dados imobiliários' }
+
+  // Proporção de tags HTML residuais muito alta
+  const htmlTags = (texto.match(/<[^>]+>/g) || []).length
+  if (htmlTags > 50 && sinaisUteis < 2) return { ok: false, reason: 'HTML_JUNK', detail: 'HTML não processado' }
+
+  return { ok: true, reason: 'OK', detail: `${sinaisUteis} sinais úteis`, sinaisUteis, isSPADomain }
+}
+
 export async function scrapeUrlJina(url) {
   const jinaUrl = `https://r.jina.ai/${url}`
-  // Primeira tentativa: markdown
-  try {
-    const res = await fetch(jinaUrl, {
-      headers: { 'Accept': 'text/plain', 'X-Return-Format': 'markdown' },
-      signal: AbortSignal.timeout(25000)
-    })
-    if (res.ok) {
-      const text = await res.text()
-      if (text && text.length > 100) return text
-    }
-  } catch(e) { /* retry abaixo */ }
-  // Segunda tentativa: text plain (às vezes funciona quando markdown falha)
-  const res2 = await fetch(jinaUrl, {
-    headers: { 'Accept': 'text/plain', 'X-Return-Format': 'text' },
-    signal: AbortSignal.timeout(25000)
-  })
-  if (!res2.ok) throw new Error(`Jina failed: ${res2.status}`)
-  const text2 = await res2.text()
-  if (!text2 || text2.length < 50) throw new Error('Jina retornou conteúdo vazio')
-  return text2
+  
+  // Tentar HTML primeiro para portais (melhor com SPAs renderizados)
+  const isSPA = SPA_DOMAINS.some(d => url.toLowerCase().includes(d))
+  const formatos = isSPA 
+    ? [['text/html', 'html'], ['text/plain', 'markdown'], ['text/plain', 'text']]
+    : [['text/plain', 'markdown'], ['text/html', 'html'], ['text/plain', 'text']]
+  
+  let melhorTexto = ''
+  for (const [accept, fmt] of formatos) {
+    try {
+      const res = await fetch(jinaUrl, {
+        headers: { 'Accept': accept, 'X-Return-Format': fmt },
+        signal: AbortSignal.timeout(25000)
+      })
+      if (res.ok) {
+        let text = await res.text()
+        // Limpar HTML tags se veio como HTML
+        if (fmt === 'html') text = text.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<style[\s\S]*?<\/style>/gi, '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ')
+        if (text && text.length > melhorTexto.length) melhorTexto = text
+        // Verificar qualidade
+        const qualidade = verificarQualidadeScrape(text, url)
+        if (qualidade.ok && qualidade.sinaisUteis >= 2) return text // bom o suficiente
+      }
+    } catch(e) { /* tentar próximo formato */ }
+  }
+
+  // Retornar o melhor que conseguiu (mesmo que de baixa qualidade)
+  if (melhorTexto.length > 80) return melhorTexto
+  throw new Error(`Jina falhou para ${url} — ${isSPA ? 'site SPA não renderizável' : 'timeout ou bloqueio'}`)
 }
 
 // ─── EXTRATOR DE CAMPOS VIA REGEX (ZERO CUSTO) ───────────────────────────────
