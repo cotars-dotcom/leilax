@@ -1208,7 +1208,24 @@ DADOS DE BAIRRO (parcial):
   // Append bairro context to market context
   const contextoCompleto = (contextoMercadoRegional || '') + contextoBairro
 
-  const analise = await analisarComClaude(url, claudeKey, parametros, criterios, dadosGPT, anexos, contextoCompleto)
+  let analise
+  try {
+    analise = await analisarComClaude(url, claudeKey, parametros, criterios, dadosGPT, anexos, contextoCompleto)
+  } catch(claudeErr) {
+    console.error('[AXIS] Claude falhou:', claudeErr.message)
+    // Se Claude falha E Gemini+DeepSeek também falharam, dar mensagem clara
+    const is401 = claudeErr.message?.includes('401') || claudeErr.message?.includes('inválida')
+    const motoresDisponiveis = [
+      geminiKey ? 'Gemini ✓' : 'Gemini ✗',
+      deepseekKey ? 'DeepSeek ✓' : 'DeepSeek ✗',
+      claudeKey ? (is401 ? 'Claude (chave inválida)' : 'Claude (erro)') : 'Claude ✗',
+    ].join(' · ')
+    throw new Error(
+      is401
+        ? `Chave Claude inválida e os outros motores falharam.\nMotores: ${motoresDisponiveis}\n\nConfigure uma chave Gemini (grátis) em Admin > API Keys — é o motor principal.`
+        : `Todos os motores de IA falharam: ${claudeErr.message}\nMotores: ${motoresDisponiveis}`
+    )
+  }
 
   progress('📊 Calculando score com parâmetros do grupo...')
   const score_total = calcularScore(analise, parametros)
