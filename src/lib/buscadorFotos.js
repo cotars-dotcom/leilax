@@ -351,37 +351,8 @@ export async function buscarFotosImovel(imovel, geminiKey = null, onProgress = n
     }
   }
 
-  // PASSO 2: Jina.ai markdown
-  progress('Usando Jina.ai para ler a página...')
-  const jinaTexto = await lerViaJina(url, progress)
-  if (jinaTexto) {
-    // Tentar extrator do portal no texto Jina também
-    if (padrao?.extrairFotos) {
-      const fotosPortalJina = padrao.extrairFotos(jinaTexto, loteId)
-      if (fotosPortalJina.length > 0) {
-        progress(`✅ ${fotosPortalJina.length} fotos do portal via Jina`)
-        return { fotos: fotosPortalJina, foto_principal: fotosPortalJina[0], fonte: `portal-jina-${dominio}` }
-      }
-    }
-    const fotosJina = filtrarFotos(extrairImgsMd(jinaTexto, dominio))
-    if (fotosJina.length > 0) {
-      progress(`✅ ${fotosJina.length} fotos via Jina`)
-      return { fotos: fotosJina, foto_principal: fotosJina[0], fonte: 'jina-filtrado' }
-    }
-  }
-
-  // PASSO 3: og:image como fallback
-  if (htmlText) {
-    const ogMatch = htmlText.match(/<meta[^>]+og:image[^>]+content=["'](https?[^"']+)["']/i)
-    const ogUrl = ogMatch?.[1]
-    if (ogUrl && !isUrlBanida(ogUrl)) {
-      progress('✅ Foto principal via og:image')
-      return { fotos: [ogUrl], foto_principal: ogUrl, fonte: 'og-image' }
-    }
-  }
-
-  // PASSO 3.5: Jina HTML format — para portais protegidos (VivaReal, ZAP, QuintoAndar)
-  // Pega o HTML renderizado que contém URLs reais das CDNs de imagem
+  // PASSO 2: Para PORTAIS PROTEGIDOS (VivaReal/ZAP/QuintoAndar) → Jina HTML PRIMEIRO
+  // Esses sites bloqueiam fetch direto (Cloudflare) e Jina markdown não retorna URLs de imagem
   const isPortalProtegido = /vivareal|zapimoveis|quintoandar|olx\.com/i.test(dominio)
   if (isPortalProtegido || (!htmlText || htmlText.includes('Cloudflare'))) {
     progress('Buscando fotos via Jina HTML (portal protegido)...')
@@ -389,11 +360,40 @@ export async function buscarFotosImovel(imovel, geminiKey = null, onProgress = n
     if (jinaHTML) {
       const fotosPortal = extrairFotosPortalHTML(jinaHTML, dominio)
       if (fotosPortal.length > 0) {
-        // Converter webp → jpg para melhor compatibilidade (Vision aceita ambos)
         const fotosClean = fotosPortal.map(u => u.replace(/&amp;/g, '&'))
-        progress(`✅ ${fotosClean.length} fotos extraídas do portal via Jina HTML`)
+        progress(`✅ ${fotosClean.length} fotos do portal via Jina HTML`)
         return { fotos: fotosClean, foto_principal: fotosClean[0], fonte: `jina-html-${dominio}` }
       }
+    }
+  }
+
+  // PASSO 3: Jina.ai markdown (para sites normais, ou fallback se Jina HTML falhou)
+  progress('Usando Jina.ai para ler a página...')
+  const jinaTexto = await lerViaJina(url, progress)
+  if (jinaTexto) {
+    // Tentar extrator do portal no texto Jina
+    if (padrao?.extrairFotos) {
+      const fotosPortalJina = padrao.extrairFotos(jinaTexto, loteId)
+      // Exigir pelo menos 2 fotos reais (1 pode ser logo/avatar)
+      if (fotosPortalJina.length >= 2) {
+        progress(`✅ ${fotosPortalJina.length} fotos do portal via Jina`)
+        return { fotos: fotosPortalJina, foto_principal: fotosPortalJina[0], fonte: `portal-jina-${dominio}` }
+      }
+    }
+    const fotosJina = filtrarFotos(extrairImgsMd(jinaTexto, dominio))
+    if (fotosJina.length >= 2) {
+      progress(`✅ ${fotosJina.length} fotos via Jina`)
+      return { fotos: fotosJina, foto_principal: fotosJina[0], fonte: 'jina-filtrado' }
+    }
+  }
+
+  // PASSO 4: og:image como fallback
+  if (htmlText) {
+    const ogMatch = htmlText.match(/<meta[^>]+og:image[^>]+content=["'](https?[^"']+)["']/i)
+    const ogUrl = ogMatch?.[1]
+    if (ogUrl && !isUrlBanida(ogUrl)) {
+      progress('✅ Foto principal via og:image')
+      return { fotos: [ogUrl], foto_principal: ogUrl, fonte: 'og-image' }
     }
   }
 

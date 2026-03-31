@@ -182,7 +182,10 @@ export default function PainelRentabilidade({ imovel }) {
 
   // Valor de mercado: usar homogeneizado se disponível
   const vmBase = parseFloat(valor_mercado_homogenizado || valor_mercado_estimado) || avaliacao * 1.05
-  const vmercado = vmBase
+  
+  // Fator de valorização pós-reforma — reforma AUMENTA o valor de venda
+  const FATOR_VAL_REFORMA = { basica: 1.04, media: 1.12, completa: 1.28 }
+  const vmercado = Math.round(vmBase * (FATOR_VAL_REFORMA[cenarioReforma] || 1.0))
 
   // Fator de homogeneização para ALUGUEL (impacto diferente da venda)
   const FATORES_ALUGUEL = {
@@ -274,8 +277,14 @@ export default function PainelRentabilidade({ imovel }) {
           {eMercado ? '🏠 Oportunidade de Compra' : '📊 Rentabilidade'} — Flip vs Locação
         </div>
         <div style={{ fontSize:10, color:C.muted }}>
-          Mercado ref.: {fmt(vmercado)}
-          {fatorCalc < 1 && <span style={{ color:GOLD }}> · fator homog. {(fatorCalc*100).toFixed(0)}% (atributos)</span>}
+          Mercado ref.: {fmt(vmBase)}
+          {cenarioReforma !== 'basica' && vmercado > vmBase && (
+            <span style={{ color:'#065F46', fontWeight:600 }}> → {fmt(vmercado)} pós-reforma (+{FATOR_VAL_REFORMA[cenarioReforma] ? Math.round((FATOR_VAL_REFORMA[cenarioReforma]-1)*100) : 0}%)</span>
+          )}
+          {cenarioReforma === 'basica' && vmercado > vmBase && (
+            <span style={{ color:'#065F46' }}> → {fmt(vmercado)} (+4%)</span>
+          )}
+          {fatorCalc < 1 && <span style={{ color:GOLD }}> · homog. {(fatorCalc*100).toFixed(0)}%</span>}
         </div>
       </div>
 
