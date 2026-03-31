@@ -791,6 +791,23 @@ function NovoImovel({onSave,onCancel,onNav,trello,parametrosBanco,criteriosBanco
 }
 
 // ── PROPERTY CARD ─────────────────────────────────────────────────────────────
+// ── CITY COLORS ──────────────────────────────────────────────────────────────
+const CIDADE_CORES = {
+  'Belo Horizonte': { accent: '#002B80', bg: '#F0F4FF', label: 'BH' },
+  'Contagem':       { accent: '#7C3AED', bg: '#F5F3FF', label: 'CT' },
+  'Betim':          { accent: '#0891B2', bg: '#ECFEFF', label: 'BT' },
+  'Nova Lima':      { accent: '#059669', bg: '#ECFDF5', label: 'NL' },
+  'Juiz de Fora':   { accent: '#D97706', bg: '#FFFBEB', label: 'JF' },
+  'Ribeirão das Neves': { accent: '#DC2626', bg: '#FEF2F2', label: 'RN' },
+  'Santa Luzia':    { accent: '#9333EA', bg: '#FAF5FF', label: 'SL' },
+  'Sabará':         { accent: '#CA8A04', bg: '#FEFCE8', label: 'SB' },
+}
+function getCidadeCor(cidade) {
+  if (!cidade) return { accent: '#6B7280', bg: '#F9FAFB', label: 'MG' }
+  const norm = cidade.trim()
+  return CIDADE_CORES[norm] || Object.values(CIDADE_CORES).find((v,i) => norm.toLowerCase().includes(Object.keys(CIDADE_CORES)[i].toLowerCase())) || { accent: '#6B7280', bg: '#F9FAFB', label: norm.substring(0,2).toUpperCase() }
+}
+
 function PropCard({p,onNav}) {
   const isPhone = useIsMobile(480)
   const sc=p.score_total||0, rc=recColor(p.recomendacao)
@@ -804,11 +821,19 @@ function PropCard({p,onNav}) {
   const scoreDelta = p.preco_m2_imovel && p.preco_m2_mercado
     ? ((1 - p.preco_m2_imovel/p.preco_m2_mercado)*100).toFixed(0)
     : null
+  const cidCor = getCidadeCor(p.cidade)
 
   return <div onClick={()=>onNav("detail",{id:p.id})}
-    style={{...card(),cursor:"pointer",transition:"all .15s",padding:isPhone?"12px":"14px"}}
+    style={{...card(),cursor:"pointer",transition:"all .15s",padding:isPhone?"12px":"14px",borderLeft:`3px solid ${cidCor.accent}`}}
     onMouseEnter={e=>{e.currentTarget.style.borderColor=K.teal;e.currentTarget.style.transform="translateY(-2px)"}}
-    onMouseLeave={e=>{e.currentTarget.style.borderColor=K.bd;e.currentTarget.style.transform="none"}}>
+    onMouseLeave={e=>{e.currentTarget.style.borderColor=K.bd;e.currentTarget.style.borderLeftColor=cidCor.accent;e.currentTarget.style.transform="none"}}>
+
+    {/* Cidade label — destaque para cidades fora de BH */}
+    {p.cidade && p.cidade !== 'Belo Horizonte' && (
+      <div style={{marginBottom:6,display:'inline-block',padding:'1px 8px',borderRadius:4,background:cidCor.bg,border:`1px solid ${cidCor.accent}25`,fontSize:9,fontWeight:700,color:cidCor.accent,letterSpacing:.5,textTransform:'uppercase'}}>
+        {p.cidade}
+      </div>
+    )}
 
     {/* Foto */}
     {p.foto_principal && (

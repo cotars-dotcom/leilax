@@ -245,13 +245,41 @@ export function exportarPDFImovel(p) {
     </div>
     <div class="card">
       <div style="font-size:9px;color:#666;text-transform:uppercase">Locação a.a.</div>
-      <div style="font-size:16px;font-weight:800" class="purple">${p.retorno_locacao_anual_pct ? `${p.retorno_locacao_anual_pct}%` : '—'}</div>
+      <div style="font-size:16px;font-weight:800" class="purple">${p.yield_bruto_pct ? `${p.yield_bruto_pct}%` : (p.retorno_locacao_anual_pct ? `${p.retorno_locacao_anual_pct}%` : '—')}</div>
     </div>
     <div class="card">
-      <div style="font-size:9px;color:#666;text-transform:uppercase">Estrutura</div>
-      <div style="font-size:14px;font-weight:700" class="navy">${p.estrutura_recomendada || '—'}</div>
+      <div style="font-size:9px;color:#666;text-transform:uppercase">${p.fator_homogenizacao && p.fator_homogenizacao < 1 ? 'Fator Homog.' : 'Estrutura'}</div>
+      <div style="font-size:14px;font-weight:700" class="${p.fator_homogenizacao && p.fator_homogenizacao < 1 ? 'amber' : 'navy'}">${p.fator_homogenizacao && p.fator_homogenizacao < 1 ? `${(p.fator_homogenizacao * 100).toFixed(0)}%` : (p.estrutura_recomendada || '—')}</div>
     </div>
   </div>
+
+  ${p._dados_bairro_axis ? `
+  <!-- Dados AXIS do Bairro -->
+  <div class="card" style="margin-bottom:14px;background:#F0F9FF;border-color:#BAE6FD">
+    <div class="card-title" style="color:#0369A1">📊 Dados AXIS — ${p._dados_bairro_axis.label || p.bairro}</div>
+    <div class="grid-3">
+      <div>
+        ${[
+          ['Classe IPEAD', p._dados_bairro_axis.classeIpeadLabel || '—'],
+          ['Zona', p._dados_bairro_axis.zona || '—'],
+        ].map(([l,v]) => `<div class="row"><span class="row-label">${l}</span><span class="row-value">${v}</span></div>`).join('')}
+      </div>
+      <div>
+        ${[
+          ['Preço contrato', p._dados_bairro_axis.precoContratoM2 ? `R$ ${p._dados_bairro_axis.precoContratoM2.toLocaleString('pt-BR')}/m²` : '—'],
+          ['Yield bruto', p._dados_bairro_axis.yieldBruto ? `${p._dados_bairro_axis.yieldBruto}% a.a.` : '—'],
+        ].map(([l,v]) => `<div class="row"><span class="row-label">${l}</span><span class="row-value">${v}</span></div>`).join('')}
+      </div>
+      <div>
+        ${[
+          ['Tendência 12m', p._dados_bairro_axis.tendencia12m != null ? `${p._dados_bairro_axis.tendencia12m}%` : '—'],
+          ...(p._score_axis_patrimonial ? [['Score AXIS', p._score_axis_patrimonial]] : []),
+          ...(p._gap_asking_closing_pct ? [['Gap negoc.', `${p._gap_asking_closing_pct}%`]] : []),
+        ].map(([l,v]) => `<div class="row"><span class="row-label">${l}</span><span class="row-value">${v}</span></div>`).join('')}
+      </div>
+    </div>
+    <div style="font-size:8px;color:#94A3B8;margin-top:6px">Fontes: QuintoAndar 3T2025 · FipeZAP fev/2026 · IPEAD/UFMG</div>
+  </div>` : ''}
 
   <div class="footer">
     <span>AXIS Inteligência Patrimonial · ${p.codigo_axis || ''} · Gerado em ${new Date().toLocaleDateString('pt-BR')}</span>
@@ -324,9 +352,22 @@ export function exportarPDFImovel(p) {
   <div class="section">
     <div class="section-title">🏘️ Comparáveis (${p.comparaveis.length})</div>
     ${p.comparaveis.slice(0, 5).map(c => `
-      <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f0f0f0;font-size:10.5px">
-        <span>${c.endereco || c.titulo || '—'}</span>
-        <span style="font-weight:600">${c.preco_m2 ? `R$ ${c.preco_m2}/m²` : (c.valor ? fmt(c.valor) : '—')}</span>
+      <div style="border:1px solid #e5e7eb;border-radius:6px;padding:8px 10px;margin-bottom:6px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div style="flex:1">
+            <div style="font-weight:600;font-size:11px;color:#002B80">${c.descricao || c.endereco || c.titulo || '—'}</div>
+            <div style="font-size:9.5px;color:#666;margin-top:2px">
+              ${c.area_m2 ? `${c.area_m2}m²` : ''} ${c.quartos ? `· ${c.quartos}q` : ''} ${c.vagas ? `· ${c.vagas}v` : ''} ${c.tipo ? `· ${c.tipo}` : ''}
+              ${c.fonte ? `· ${c.fonte}` : ''}
+              ${c.similaridade ? ` · ${Number(c.similaridade).toFixed(1)} compat.` : ''}
+            </div>
+            ${c.link ? `<div style="font-size:9px;margin-top:2px"><a href="${c.link}" style="color:#0D9488;text-decoration:none">🔗 ${c.link.substring(0, 50)}...</a></div>` : ''}
+          </div>
+          <div style="text-align:right;flex-shrink:0;margin-left:10px">
+            <div style="font-weight:700;font-size:13px;color:#0D9488">${c.valor ? `${(c.valor/1000).toFixed(0)}K` : '—'}</div>
+            ${c.preco_m2 ? `<div style="font-size:9px;color:#666">R$ ${Number(c.preco_m2).toLocaleString('pt-BR')}/m²</div>` : ''}
+          </div>
+        </div>
       </div>
     `).join('')}
   </div>` : ''}
@@ -346,16 +387,18 @@ export function exportarPDFImovel(p) {
       ).join('')}
     </div>
     <div class="card">
-      <div class="card-title">🏗️ Atributos</div>
+      <div class="card-title">🏗️ Atributos & Homogeneização</div>
       ${[
-        ['Elevador', p.elevador != null ? (p.elevador ? '✓' : '✗') : null],
-        ['Piscina', p.piscina != null ? (p.piscina ? '✓' : '✗') : null],
-        ['Área lazer', p.area_lazer != null ? (p.area_lazer ? '✓' : '✗') : null],
-        ['Salão festas', p.salao_festas != null ? (p.salao_festas ? '✓' : '✗') : null],
-        ['Idade prédio', p.idade_predio ? `${p.idade_predio} anos` : null],
-        ['Condomínio', p.condominio_mensal ? `R$ ${p.condominio_mensal}/mês` : null],
-      ].filter(([,v]) => v != null).map(([l,v]) =>
-        `<div class="row"><span class="row-label">${l}</span><span class="row-value">${v}</span></div>`
+        ['Elevador', p.elevador != null ? (p.elevador ? '✓ Sim' : '✗ Não (-13%)') : null, p.elevador === false ? 'red' : 'green'],
+        ['Piscina', p.piscina != null ? (p.piscina ? '✓ Sim' : '✗ Não (-3%)') : null, p.piscina === false ? 'red' : 'green'],
+        ['Área lazer', p.area_lazer != null ? (p.area_lazer ? '✓ Sim' : '✗ Não (-5%)') : null, p.area_lazer === false ? 'red' : 'green'],
+        ['Salão festas', p.salao_festas != null ? (p.salao_festas ? '✓ Sim' : '✗ Não (-3%)') : null, p.salao_festas === false ? 'red' : 'green'],
+        ['Condomínio', p.condominio_mensal ? `R$ ${Number(p.condominio_mensal).toLocaleString('pt-BR')}/mês` : null, ''],
+        ['Idade prédio', p.idade_predio ? `${p.idade_predio} anos` : null, ''],
+        ['Fator homog.', p.fator_homogenizacao && p.fator_homogenizacao < 1 ? `${(p.fator_homogenizacao * 100).toFixed(0)}% (NBR 14653)` : null, 'amber'],
+        ['Valor homog.', p.valor_mercado_homogenizado ? fmt(p.valor_mercado_homogenizado) : null, 'navy'],
+      ].filter(([,v]) => v != null).map(([l,v,c]) =>
+        `<div class="row"><span class="row-label">${l}</span><span class="row-value ${c}">${v}</span></div>`
       ).join('')}
     </div>
   </div>
