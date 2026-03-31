@@ -5,6 +5,7 @@ import { supabase } from "../lib/supabase.js"
 // trelloService: import dinâmico em handleTrello
 import CalculadoraROI from "./CalculadoraROI.jsx"
 import { CLASSES_MERCADO_REFORMA, calcularCustoReforma, detectarClasseMercado } from "../data/custos_reforma.js"
+import { CUSTO_M2_SINAPI, ESCOPOS as ESCOPOS_REFORMA, FATOR_VALORIZACAO, detectarClasse as detectarClasseReforma } from "../lib/reformaUnificada.js"
 import PainelLeilao from './PainelLeilao.jsx'
 const AbaJuridicaAgente = lazy(() => import('./AbaJuridicaAgente.jsx'))
 import { buscarArrematesSimilares, carregarCacheArremates } from '../lib/buscaArrematesGPT.js'
@@ -906,49 +907,57 @@ export default function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze
     })
   }, [p?.id])
 
-  // Buscar oportunidades de leilão similares (para mercado direto)
+  // Buscar oportunidades melhores (leilão + mercado mais barato)
   useEffect(() => {
-    if (!p?.id || !isMercadoDireto(p.fonte_url, p.tipo_transacao)) return
+    if (!p?.id) return
     const tipo = (p.tipo || p.tipologia || 'apartamento').toLowerCase()
     const area = parseFloat(p.area_privativa_m2 || p.area_m2) || 0
-    const cidade = (p.cidade || 'Belo Horizonte').trim()
+    const precoRef = parseFloat(p.preco_pedido || p.valor_minimo) || 0
+    const eMercado = isMercadoDireto(p.fonte_url, p.tipo_transacao)
     import('../lib/supabase.js').then(async ({ supabase: sb }) => {
       try {
-        let query = sb.from('imoveis')
-          .select('id,titulo,bairro,cidade,area_m2,area_privativa_m2,quartos,vagas,valor_minimo,valor_avaliacao,preco_m2_imovel,score_total,recomendacao,foto_principal,fonte_url,tipo_transacao,num_leilao,data_leilao,desconto_percentual')
+        // Buscar todos os imóveis (não filtrar por cidade — buscar regional MG)
+        const { data } = await sb.from('imoveis')
+          .select('id,titulo,bairro,cidade,area_m2,area_privativa_m2,quartos,vagas,valor_minimo,valor_avaliacao,preco_m2_imovel,score_total,recomendacao,foto_principal,fonte_url,tipo_transacao,num_leilao,data_leilao,desconto_percentual,preco_pedido')
           .neq('id', p.id)
-          .or('tipo_transacao.eq.leilao,tipo_transacao.is.null')
-          .ilike('cidade', `%${cidade}%`)
           .gt('valor_minimo', 0)
           .order('score_total', { ascending: false })
-          .limit(20)
-        const { data } = await query
+          .limit(50)
         if (!data?.length) return
-        // Filtrar e ranquear por similaridade
         const scored = data.map(im => {
           let sim = 0
           const areaIm = parseFloat(im.area_privativa_m2 || im.area_m2) || 0
-          // Mesmo tipo? (+3)
           const tipoIm = (im.titulo || '').toLowerCase()
+          const precoIm = parseFloat(im.preco_pedido || im.valor_minimo) || 0
+          // Mesmo tipo? (+3)
           if (tipo.includes('apart') && tipoIm.includes('apart')) sim += 3
           else if (tipo.includes('casa') && tipoIm.includes('casa')) sim += 3
-          // Área similar ±30%? (+3)
-          if (area > 0 && areaIm > 0 && Math.abs(areaIm - area) / area < 0.30) sim += 3
+          // Área similar ±40%? (+2)
+          if (area > 0 && areaIm > 0 && Math.abs(areaIm - area) / area < 0.40) sim += 2
           // Mesmos quartos? (+2)
-          if (p.quartos && im.quartos && p.quartos === im.quartos) sim += 2
-          // Mesmo bairro? (+2)
-          if (p.bairro && im.bairro && p.bairro.toLowerCase() === im.bairro.toLowerCase()) sim += 2
-          // Preço menor que o pedido? (+1)
-          if (im.valor_minimo < (p.preco_pedido || p.valor_minimo)) sim += 1
+          if (p.quartos && im.quartos && parseInt(p.quartos) === parseInt(im.quartos)) sim += 2
+          // Mesma cidade? (+2) ou RMBH (+1)
+          const cidadeIm = (im.cidade || '').toLowerCase()
+          const cidadeP = (p.cidade || '').toLowerCase()
+          if (cidadeIm === cidadeP) sim += 2
+          else if (['belo horizonte','contagem','betim','nova lima','santa luzia','sabará','ribeirão das neves'].some(c => cidadeIm.includes(c))) sim += 1
+          // Preço menor? (+2 se leilão, +1 se mercado)
+          if (precoIm < precoRef) {
+            sim += (im.tipo_transacao !== 'mercado_direto') ? 2 : 1
+          }
+          // Score alto? (+1)
+          if ((im.score_total || 0) >= 7) sim += 1
           // Economia
-          const economia = (p.preco_pedido || p.valor_minimo || 0) - (im.valor_minimo || 0)
-          return { ...im, _similaridade: sim, _economia: economia, _area: areaIm }
+          const economia = precoRef - precoIm
+          // Tag: leilão ou mercado
+          const isLeilao = im.tipo_transacao !== 'mercado_direto'
+          return { ...im, _similaridade: sim, _economia: economia, _area: areaIm, _isLeilao: isLeilao }
         })
-        .filter(im => im._similaridade >= 3)
+        .filter(im => im._similaridade >= 4 && im._economia > 0) // mínimo 4 pontos e mais barato
         .sort((a, b) => b._similaridade - a._similaridade || b._economia - a._economia)
-        .slice(0, 3)
+        .slice(0, 5)
         setOportunidadesLeilao(scored)
-      } catch(e) { console.warn('[AXIS] Oportunidades leilão:', e.message) }
+      } catch(e) { console.warn('[AXIS] Oportunidades:', e.message) }
     })
   }, [p?.id, p?.fonte_url, p?.tipo_transacao])
 
@@ -1441,59 +1450,62 @@ for (const s of SCORES) {
             </div>
           </div>
         )}
-        {/* Oportunidades de leilão similares */}
-        {isMercadoDireto(p.fonte_url, p.tipo_transacao) && oportunidadesLeilao.length > 0 && (
-          <div style={{...card(),marginBottom:14,padding:'14px',background:'#FFF1F2',border:'1.5px solid #FDA4AF'}}>
-            <div style={{fontSize:12,fontWeight:700,color:'#9F1239',marginBottom:10}}>
-              🏆 Oportunidades em Leilão — Imóveis Similares
+        {/* Oportunidades melhores — leilão e mercado mais barato */}
+        {oportunidadesLeilao.length > 0 && (
+          <div style={{...card(),marginBottom:14,padding:'14px',background:'#F0FDF4',border:'1.5px solid #86EFAC'}}>
+            <div style={{fontSize:12,fontWeight:700,color:'#065F46',marginBottom:10}}>
+              🏆 Oportunidades Melhores — Imóveis Similares Mais Baratos
             </div>
-            <div style={{fontSize:11,color:'#881337',marginBottom:10,lineHeight:1.5}}>
-              Encontramos {oportunidadesLeilao.length} imóve{oportunidadesLeilao.length > 1 ? 'is' : 'l'} em leilão com características similares na mesma cidade, com preços potencialmente menores.
+            <div style={{fontSize:11,color:'#047857',marginBottom:10,lineHeight:1.5}}>
+              {oportunidadesLeilao.length} imóve{oportunidadesLeilao.length > 1 ? 'is' : 'l'} com características similares e preço menor na RMBH.
             </div>
-            {oportunidadesLeilao.map((op, i) => {
+            {oportunidadesLeilao.map((op) => {
               const areaOp = parseFloat(op.area_privativa_m2 || op.area_m2) || 0
               return (
                 <div key={op.id} onClick={() => onNav && onNav('detail', { id: op.id })}
                   style={{padding:'10px 12px',borderRadius:8,marginBottom:6,cursor:'pointer',
-                    background:'#fff',border:'1px solid #FECDD3',transition:'all .15s'}}
-                  onMouseEnter={e => e.currentTarget.style.borderColor = '#F43F5E'}
-                  onMouseLeave={e => e.currentTarget.style.borderColor = '#FECDD3'}>
+                    background:'#fff',border:`1px solid ${op._isLeilao ? '#FDE68A' : '#BBF7D0'}`,transition:'all .15s'}}
+                  onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-1px)'}
+                  onMouseLeave={e => e.currentTarget.style.transform = 'none'}>
                   <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8}}>
                     <div style={{flex:1,minWidth:0}}>
+                      <div style={{display:'flex',gap:4,alignItems:'center',marginBottom:3}}>
+                        <span style={{fontSize:9,fontWeight:700,padding:'1px 6px',borderRadius:3,
+                          background:op._isLeilao ? '#FEF3C7' : '#DBEAFE',
+                          color:op._isLeilao ? '#92400E' : '#1D4ED8'}}>
+                          {op._isLeilao ? `🔨 ${op.num_leilao || ''}º LEILÃO` : '🏠 MERCADO'}
+                        </span>
+                        {op.score_total >= 7 && <span style={{fontSize:9,fontWeight:700,color:'#065F46'}}>⭐ {op.score_total.toFixed(1)}</span>}
+                      </div>
                       <div style={{fontSize:12,fontWeight:700,color:C.navy,marginBottom:2,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
-                        {op.titulo || 'Imóvel em leilão'}
+                        {op.titulo || 'Imóvel'}
                       </div>
-                      <div style={{fontSize:10,color:C.muted,marginBottom:4}}>
+                      <div style={{fontSize:10,color:C.muted}}>
                         📍 {op.bairro || '—'}, {op.cidade}
-                        {op.num_leilao && <span style={{marginLeft:6,padding:'1px 5px',borderRadius:3,background:'#FEF3C7',color:'#92400E',fontSize:9,fontWeight:600}}>{op.num_leilao}º leilão</span>}
                       </div>
-                      <div style={{display:'flex',gap:8,flexWrap:'wrap',fontSize:10,color:C.hint}}>
+                      <div style={{display:'flex',gap:8,flexWrap:'wrap',fontSize:10,color:C.hint,marginTop:2}}>
                         {areaOp > 0 && <span>📐 {areaOp}m²</span>}
                         {op.quartos > 0 && <span>🛏 {op.quartos}q</span>}
                         {op.vagas > 0 && <span>🚗 {op.vagas}v</span>}
-                        {op.desconto_percentual > 0 && <span style={{color:'#065F46',fontWeight:600}}>↓ {op.desconto_percentual}% desc.</span>}
-                        {op.score_total > 0 && <span>⭐ {op.score_total.toFixed(1)}</span>}
+                        {op.desconto_percentual > 0 && <span style={{color:'#065F46',fontWeight:600}}>↓{op.desconto_percentual}%</span>}
                       </div>
                     </div>
                     <div style={{textAlign:'right',flexShrink:0}}>
-                      <div style={{fontSize:14,fontWeight:800,color:'#E11D48'}}>
+                      <div style={{fontSize:14,fontWeight:800,color:op._isLeilao ? '#D97706' : '#1D4ED8'}}>
                         R$ {Math.round(op.valor_minimo / 1000)}k
                       </div>
                       {op._economia > 0 && (
                         <div style={{fontSize:10,fontWeight:700,color:'#065F46',marginTop:2}}>
-                          💰 -{Math.round(op._economia / 1000)}k
+                          💰 -{Math.round(op._economia / 1000)}k economia
                         </div>
                       )}
-                      <div style={{fontSize:9,color:C.hint,marginTop:1}}>
-                        {op.preco_m2_imovel ? `R$ ${Math.round(op.preco_m2_imovel).toLocaleString('pt-BR')}/m²` : ''}
-                      </div>
                     </div>
                   </div>
                 </div>
               )
             })}
-            <div style={{fontSize:9,color:'#9F1239',marginTop:6,lineHeight:1.4}}>
-              ⚠️ Leilão envolve riscos adicionais (ocupação, débitos, prazo). Clique no imóvel para ver análise completa.
+            <div style={{fontSize:9,color:'#065F46',marginTop:6,lineHeight:1.4}}>
+              Clique para ver análise completa. Leilões envolvem riscos adicionais (ocupação, débitos, prazo).
             </div>
           </div>
         )}
@@ -1506,34 +1518,35 @@ for (const s of SCORES) {
       <div style={{...card(),marginBottom:"14px"}}>
         <CalculadoraROI imovel={p} />
       </div>
-      {/* Plano de Reforma — SINAPI Real */}
+      {/* Plano de Reforma — SINAPI Unificado (mesma fonte dos painéis) */}
       {(() => {
-        const area = p.area_m2 || p.area_privativa || 60
-        const preco_m2 = p.preco_m2_mercado || (p.valor_mercado && area ? p.valor_mercado / area : 0)
-        const classe = detectarClasseMercado(p.regiao_mercado, preco_m2)
+        const area = parseFloat(p.area_privativa_m2 || p.area_m2) || 60
+        const preco_m2 = parseFloat(p.preco_m2_mercado) || 7000
+        const classe = detectarClasseReforma(preco_m2)
+        const classeLabels = { A_prime:'A — Prime', B_medio_alto:'B — Médio-Alto', C_intermediario:'C — Intermediário', D_popular:'D — Popular' }
         const escopos = ['refresh_giro','leve_funcional','leve_reforcada_1_molhado']
         return (
           <div style={{...card(),marginBottom:"14px"}}>
             <div style={{fontWeight:"600",color:K.wh,marginBottom:"12px",fontSize:"13px"}}>🏗️ Plano de Reforma — Custos SINAPI</div>
-            <div style={{fontSize:11,color:K.t2,marginBottom:10}}>Classe: <strong style={{color:K.tx}}>{classe.label}</strong> · Área: {area} m²</div>
+            <div style={{fontSize:11,color:K.t2,marginBottom:10}}>Classe: <strong style={{color:K.tx}}>{classeLabels[classe] || classe}</strong> · Área: {area} m²</div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
               {escopos.map(esc => {
-                const r = calcularCustoReforma({area_m2:area, escopo:esc, regiao_mercado:p.regiao_mercado, preco_m2_atual:preco_m2})
-                if(!r) return null
+                const custoM2 = CUSTO_M2_SINAPI[esc]?.[classe] || 0
+                const custoBase = Math.round(area * custoM2)
+                const escInfo = ESCOPOS_REFORMA?.find(e => e.id === esc)
+                const fatorVal = FATOR_VALORIZACAO[esc] || 1.0
                 const isRefresh = esc === 'refresh_giro'
                 return (
                   <div key={esc} style={{background:isRefresh?K.s2:C.white,borderRadius:10,padding:12,border:`1px solid ${isRefresh?K.teal+'30':C.borderW}`}}>
-                    <div style={{fontSize:11,fontWeight:600,color:isRefresh?K.teal:K.tx,marginBottom:6}}>{r.classe_label?.split(' — ')[1] || esc.replace(/_/g,' ')}</div>
-                    <div style={{fontSize:10,color:K.t2,marginBottom:4}}>R$ {r.custo_m2_min}–{r.custo_m2_max}/m²</div>
-                    <div style={{fontSize:16,fontWeight:700,color:K.tx}}>{fmtC(r.custo_total_final)}</div>
-                    <div style={{fontSize:9,color:K.t3,marginTop:4}}>+contingência 12% · +logística 15%</div>
-                    <div style={{fontSize:9,color:K.teal,marginTop:2}}>Valorização: +{((r.fator_valorizacao-1)*100).toFixed(0)}%</div>
+                    <div style={{fontSize:11,fontWeight:600,color:isRefresh?K.teal:K.tx,marginBottom:6}}>{escInfo?.label || esc.replace(/_/g,' ')}</div>
+                    <div style={{fontSize:10,color:K.t2,marginBottom:4}}>R$ {custoM2}/m²</div>
+                    <div style={{fontSize:16,fontWeight:700,color:K.tx}}>{fmtC(custoBase)}</div>
+                    <div style={{fontSize:9,color:K.teal,marginTop:4}}>Valorização: +{((fatorVal-1)*100).toFixed(0)}%</div>
                   </div>
                 )
               })}
             </div>
-            {classe.observacao && <div style={{fontSize:10,color:K.t3,marginTop:8,fontStyle:"italic"}}>💡 {classe.observacao}</div>}
-            <div style={{fontSize:9,color:K.t3,marginTop:6,borderTop:`1px solid ${C.borderW}`,paddingTop:6}}>Fonte: SINAPI MG jun/2025 · Lar Pontual SP 2026 ajustado MG · Preço da Obra</div>
+            <div style={{fontSize:9,color:K.t3,marginTop:6,borderTop:`1px solid ${C.borderW}`,paddingTop:6}}>Fonte: SINAPI MG 2026 · Valores idênticos aos painéis de Rentabilidade e Cenários</div>
           </div>
         )
       })()}
