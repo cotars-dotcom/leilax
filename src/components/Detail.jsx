@@ -12,6 +12,8 @@ import PainelLancamento from './PainelLancamento.jsx'
 import PainelRentabilidade from './PainelRentabilidade.jsx'
 import { isMercadoDireto } from '../lib/detectarFonte.js'
 import CenariosReforma from './CenariosReforma.jsx'
+import CustosReaisEditor from './CustosReaisEditor.jsx'
+import { exportarPDFImovel } from './ExportarPDF.jsx'
 
 const ESCOPOS_INFO = {
   refresh_giro: {
@@ -1136,6 +1138,7 @@ for (const s of SCORES) {
               </button>
             </>}
         {isAdmin&&<button style={btn("trello")} onClick={sendTrello} disabled={sending}>{sending?"Enviando...":"🔷 Trello"}</button>}
+        <button onClick={() => exportarPDFImovel(p)} style={{...btn("s"),background:'#7C3AED12',color:'#7C3AED',border:'1px solid #7C3AED30'}}>📄 PDF</button>
         <button onClick={() => setModoAoVivo(true)} style={{
           padding:'5px 12px', borderRadius:8,
           background:'#E5484D', color:'#fff',
@@ -1342,6 +1345,7 @@ for (const s of SCORES) {
             </div>
           </div>
         )}
+        <CustosReaisEditor imovel={p} onUpdateProp={onUpdateProp} isAdmin={isAdmin} />
         <PainelRentabilidade imovel={p}/>
       {/* Cenários de Reforma */}
       <CenariosReforma imovel={p} isAdmin={isAdmin} />
