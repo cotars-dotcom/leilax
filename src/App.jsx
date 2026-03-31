@@ -623,15 +623,17 @@ function NovoImovel({onSave,onCancel,onNav,trello,parametrosBanco,criteriosBanco
         if (info.links.length > 0 || imoveisGrounding.length > 0) {
           const totalImoveis = info.links.length || imoveisGrounding.length
           const precoInfo = imoveisGrounding.length > 0
-            ? imoveisGrounding.map(im => `R$ ${(im.preco||0).toLocaleString('pt-BR')} · ${im.area_m2||'?'}m² · ${im.quartos||'?'}q`).join('\n')
+            ? imoveisGrounding.map((im,i) => `${i+1}. R$ ${(im.preco||0).toLocaleString('pt-BR')} · ${im.area_m2||'?'}m² · ${im.quartos||'?'}q · ${im.vagas||'?'}v`).join('\n')
             : (info.precoMinimo > 0 ? `A partir de R$ ${info.precoMinimo.toLocaleString('pt-BR')}` : '')
+          const alugInfo = info.aluguelReferencia ? `\n📊 Ref. aluguel no prédio: R$ ${info.aluguelReferencia.toLocaleString('pt-BR')}/mês` : ''
           const confirmar = window.confirm(
             `🏢 ${info.condominio || 'Condomínio'}\n` +
             `📍 ${info.endereco || info.bairro || ''} ${info.cidade ? '— ' + info.cidade : ''}\n` +
-            `${precoInfo ? '\n' + precoInfo + '\n' : ''}` +
-            `\n🔗 ${totalImoveis} apartamento(s) encontrado(s).\n\n` +
-            `Analisar ${totalImoveis === 1 ? 'este imóvel' : 'todos os ' + totalImoveis + ' imóveis'} individualmente?\n` +
-            `(Cada um terá seu próprio card com score)`
+            `${precoInfo ? '\n🏠 Imóveis para COMPRA:\n' + precoInfo + '\n' : ''}` +
+            `${alugInfo}\n` +
+            `\n✅ ${totalImoveis} apartamento(s) para compra encontrado(s).\n` +
+            `${info.aluguelReferencia ? '(Aluguel do prédio será usado como referência de yield)\n' : ''}` +
+            `\nAnalisar ${totalImoveis === 1 ? 'este imóvel' : 'todos os ' + totalImoveis} individualmente?`
           )
           if (confirmar) {
             setLoading(true)
@@ -646,6 +648,13 @@ function NovoImovel({onSave,onCancel,onNav,trello,parametrosBanco,criteriosBanco
                   const data = await _analisarImovelCompleto(info.links[i], claudeKeyReal, openaiKey, parametrosBanco, criteriosBanco, (msg) => setStep(`[${i+1}/${info.links.length}] ${msg}`), [], null, null)
                   data.fonte_url = info.links[i]
                   if (!data.tipo_transacao) data.tipo_transacao = 'mercado_direto'
+                  // Usar aluguel de referência do condomínio se disponível
+                  if (info.aluguelReferencia && (!data.aluguel_mensal_estimado || data.aluguel_mensal_estimado === 0)) {
+                    data.aluguel_mensal_estimado = info.aluguelReferencia
+                  }
+                  if (info.condominioMensal && !data.condominio_mensal) {
+                    data.condominio_mensal = info.condominioMensal
+                  }
                   const precoOk = parseFloat(data.valor_minimo || data.preco_pedido) > 0
                   const tituloOk = data.titulo && data.titulo.length > 5
                   if (precoOk || tituloOk) {
@@ -680,22 +689,26 @@ function NovoImovel({onSave,onCancel,onNav,trello,parametrosBanco,criteriosBanco
                     showToast(`✓ [${i+1}/${imoveisGrounding.length}] ${data.titulo?.substring(0,40)||im.descricao||'Imóvel'}`)
                   } else {
                     // Sem link → criar card com dados do Grounding diretamente
+                    const alugRef = info.aluguelReferencia || (im.preco ? Math.round(im.preco * 0.005) : 0)
                     const property = {
                       id: uid(), createdAt: new Date().toISOString(),
-                      titulo: `${im.descricao || 'Apartamento'} — ${info.condominio}`,
+                      titulo: `Apt ${im.quartos||''}q ${im.area_m2||''}m² — ${info.bairro||info.condominio}, ${info.cidade||'Contagem'}`,
                       tipo_transacao: 'mercado_direto',
                       fonte_url: urlTrimmed,
                       preco_pedido: im.preco || 0, valor_minimo: im.preco || 0,
-                      area_m2: im.area_m2 || 0, quartos: im.quartos || 0, vagas: im.vagas || 0,
+                      area_m2: im.area_m2 || 0, area_privativa_m2: im.area_m2 || 0,
+                      quartos: im.quartos || 0, vagas: im.vagas || 0,
                       bairro: info.bairro || '', cidade: info.cidade || 'Contagem', estado: 'MG',
                       endereco: info.endereco || '',
                       tipo: 'Apartamento', tipologia: 'apartamento_padrao',
-                      aluguel_mensal_estimado: im.preco ? Math.round(im.preco * 0.005) : 0,
+                      aluguel_mensal_estimado: alugRef,
+                      condominio_mensal: info.condominioMensal || null,
                       valor_mercado_estimado: im.preco || 0,
                       preco_m2_imovel: im.area_m2 > 0 ? Math.round((im.preco||0) / im.area_m2) : 0,
+                      preco_m2_mercado: im.area_m2 > 0 ? Math.round((im.preco||0) / im.area_m2) : 0,
                       score_total: 0, recomendacao: 'AGUARDAR',
                       _modelo_usado: 'gemini-grounding-condominio',
-                      alertas: ['[INFO] Dados extraídos via Gemini Grounding — reanalisar para score completo'],
+                      alertas: ['[INFO] Dados via Gemini Grounding — reanalisar para score completo'],
                     }
                     await onSave(property)
                     showToast(`✓ [${i+1}/${imoveisGrounding.length}] ${im.descricao||'Imóvel'} · R$ ${(im.preco||0).toLocaleString('pt-BR')}`)
@@ -975,14 +988,25 @@ function PropCard({p,onNav}) {
       </div>
     )}
 
-    {/* Header: título */}
+    {/* Header: título padronizado */}
     <div style={{marginBottom:3}}>
-      <div style={{fontWeight:"700",fontSize:isPhone?"13px":"13.5px",color:K.wh,lineHeight:1.3}}>{p.titulo||"Imóvel sem título"}</div>
+      <div style={{fontWeight:"700",fontSize:isPhone?"13px":"13.5px",color:K.wh,lineHeight:1.3}}>{(()=>{
+        // Título curto padronizado: "Apt 2q 43m² — Bairro, Cidade" ou título original se curto
+        const t = p.titulo || 'Imóvel sem título'
+        if (t.length <= 45) return t
+        const tipo = (p.tipo||'').toLowerCase().includes('casa') ? 'Casa' : (p.tipo||'').toLowerCase().includes('cobertura') ? 'Cobertura' : (p.tipo||'').toLowerCase().includes('sala') ? 'Sala' : 'Apt'
+        const area = p.area_privativa_m2 || p.area_m2
+        const parts = [tipo]
+        if (p.quartos) parts.push(`${p.quartos}q`)
+        if (area) parts.push(`${area}m²`)
+        const local = [p.bairro, p.cidade].filter(Boolean).join(', ')
+        return local ? `${parts.join(' ')} — ${local}` : parts.join(' ')
+      })()}</div>
     </div>
 
-    {/* Localização + tipo + área */}
+    {/* Resumo: bairro · tipo · área · quartos · vagas */}
     <div style={{fontSize:"10.5px",color:K.t3,marginBottom:6}}>
-      📍 {[p.bairro,p.cidade].filter(Boolean).join(', ')}/{p.estado} · {tipFmt} · {(p.area_privativa_m2||p.area_m2)||'—'}m²
+      📍 {[p.bairro,p.cidade].filter(Boolean).join(', ')}/{p.estado} · {tipFmt} · {(p.area_privativa_m2||p.area_m2)||'—'}m²{p.quartos ? ` · ${p.quartos}q` : ''}{p.suites ? ` · ${p.suites}s` : ''}{p.vagas ? ` · ${p.vagas}v` : ''}
     </div>
 
     {/* Data do leilão — oculto para mercado */}

@@ -57,6 +57,18 @@ function gerarHTML(p) {
     p.portaria_24h && ['Portaria 24h', true, '✓'],
   ].filter(Boolean)
 
+  // Título padronizado
+  const tituloCurto = (() => {
+    const t = p.titulo || 'Imóvel'
+    if (t.length <= 50) return t
+    const tipo = (p.tipo||'').toLowerCase().includes('casa') ? 'Casa' : (p.tipo||'').toLowerCase().includes('cobertura') ? 'Cobertura' : (p.tipo||'').toLowerCase().includes('sala') ? 'Sala Comercial' : 'Apartamento'
+    const parts = [tipo]
+    if (p.quartos) parts.push(`${p.quartos} quartos`)
+    if (area) parts.push(`${area}m²`)
+    const local = [p.bairro, p.cidade].filter(Boolean).join(', ')
+    return local ? `${parts.join(' · ')} — ${local}` : parts.join(' · ')
+  })()
+
   let _hostname = ''
   try { if (p.fonte_url) _hostname = new URL(p.fonte_url).hostname } catch {}
 
@@ -65,7 +77,7 @@ function gerarHTML(p) {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>AXIS · ${p.codigo_axis || ''} · ${p.titulo || 'Imóvel'}</title>
+<title>AXIS · ${p.codigo_axis || ''} · ${tituloCurto}</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Segoe UI','Inter',system-ui,sans-serif;font-size:13px;color:#1a1a2e;background:#f8f7f4;line-height:1.5}
@@ -145,10 +157,10 @@ ${(p.fotos?.length > 1) ? `<div style="display:flex;gap:6px;overflow-x:auto;marg
 </div>` : ''}
 <div class="hdr">
   <div>
-    <h1>${p.titulo || 'Imóvel'}</h1>
+    <h1>${tituloCurto}</h1>
     <div class="sub">
       ${p.codigo_axis ? `<strong>${p.codigo_axis}</strong> · ` : ''}📍 ${[p.bairro, p.cidade].filter(Boolean).join(', ')}/${p.estado || 'MG'}
-      · ${area ? area + 'm²' : ''}${p.quartos ? ' · ' + p.quartos + 'q' : ''}${p.vagas ? ' · ' + p.vagas + 'v' : ''}
+      · ${area ? area + 'm²' : ''}${p.quartos ? ' · ' + p.quartos + 'q' : ''}${p.suites ? ' · ' + p.suites + 's' : ''}${p.vagas ? ' · ' + p.vagas + 'v' : ''}${p.condominio_mensal ? ' · Cond. R$ ' + Number(p.condominio_mensal).toLocaleString('pt-BR') : ''}
     </div>
     <div style="margin-top:6px">
       <span class="badge" style="background:${rec.bg};color:${rec.color}">${rec.text}</span>

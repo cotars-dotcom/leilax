@@ -29,15 +29,21 @@ ALERTAS CRÍTICOS DE IDENTIFICAÇÃO (APLIQUE SEMPRE):
 `
 
   const instrucaoTipo = eMercadoDireto ? `
-ATENÇÃO: Este é um imóvel de MERCADO DIRETO (não é leilão).
+ATENÇÃO MÁXIMA: Este é um imóvel de MERCADO DIRETO — NÃO É LEILÃO.
 - tipo_transacao = "mercado_direto"
 - valor_minimo = preço pedido pelo vendedor (não é lance mínimo)
-- num_leilao = null, data_leilao = null, modalidade_leilao = null
+- num_leilao = null, data_leilao = null, modalidade_leilao = null, leiloeiro = null
 - desconto_percentual = quanto o preço pedido está abaixo do valor real de mercado
+- NUNCA mencione "leilão judicial", "arrematação", "edital" ou "praça" na síntese ou justificativa
+- Na síntese, diga "compra de mercado" ou "oportunidade de mercado" em vez de "leilão"
+- score_juridico para mercado direto: avaliar documentação do imóvel (matrícula, IPTU)
 - Analise necessidade de reforma pelo padrão e idade estimada do imóvel
 - Score de desconto: positivo se preço pedido < mercado real homogeneizado
 ` : ''
-  return `${ALERTAS_CRITICOS}${instrucaoTipo}Você é especialista em leilões judiciais imobiliários no Brasil (BH/MG) e avaliação imobiliária.
+  const perfilIA = eMercadoDireto
+    ? 'Você é especialista em avaliação imobiliária e investimentos no Brasil (BH/MG).'
+    : 'Você é especialista em leilões judiciais imobiliários no Brasil (BH/MG) e avaliação imobiliária.'
+  return `${ALERTAS_CRITICOS}${instrucaoTipo}${perfilIA}
 Analise o imóvel e retorne APENAS JSON válido (sem markdown, sem texto extra).
 
 DADOS JÁ EXTRAÍDOS AUTOMATICAMENTE:
@@ -577,9 +583,30 @@ export async function analisarComGemini(url, geminiKey, parametros, onProgress, 
     analise.tipo_transacao = 'mercado_direto'
     analise.preco_pedido = analise.preco_pedido || analise.valor_minimo || 0
     // Limpar campos de leilão que não se aplicam
-    if (!analise.num_leilao) analise.num_leilao = null
-    if (!analise.data_leilao) analise.data_leilao = null
-    if (!analise.modalidade_leilao) analise.modalidade_leilao = null
+    analise.num_leilao = null
+    analise.data_leilao = null
+    analise.modalidade_leilao = null
+    analise.leiloeiro = null
+    // Limpar síntese/justificativa que mencionam leilão por engano
+    const leilaoTermos = /leil[ãa]o\s*judicial|arrematação|arrematante|edital|praça|lance\s*mínimo|leiloeiro/gi
+    if (analise.sintese_executiva && leilaoTermos.test(analise.sintese_executiva)) {
+      analise.sintese_executiva = analise.sintese_executiva
+        .replace(/leil[ãa]o\s*judicial/gi, 'compra de mercado')
+        .replace(/arrematação/gi, 'aquisição')
+        .replace(/arrematante/gi, 'comprador')
+        .replace(/edital/gi, 'anúncio')
+        .replace(/(?:1[ªº]|2[ªº])\s*praça/gi, 'negociação')
+        .replace(/lance\s*mínimo/gi, 'preço pedido')
+        .replace(/leiloeiro/gi, 'vendedor')
+    }
+    if (analise.justificativa && /leil[ãa]o|arrematação|edital|praça/i.test(analise.justificativa)) {
+      analise.justificativa = analise.justificativa
+        .replace(/leil[ãa]o\s*judicial/gi, 'compra de mercado')
+        .replace(/leil[ãa]o/gi, 'mercado')
+        .replace(/arrematação/gi, 'aquisição')
+        .replace(/edital/gi, 'anúncio')
+        .replace(/lance\s*mínimo/gi, 'preço pedido')
+    }
   }
 
   // PASSO 5b: Gerar links de busca para comparáveis sem link

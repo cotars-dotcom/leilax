@@ -389,21 +389,26 @@ export async function extrairLinksCondominio(url, geminiKey = null) {
   // 3. Se Jina não encontrou links → usar Gemini Grounding para buscar
   if (result.links.length === 0 && geminiKey) {
     try {
-      const prompt = `Preciso encontrar os links de ANÚNCIOS INDIVIDUAIS de apartamentos à venda no condomínio "${result.condominio}" em ${result.cidade || 'Minas Gerais'}.
+      const prompt = `Preciso encontrar os apartamentos À VENDA (COMPRA) no condomínio "${result.condominio}" em ${result.cidade || 'Minas Gerais'}.
 
 URL da página do condomínio: ${url}
 
-Busque no QuintoAndar os apartamentos disponíveis para COMPRA neste condomínio.
-Para cada apartamento encontrado, retorne o link individual (formato quintoandar.com.br/imovel/XXXXX), preço, área e quartos.
+REGRAS IMPORTANTES:
+1. Busque APENAS imóveis para COMPRA (não incluir os de aluguel)
+2. Se existir um imóvel para ALUGUEL no mesmo condomínio, use o valor como referência de aluguel (campo aluguel_referencia)
+3. Para cada apartamento de COMPRA, retorne link individual, preço, área, quartos, vagas
+4. Links do QuintoAndar devem estar no formato: quintoandar.com.br/imovel/XXXXX
 
 Retorne APENAS JSON válido:
 {
   "condominio": "nome do condomínio",
-  "endereco": "endereço completo",
+  "endereco": "endereço completo com rua e número",
   "cidade": "cidade",
   "bairro": "bairro",
+  "aluguel_referencia": 1100,
+  "condominio_mensal": 275,
   "imoveis": [
-    { "link": "https://www.quintoandar.com.br/imovel/XXXXX", "preco": 204000, "area_m2": 42, "quartos": 2, "vagas": 1, "descricao": "breve" }
+    { "link": "https://www.quintoandar.com.br/imovel/XXXXX", "preco": 204000, "area_m2": 42, "quartos": 2, "vagas": 1, "descricao": "breve descrição" }
   ]
 }`
 
@@ -431,8 +436,10 @@ Retorne APENAS JSON válido:
           if (parsed.endereco) result.endereco = parsed.endereco
           if (parsed.cidade) result.cidade = parsed.cidade
           if (parsed.bairro) result.bairro = parsed.bairro
+          if (parsed.aluguel_referencia) result.aluguelReferencia = parsed.aluguel_referencia
+          if (parsed.condominio_mensal) result.condominioMensal = parsed.condominio_mensal
           if (parsed.imoveis?.length) {
-            result._imoveis = parsed.imoveis // dados completos para uso direto
+            result._imoveis = parsed.imoveis
             for (const im of parsed.imoveis) {
               if (im.link && !result.links.includes(im.link)) result.links.push(im.link)
             }
