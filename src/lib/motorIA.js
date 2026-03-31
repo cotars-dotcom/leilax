@@ -762,6 +762,46 @@ export function validarECorrigirAnalise(analise) {
 
   // 1. Área usada para cálculo — corrigir se usou total/real em vez de privativa
   const areaReal = analise.area_real_total_m2 || analise.area_total_m2
+
+  // 0b. Validar/inferir atributos do prédio por heurísticas
+  // Se condomínio alto → provavelmente tem infraestrutura
+  const cond = parseFloat(analise.condominio_mensal) || 0
+  if (cond > 0) {
+    // Condomínio > R$600: provável elevador + piscina + lazer
+    if (cond >= 600 && analise.elevador == null) analise.elevador = true
+    if (cond >= 800 && analise.piscina == null) analise.piscina = true
+    if (cond >= 500 && analise.area_lazer == null) analise.area_lazer = true
+    if (cond >= 400 && analise.salao_festas == null) analise.salao_festas = true
+    // Condomínio < R$200: provavelmente walk-up simples
+    if (cond < 200 && analise.elevador == null) analise.elevador = false
+    if (cond < 200 && analise.piscina == null) analise.piscina = false
+  }
+  // Se piscina = true → elevador quase certo (prédio vertical com lazer)
+  if (analise.piscina === true && analise.elevador == null) {
+    analise.elevador = true
+    avisos.push('INFERIDO: piscina detectada → elevador = true (condomínio vertical)')
+  }
+  // Se portaria_24h = true → área lazer provável
+  if (analise.portaria_24h === true && analise.area_lazer == null) {
+    analise.area_lazer = true
+  }
+  // Se tem >3 andares → elevador provável (lei acessibilidade)
+  if (analise.andar && parseInt(analise.andar) >= 4 && analise.elevador == null) {
+    analise.elevador = true
+    avisos.push('INFERIDO: andar >= 4 → elevador = true')
+  }
+  // Verificar texto scrapeado para menções não captadas pelo regex
+  const textoLower = (analise._texto_scrapeado || '').toLowerCase()
+  if (textoLower && analise.piscina == null) {
+    if (/piscina|swimming|pool/i.test(textoLower)) analise.piscina = true
+  }
+  if (textoLower && analise.area_lazer == null) {
+    if (/churrasqueir|gourmet|playground|academia|fitness|quadra/i.test(textoLower)) analise.area_lazer = true
+  }
+  if (textoLower && analise.elevador == null) {
+    if (/elevador/i.test(textoLower)) analise.elevador = true
+    else if (/sem elevador|walk.?up|escada/i.test(textoLower)) analise.elevador = false
+  }
   const areaPriv = analise.area_privativa_m2
   if (areaReal && areaPriv && analise.area_usada_calculo_m2 === areaReal) {
     analise.area_usada_calculo_m2 = areaPriv
@@ -1340,16 +1380,20 @@ DADOS DE BAIRRO (parcial):
     // Homogeneização: calcular e salvar fator se não veio da IA
     if (!analise.fator_homogenizacao || analise.fator_homogenizacao >= 1) {
       let fh = 1.0
-      if (analise.elevador === false) fh *= 0.87
+      if (analise.elevador === false) fh *= 0.85  // -15% (NBR 14653 central)
       if (analise.piscina === false) fh *= 0.97
       if (analise.area_lazer === false) fh *= 0.95
       if ((analise.vagas || 0) === 0) fh *= 0.90
       if (fh < 1.0) analise.fator_homogenizacao = parseFloat(fh.toFixed(4))
     }
-    // Calibrar valor_mercado_homogenizado
-    if (dadosBairroCalib.precoContratoM2 && analise.area_m2 && !analise.valor_mercado_homogenizado) {
+    // Calibrar valor_mercado_homogenizado — aplicar sobre preço ANÚNCIO, não contrato
+    // Evita dupla penalização: contrato já embute ~15-20% de desconto
+    if (dadosBairroCalib.precoAnuncioM2 && analise.area_m2 && !analise.valor_mercado_homogenizado) {
       const fh = analise.fator_homogenizacao || 1.0
-      analise.valor_mercado_homogenizado = Math.round(dadosBairroCalib.precoContratoM2 * analise.area_m2 * fh)
+      analise.valor_mercado_homogenizado = Math.round(dadosBairroCalib.precoAnuncioM2 * analise.area_m2 * fh)
+    } else if (dadosBairroCalib.precoContratoM2 && analise.area_m2 && !analise.valor_mercado_homogenizado) {
+      // Fallback: se só tem contrato, NÃO aplicar fator (já está descontado)
+      analise.valor_mercado_homogenizado = Math.round(dadosBairroCalib.precoContratoM2 * analise.area_m2)
     }
     // Calibrar aluguel com dados reais do bairro
     if (dadosBairroCalib.precoContratoM2 && analise.area_m2 && !analise.aluguel_mensal_estimado) {

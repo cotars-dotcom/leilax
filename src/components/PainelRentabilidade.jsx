@@ -10,7 +10,7 @@ const GREEN = '#065F46', RED = '#991B1B', GOLD = '#92400E'
 
 // Fatores de homogeneização NBR 14653 (fonte: pesquisa mercado BH 2025-2026)
 const FATORES_ATRIBUTOS = {
-  sem_elevador: 0.87,   // -13% (MRV/CNN Brasil média nacional)
+  sem_elevador: 0.85,   // -15% (NBR 14653, validação AXIS: central 0.85, térreo 0.90, andar alto 0.80)
   sem_piscina:  0.97,   // -3%
   sem_lazer:    0.95,   // -5%
   sem_salao:    0.97,   // -3%
@@ -292,7 +292,7 @@ export default function PainelRentabilidade({ imovel }) {
           <div style={{ display:'flex', gap:6, flexWrap:'wrap', padding:'8px 10px',
             background:C.surface, borderRadius:7, border:`1px solid ${C.borderW}` }}>
             {[
-              ['Elevador', elevador, -13],
+              ['Elevador', elevador, -15],
               ['Piscina', piscina, -3],
               ['Área lazer', area_lazer, -5],
               ['Salão festas', salao_festas, -3],
@@ -391,9 +391,10 @@ export default function PainelRentabilidade({ imovel }) {
 
       {/* Nota */}
       <div style={{ marginTop:8, fontSize:9, color:C.hint, lineHeight:1.5 }}>
-        Homogeneização venda: sem elevador -13% · sem piscina -3% · sem lazer -5% · sem vaga -10% (NBR 14653/IBAPE).
+        Homogeneização venda: sem elevador -15% · sem piscina -3% · sem lazer -5% · sem vaga -10% (NBR 14653/IBAPE).
         Homogeneização aluguel: sem elevador -15% · sem vaga -12% · mobiliado +15%.
         Yield líquido considera vacância 6%, manutenção 0,5% a.a. Flip: IRPF 15%, corretagem 6%, ITBI 3%.
+        Fator aplicado sobre preço de anúncio — NÃO sobre preço de contrato (evita dupla penalização).
       </div>
     </div>
   )

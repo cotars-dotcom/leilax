@@ -74,15 +74,16 @@ Use o tipo de processo para identificar a vara e calibrar prazo_liberacao_estima
 Taxa sucesso < 85% → score_juridico máximo 6.0.` : ''}
 ${metricasBairro ? `
 MÉTRICAS DO BAIRRO ${metricasBairro.bairro} (FipeZAP/SECOVI-MG/QuintoAndar 2025-2026):
-- Preço anúncio: R$ ${(metricasBairro.preco_anuncio_m2||0).toLocaleString('pt-BR')}/m²
-- Preço contrato real: R$ ${(metricasBairro.preco_contrato_m2||0).toLocaleString('pt-BR')}/m² — USE ESTE como preco_m2_mercado base
+- Preço anúncio: R$ ${(metricasBairro.preco_anuncio_m2||0).toLocaleString('pt-BR')}/m² — USE ESTE como BASE para homogeneização
+- Preço contrato real: R$ ${(metricasBairro.preco_contrato_m2||0).toLocaleString('pt-BR')}/m² — referência de transação real (NÃO aplicar homog sobre este)
 - Yield bruto: ${metricasBairro.yield_bruto||'—'}% a.a. | Classe IPEAD: ${metricasBairro.classe_ipead||'—'}
 - Aluguel/m² c/ elevador: R$ ${(metricasBairro.aluguel_m2_com_elevador||0).toFixed(2)}/m²
 - Aluguel/m² SEM elevador: R$ ${(metricasBairro.aluguel_m2_sem_elevador||0).toFixed(2)}/m² (fator ${metricasBairro.fator_elevador||0.85})
 - Aluguel típico 3 quartos: R$ ${(metricasBairro.aluguel_3q_tipico||0).toLocaleString('pt-BR')}/mês
 - Vacância estimada: ${metricasBairro.vacancia_pct||6}% | Tempo p/ alugar: ${metricasBairro.tempo_locacao_dias||15} dias
-HOMOGENEIZAÇÃO (NBR 14653): aplique multiplicadores ao preco_m2_mercado base:
+HOMOGENEIZAÇÃO (NBR 14653): aplique multiplicadores ao preço de ANÚNCIO (não contrato):
   sem elevador × ${metricasBairro.fator_elevador||0.85} | sem piscina × 0.97 | sem lazer × 0.95 | sem vaga × 0.90
+  ⚠️ NÃO aplique sobre preço de contrato — dupla penalização
   Preencha fator_homogenizacao = produto dos fatores aplicáveis.` : ''}
 COMPARÁVEIS — REGRAS CRÍTICAS:
 Retorne 3 a 5 imóveis do MESMO TIPO que o imóvel analisado (campo "tipo" acima).
@@ -93,12 +94,19 @@ Para cada comparável, use preço de venda/anúncio ativo no ZAP/VivaReal/OLX ou
 Calcule similaridade: mesmo tipo +3, área ±20% +3, mesmos quartos +2, mesmo bairro +1, vagas +1.
 
 CALCULE obrigatoriamente (com homogeneização por atributos):
-- preco_m2_mercado: use preco_contrato do bairro × fator_homogenizacao
-  fator_homogenizacao = 1.0 × (sem elevador: 0.87) × (sem piscina: 0.97) × (sem lazer: 0.95)
+- preco_m2_mercado: usar a MÉDIA DOS COMPARÁVEIS (preço de anúncio) × fator_homogenizacao
+  ⚠️ NÃO aplique fator sobre preço de contrato — isso causa dupla penalização
+  O preço de contrato já embute ~15-20% de desconto sobre o anúncio
+  fator_homogenizacao = 1.0 × (sem elevador: 0.85) × (sem piscina: 0.97) × (sem lazer: 0.95) × (sem vaga: 0.90)
+  Fatores NBR 14653-2 (IBAPE): campo de arbítrio ±15%, faixa 0.80-1.20
+  Elevador: -15% (0.85) como central, -10% (0.90) para térreo/2º andar, -20% (0.80) só andar alto+prédio antigo
   Preencha o campo fator_homogenizacao com o valor calculado
+- valor_mercado_estimado = preco_m2_mercado × area_m2 (resultado COM homogeneização)
+- valor_mercado_homogenizado = mesmo que valor_mercado_estimado quando há fator aplicado
 - aluguel_mensal_estimado: se bairro tem dados → usar aluguel_m2 × area_m2 (conforme elevador)
   Se sem dados → preco_m2_mercado × area_m2 × yield_bruto / 100 / 12
   yields: Popular=7.5%, Médio=6.5%, Alto=5.3%, Luxo=4.5%
+  ⚠️ Mercado BH subiu +13% em 2025 — usar dados atualizados, não históricos
   Não use o aluguel_3q_tipico diretamente — ajuste pela área privativa real
 - mao_flip = valor_mercado_estimado × 0.88 − (custo_reforma_estimado + valor_minimo × 0.075)
   (88% = 1 - 6% corretagem - 6% ITBI+taxas)

@@ -389,7 +389,7 @@ export function exportarPDFImovel(p) {
     <div class="card">
       <div class="card-title">🏗️ Atributos & Homogeneização</div>
       ${[
-        ['Elevador', p.elevador != null ? (p.elevador ? '✓ Sim' : '✗ Não (-13%)') : null, p.elevador === false ? 'red' : 'green'],
+        ['Elevador', p.elevador != null ? (p.elevador ? '✓ Sim' : '✗ Não (-15%)') : null, p.elevador === false ? 'red' : 'green'],
         ['Piscina', p.piscina != null ? (p.piscina ? '✓ Sim' : '✗ Não (-3%)') : null, p.piscina === false ? 'red' : 'green'],
         ['Área lazer', p.area_lazer != null ? (p.area_lazer ? '✓ Sim' : '✗ Não (-5%)') : null, p.area_lazer === false ? 'red' : 'green'],
         ['Salão festas', p.salao_festas != null ? (p.salao_festas ? '✓ Sim' : '✗ Não (-3%)') : null, p.salao_festas === false ? 'red' : 'green'],
