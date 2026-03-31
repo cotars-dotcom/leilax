@@ -15,6 +15,7 @@ import { calcularScore, validarECorrigirAnalise } from './motorIA.js'
 import { getMercadoComFallback, getJurimetriaVara, getMetricasBairro } from './supabase.js'
 import { detectarRegiao, getMercado } from '../data/mercado_regional.js'
 import { calcularCustoReforma, detectarClasseMercado } from '../data/custos_reforma.js'
+import { isMercadoDireto } from './detectarFonte.js'
 
 // ─── PROMPT GEMINI COMPACTO ──────────────────────────────────────────────────
 function buildPromptGemini(campos, textoScrapeado, contextoMercado, imovelContexto = null, jurimetria = [], metricasBairro = null, eMercadoDireto = false) {
