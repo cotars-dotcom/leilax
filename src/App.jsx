@@ -701,6 +701,19 @@ function NovoImovel({onSave,onCancel,onNav,trello,parametrosBanco,criteriosBanco
       } else {
         setTrelloMsg(prev => (prev ? prev + ' | ' : '') + `✅ Motor: ${modeloUsado}`)
       }
+      // VALIDAÇÃO: verificar se a análise retornou dados mínimos viáveis
+      const precoValido = parseFloat(data.valor_minimo || data.preco_pedido) > 0
+      const tituloValido = data.titulo && data.titulo.length > 5 && !data.titulo.includes('undefined')
+      const scoreValido = parseFloat(data.score_total) > 0
+      if (!precoValido && !tituloValido) {
+        setError(`⚠️ Análise falhou — não foi possível extrair dados do imóvel.\n\n` +
+          `Motivo provável: o site (${new URL(url.trim()).hostname}) é um SPA que bloqueia scraping.\n\n` +
+          `💡 Tente buscar o mesmo imóvel no VivaReal ou ZAP Imóveis e colar essa URL.`)
+        setLoading(false); setStep(''); return
+      }
+      if (!scoreValido) {
+        data.alertas = [...(data.alertas || []), '[AVISO] Score zerado — análise incompleta, verifique os dados']
+      }
       onSave(property)
     } catch(e){
       // Mostrar erro detalhado para o usuário saber o que falhou
@@ -1505,30 +1518,33 @@ useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("param
         p.codigo_axis=`MG-${new Date().getFullYear()}-${Date.now().toString().slice(-4)}`
       }
     }
-    // 1. Atualizar state imediatamente (UI responsiva)
+    // 1. Salvar no Supabase PRIMEIRO (fonte primária) — antes de navegar
+    let salvoNoBanco = false
+    if(session) {
+      try {
+        const{saveImovelCompleto}=await import('./lib/supabase.js')
+        const salvo=await saveImovelCompleto(p,session.user.id)
+        // Usar dados confirmados pelo Supabase
+        p = salvo
+        salvoNoBanco = true
+        console.debug('[AXIS] Imóvel salvo no Supabase:',salvo.codigo_axis)
+      } catch(e) {
+        console.error('[AXIS] FALHA ao salvar no Supabase:',e.message,e)
+        showToast(`⚠️ Erro ao salvar: ${e.message}. Dados ficam no cache local.`,'#E5484D')
+      }
+    }
+    // 2. Atualizar state
     setProps(ps=>{
       const existe=ps.find(x=>x.id===p.id)
       if(existe) return ps.map(x=>x.id===p.id?p:x)
       return [p,...ps]
     })
-    showToast(`✓ ${p.codigo_axis} · ${p.titulo||"Imóvel"} — Score ${(p.score_total||0).toFixed(1)} · ${p.recomendacao}`)
+    showToast(`✓ ${p.codigo_axis} · ${p.titulo||"Imóvel"} — Score ${(p.score_total||0).toFixed(1)} · ${p.recomendacao}${salvoNoBanco?'':' (local)'}`)
     if ((p.score_total||0) >= 7.5) {
       setTimeout(() => showToast(`OPORTUNIDADE: Score ${p.score_total.toFixed(1)} — ${p.titulo||p.bairro||'Ver imóvel'}`, K.grn), 1500)
     }
+    // 3. Navegar DEPOIS de salvar
     nav("detail",{id:p.id})
-    // 2. Salvar no Supabase (fonte primária)
-    if(session) {
-      try {
-        const{saveImovelCompleto}=await import('./lib/supabase.js')
-        const salvo=await saveImovelCompleto(p,session.user.id)
-        // Atualizar state com dados confirmados pelo Supabase
-        setProps(ps=>ps.map(x=>x.id===salvo.id?salvo:x))
-        console.debug('[AXIS] Imóvel salvo no Supabase:',salvo.codigo_axis)
-      } catch(e) {
-        console.error('[AXIS] FALHA ao salvar no Supabase:',e.message,e)
-        showToast(`⚠️ Salvo localmente — sync nuvem falhou: ${e.message}`)
-      }
-    }
   }
   const delProp=async(id)=>{deleteImovel(id).catch(()=>{});setProps(ps=>ps.filter(p=>p.id!==id));showToast("Excluído",K.red);nav("imoveis")}
 
