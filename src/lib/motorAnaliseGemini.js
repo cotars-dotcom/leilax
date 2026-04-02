@@ -213,16 +213,16 @@ CALIBRAÇÃO DE SCORES (escala 0-10):
 - score_juridico: sem processos+matricula ok→8.5, 1 processo leve→6.5, risco grave→3.0
 - score_ocupacao: desocupado confirmado→8.5, incerto→5.5, ocupado→3.0
 
-ATRIBUTOS DO PRÉDIO — REGRAS DE IDENTIFICAÇÃO:
-- elevador: true se texto menciona elevador, prédio >4 andares, ou alto padrão. false se explicitamente sem elevador ou walk-up
-- piscina: true se texto menciona piscina, "área de lazer completa", fotos com piscina. Se condomínio com portaria + piscina → ambos true
-- area_lazer: true se menciona playground, academia, churrasqueira, salão de jogos, quadra, área gourmet
-- salao_festas: true se menciona salão de festas, espaço gourmet, churrasqueira do condomínio
-- portaria_24h: true se menciona porteiro, portaria 24h, segurança
+ATRIBUTOS DO PRÉDIO — REGRAS CONSERVADORAS (só marcar true quando EXPLICITAMENTE mencionado no texto):
+- elevador: true SOMENTE se texto menciona explicitamente "elevador", "andar alto" ou "cobertura". false se "sem elevador", "walk-up", "térreo", "sobrado" ou casas isoladas. null se não há menção.
+- piscina: true SOMENTE se texto menciona explicitamente "piscina". "área de lazer completa" sozinho NÃO é suficiente. null se não há menção.
+- area_lazer: true SOMENTE se menciona explicitamente playground, academia, churrasqueira, salão de jogos, quadra ou área gourmet. null se não há menção.
+- salao_festas: true SOMENTE se menciona explicitamente salão de festas, espaço gourmet ou churrasqueira do condomínio. null se não há menção.
+- portaria_24h: true SOMENTE se menciona porteiro, portaria 24h, segurança 24h. null se não há menção.
 - condominio_mensal: extrair valor se mencionado (em R$/mês). Se não encontrar, estimar: Popular 200-400, Médio 400-700, Alto 700-1200, Luxo 1200+
 - mobiliado: true/false/"semi" — verificar se imóvel vem com móveis planejados, armários embutidos etc.
-- REGRA: Se imóvel tem piscina, quase certamente tem elevador também (condomínio vertical com piscina = tem elevador)
-- REGRA: Presença de porteiro/portaria implica condomínio organizado → área_lazer provável
+- ATENÇÃO: Quando não há informação explícita, use null — NUNCA infira por associação (portaria ≠ piscina, alto padrão ≠ piscina, área de lazer ≠ piscina).
+- ATENÇÃO: Bairros populares/médios (Dona Clara, Pampulha, norte BH) raramente têm piscina — não assuma sem menção explícita.
 - score_liquidez: alta demanda→8.5, média→6.5, baixa→4.0
 - score_mercado: classe Luxo BH→8.5, Alto→7.0, Médio→5.5, Popular→4.0`
 }
@@ -563,8 +563,23 @@ export async function analisarComGemini(url, geminiKey, parametros, onProgress, 
     vagas: camposBasicos.vagas || analiseGemini.vagas,
     processo_numero: camposBasicos.processo_numero || analiseGemini.processo_numero,
     // Atributos do prédio: Gemini prioritário, regex fallback
-    elevador: analiseGemini.elevador ?? camposBasicos.elevador ?? null,
-    piscina: analiseGemini.piscina ?? camposBasicos.piscina ?? null,
+    // Validação anti-falso-positivo: se não há evidência textual, usar null em vez de true
+    elevador: (() => {
+      const v = analiseGemini.elevador ?? camposBasicos.elevador ?? null
+      if (v !== true) return v
+      const txt = (camposBasicos._textoRaw || camposBasicos.titulo || '').toLowerCase()
+      const pm2 = parseFloat(analiseGemini.preco_m2_mercado || analiseGemini.preco_m2_imovel || camposBasicos.preco_m2_mercado) || 0
+      const area = parseFloat(analiseGemini.area_m2 || camposBasicos.area_m2) || 0
+      if (!txt.includes('elevador') && !txt.includes('andar') && !txt.includes('cobertura') && pm2 < 9000 && area < 150) return null
+      return true
+    })(),
+    piscina: (() => {
+      const v = analiseGemini.piscina ?? camposBasicos.piscina ?? null
+      if (v !== true) return v
+      const txt = (camposBasicos._textoRaw || camposBasicos.titulo || '').toLowerCase()
+      if (!txt.includes('piscina')) return null
+      return true
+    })(),
     area_lazer: analiseGemini.area_lazer ?? camposBasicos.area_lazer ?? null,
     salao_festas: analiseGemini.salao_festas ?? camposBasicos.salao_festas ?? null,
     portaria_24h: analiseGemini.portaria_24h ?? camposBasicos.portaria_24h ?? null,
@@ -822,6 +837,21 @@ export async function analisarComGPT(url, openaiKey, parametros, onProgress) {
   analise.portaria_24h = analise.portaria_24h ?? camposBasicos.portaria_24h ?? null
   analise.condominio_mensal = analise.condominio_mensal || camposBasicos.condominio_mensal || null
   analise.banheiros = analise.banheiros || camposBasicos.banheiros || null
+
+  // ── VALIDAÇÃO ANTI-FALSO-POSITIVO DE ATRIBUTOS ─────────────────────────────
+  // Se Gemini marcou piscina=true mas o texto fonte não contém "piscina" → anular
+  const textoFonte = (camposBasicos._textoRaw || camposBasicos.titulo || '').toLowerCase()
+  const menciona = (termo) => textoFonte.includes(termo)
+  if (analise.piscina === true && !menciona('piscina')) {
+    analise.piscina = null  // sem evidência textual → incerto, não penalizar
+  }
+  if (analise.elevador === true && !menciona('elevador') && !menciona('andar') && !menciona('cobertura')) {
+    // Preservar true apenas se preco_m2 > 9000 (alto padrão inequívoco) OU area_m2 > 150
+    const pm2 = parseFloat(analise.preco_m2_mercado || analise.preco_m2_imovel) || 0
+    const area = parseFloat(analise.area_m2) || 0
+    if (pm2 < 9000 && area < 150) analise.elevador = null
+  }
+  // ───────────────────────────────────────────────────────────────────────────
   
   // Mercado direto
   if (isMercadoDireto(url, analise.tipo_transacao)) {

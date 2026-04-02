@@ -169,11 +169,11 @@ const PADROES_LEILOEIRO = {
       const resized = html.match(/https?:\/\/resizedimgs\.vivareal\.com\/img\/vr-listing\/[^\s"'<>]+/gi) || []
       for (const url of resized) {
         const clean = url.replace(/&amp;/g, '&')
-        // Filtrar avatars e thumbnails pequenos
-        if (/72x56|dimension=72|48x48|200x200|pereira|corretora|logo/i.test(clean)) continue
-        // Só manter fotos com dimensão razoável (>300)
+        // Filtrar avatars, thumbnails e logos
+        if (/72x56|48x48|200x200|pereira|corretora|logo|avatar|thumb/i.test(clean)) continue
+        // Só manter fotos com dimensão razoável (>200px) — threshold baixado de 300
         const dimMatch = clean.match(/dimension=(\d+)x(\d+)/)
-        if (dimMatch && parseInt(dimMatch[1]) < 300) continue
+        if (dimMatch && parseInt(dimMatch[1]) < 200) continue
         if (!fotos.includes(clean)) fotos.push(clean)
       }
       return fotos.filter(u => !isUrlBanida(u))

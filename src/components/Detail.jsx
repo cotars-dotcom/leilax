@@ -132,6 +132,22 @@ function PainelReforma({ imovel }) {
 
 const Bdg = ({c,ch}) => <span style={{display:"inline-block",fontSize:"10px",fontWeight:"700",padding:"2px 8px",borderRadius:"5px",textTransform:"uppercase",letterSpacing:".5px",background:`${c}12`,color:c}}>{ch}</span>
 
+// Normaliza título longo do portal para "Apt 2q 43m² — Bairro, Cidade" (mesmo padrão do card)
+function formatTitulo(p) {
+  const t = p?.titulo || 'Imóvel'
+  if (t.length <= 45) return t
+  const tipo = (p?.tipo||'').toLowerCase().includes('casa') ? 'Casa'
+    : (p?.tipo||'').toLowerCase().includes('cobertura') ? 'Cobertura'
+    : (p?.tipo||'').toLowerCase().includes('sala') ? 'Sala'
+    : 'Apt'
+  const area = p?.area_privativa_m2 || p?.area_m2
+  const parts = [tipo]
+  if (p?.quartos) parts.push(`${p.quartos}q`)
+  if (area) parts.push(`${area}m²`)
+  const local = [p?.bairro, p?.cidade].filter(Boolean).join(', ')
+  return local ? `${parts.join(' ')} — ${local}` : parts.join(' ')
+}
+
 function Hdr({title,sub,actions}) {
   return <div style={{padding:"22px 28px 16px",borderBottom:`1px solid ${C.borderW}`,flexShrink:0,background:C.white}}>
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:"10px",flexWrap:"wrap"}}>
@@ -307,15 +323,17 @@ function GaleriaFotos({ fotos = [], foto_principal = null, url = null, imovelId 
         <div style={{
           width: '100%',
           borderRadius: 12, overflow: 'hidden',
-          marginBottom: 8, background: '#1A1A2E',
+          marginBottom: 8, background: '#F8FAFC',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           minHeight: 200, maxHeight: 420,
           position: 'relative',
+          border: '1px solid #E2E8F0',
         }}>
           <img
             src={fotoAtiva}
             alt="Foto principal"
             referrerPolicy="no-referrer"
+            crossOrigin="anonymous"
             style={{
               maxWidth: '100%',
               maxHeight: 420,
@@ -324,7 +342,18 @@ function GaleriaFotos({ fotos = [], foto_principal = null, url = null, imovelId 
               objectFit: 'contain',
               display: 'block',
             }}
-            onError={e => { e.target.style.display = 'none' }}
+            onError={e => {
+              // Se falhar com no-referrer, tentar sem política de referrer (origem não enviada)
+              if (!e.target.dataset.retried) {
+                e.target.dataset.retried = '1'
+                e.target.removeAttribute('crossorigin')
+                e.target.referrerPolicy = 'origin'
+                e.target.src = e.target.src + (e.target.src.includes('?') ? '&' : '?') + '_r=' + Date.now()
+              } else {
+                // Fallback final: esconder imagem e mostrar placeholder no container
+                e.target.parentElement.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:200px;color:#94A3B8;gap:8px;"><span style="font-size:36px">🖼️</span><span style="font-size:12px">Foto indisponível — abra o anúncio original</span></div>`
+              }
+            }}
           />
         </div>
       )}
@@ -1200,7 +1229,7 @@ for (const s of SCORES) {
     setSending(false)
   }
   return <div>
-    <Hdr title={<>{p.titulo||"Imóvel"}{p.codigo_axis&&<span style={{fontSize:"10.5px",fontWeight:700,padding:"2px 8px",borderRadius:4,background:"#002B8010",color:"#002B80",border:"1px solid #002B8020",fontFamily:"monospace",letterSpacing:"0.5px",marginLeft:10,verticalAlign:"middle"}}>{p.codigo_axis}</span>}{p.num_leilao&&!isMercadoDireto(p.fonte_url,p.tipo_transacao)&&<span style={{display:"inline-block",background:p.num_leilao>=2?"#FEF3C7":"#ECFDF5",color:p.num_leilao>=2?"#D97706":"#065F46",fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:4,marginLeft:6,verticalAlign:"middle"}}>{p.num_leilao}º LEILÃO{p.valor_minimo&&p.valor_avaliacao?` · mín. ${Math.round(p.valor_minimo/p.valor_avaliacao*100)}%`:p.num_leilao>=2?" · mín. 35%":""}</span>}
+    <Hdr title={<>{formatTitulo(p)}{p.codigo_axis&&<span style={{fontSize:"10.5px",fontWeight:700,padding:"2px 8px",borderRadius:4,background:"#002B8010",color:"#002B80",border:"1px solid #002B8020",fontFamily:"monospace",letterSpacing:"0.5px",marginLeft:10,verticalAlign:"middle"}}>{p.codigo_axis}</span>}{p.num_leilao&&!isMercadoDireto(p.fonte_url,p.tipo_transacao)&&<span style={{display:"inline-block",background:p.num_leilao>=2?"#FEF3C7":"#ECFDF5",color:p.num_leilao>=2?"#D97706":"#065F46",fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:4,marginLeft:6,verticalAlign:"middle"}}>{p.num_leilao}º LEILÃO{p.valor_minimo&&p.valor_avaliacao?` · mín. ${Math.round(p.valor_minimo/p.valor_avaliacao*100)}%`:p.num_leilao>=2?" · mín. 35%":""}</span>}
       {isMercadoDireto(p.fonte_url,p.tipo_transacao)&&<span style={{display:"inline-block",background:"#FFFBEB",color:"#92400E",fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:4,marginLeft:6,verticalAlign:"middle"}}>🏠 MERCADO DIRETO</span>}{p.trello_card_url&&<a href={p.trello_card_url} target="_blank" rel="noreferrer" style={{fontSize:11,color:"#0052CC",marginLeft:8,verticalAlign:"middle",textDecoration:"none"}}>Trello</a>}</>} sub={`${p.cidade}/${p.estado} · ${fmtD(p.createdAt)}`}
       actions={<>
         {p.fonte_url&&<a href={p.fonte_url} target="_blank" rel="noopener noreferrer" title={isMercadoDireto(p.fonte_url,p.tipo_transacao)?"Abrir anúncio no portal":"Abrir edital original no portal do leiloeiro"} style={{...btn("s"),textDecoration:"none",display:"inline-block",background:`${C.blue}08`,color:C.blue,border:`1px solid ${C.blue}30`}}>{isMercadoDireto(p.fonte_url,p.tipo_transacao)?'🔗 Anúncio':'🔗 Edital'}</a>}
@@ -1438,7 +1467,20 @@ for (const s of SCORES) {
             Síntese da análise
           </p>
           <p style={{ margin:0, fontSize:13, color:C.text, lineHeight:1.6 }}>
-            {normalizarTextoAlerta(p.sintese_executiva)}
+            {normalizarTextoAlerta(
+              isMercadoDireto(p.fonte_url, p.tipo_transacao)
+                ? (p.sintese_executiva || '')
+                    .replace(/leil[ãa]o\s*judicial/gi, 'compra de mercado')
+                    .replace(/leil[ãa]o/gi, 'mercado')
+                    .replace(/arrematação|arrematante/gi, m => m.toLowerCase().startsWith('arrematante') ? 'comprador' : 'aquisição')
+                    .replace(/edital/gi, 'anúncio')
+                    .replace(/(?:1[ªº]|2[ªº])\s*praça/gi, 'negociação')
+                    .replace(/lance\s*mínimo/gi, 'preço pedido')
+                    .replace(/leiloeiro/gi, 'vendedor')
+                    .replace(/não\s+parece\s+ser\s+de\s+um\s+leilão[^.]*\./gi, '')
+                    .trim()
+                : p.sintese_executiva
+            )}
           </p>
         </div>
       )}

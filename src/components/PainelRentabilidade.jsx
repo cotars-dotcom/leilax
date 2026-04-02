@@ -103,7 +103,7 @@ function CardLance({ titulo, lance, avaliacao, vmercado, flip, loc, prob, destaq
             letterSpacing:.4, marginBottom:6 }}>🔨 Flip (venda)</div>
           {[
             ['Custo total', fmt(flip.custoTotal)],
-            ['Venda estimada', fmt(vmercado * 0.94)],
+            ['Venda estimada', fmt(flip.vmercadoLiq)],
             ['Lucro líquido', fmt(flip.lucro)],
             ['ROI', pct(flip.roi)],
           ].map(([k,v]) => (
@@ -218,10 +218,17 @@ export default function PainelRentabilidade({ imovel }) {
   const aluguelBase = parseFloat(aluguel_mensal_estimado) || 3200
   const aluguelHomogeneizado = Math.round(aluguelBase * fatorAluguel)
 
-  const aluguelMap = {
+  // Aluguel bruto por cenário (pode vir invertido do banco — sanitizar logo abaixo)
+  const _aluguelRaw = {
     basica:   parseFloat(aluguel_sem_reforma) || Math.round(aluguelHomogeneizado * 0.90),
-    media:    parseFloat(aluguel_com_reforma) || aluguelHomogeneizado,
+    media:    parseFloat(aluguel_com_reforma)  || aluguelHomogeneizado,
     completa: (parseFloat(aluguel_com_reforma) || aluguelHomogeneizado) * 1.10,
+  }
+  // Sanidade: garantir basica ≤ media ≤ completa (banco pode ter valores invertidos/desatualizados)
+  const aluguelMap = {
+    basica:   _aluguelRaw.basica,
+    media:    Math.max(_aluguelRaw.media,   _aluguelRaw.basica),
+    completa: Math.max(_aluguelRaw.completa, _aluguelRaw.media, Math.round(_aluguelRaw.basica * 1.08)),
   }
   const aluguelAtual = Math.round(aluguelMap[cenarioReforma]) || 3200
 
@@ -252,6 +259,8 @@ export default function PainelRentabilidade({ imovel }) {
   const melhoresCenarios = cenarios.map(c => {
     const desc = ((avaliacao - c.lance) / avaliacao * 100)
     const f = calcFlip(c.lance, vmercado, reformaValor)
+    // Injetar vmercadoLiq diretamente no flip para evitar stale prop no CardLance
+    f.vmercadoLiq = Math.round(vmercado * 0.94)
     const l = calcLocacao(c.lance, aluguelAtual, reformaValor, vmercado)
     const p = c.isMercado ? { prob: 1.0, label: '—', cor: GREEN } : probArrematacao(desc, c.leilao)
     return { ...c, desc, flip: f, loc: l, prob: p }
