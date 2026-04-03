@@ -134,6 +134,15 @@ const PADROES_LEILOEIRO = {
         loteMatches.forEach(u => { if (!fotos.includes(u)) fotos.push(u) })
       }
 
+      // Padrão 4: static.suporteleiloes.com.br/bens/{bem_id}/arquivos/ (plataforma suporteLeiloes)
+      const suporteMatches = html.match(/https?:\/\/static\.suporteleiloes\.com\.br\/[^\s"'<>]+\/bens\/\d+\/arquivos\/[^\s"'<>]+\.(?:jpg|jpeg|png|webp)/gi) || []
+      suporteMatches.forEach(u => {
+        // Filtrar logos, comitentes e arquivos-avulsos (não são fotos do imóvel)
+        if (!u.includes('comitentes') && !u.includes('arquivos-avulsos') && !fotos.includes(u)) {
+          fotos.push(u)
+        }
+      })
+
       return fotos.filter(u => !isUrlBanida(u))
     }
   },
