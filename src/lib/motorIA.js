@@ -1023,7 +1023,9 @@ Retorne SOMENTE este JSON (sem texto adicional):
     }
 
     // Fallback: Claude Haiku com web_search
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    let res
+    try {
+      res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -1038,9 +1040,13 @@ Retorne SOMENTE este JSON (sem texto adicional):
         messages: [{ role: 'user', content: promptFotos }]
       }),
       signal: AbortSignal.timeout(20000)
-    })
+      })
+    } catch(e) {
+      console.warn('[AXIS] extrairFotosImovel fetch:', e.message)
+      if (ogFallback) return { fotos: [ogFallback], foto_principal: ogFallback }
+      return { fotos: [], foto_principal: null }
+    }
     if (!res.ok) {
-      // Se a chamada IA falhou mas temos og:image, usar como fallback
       if (ogFallback) return { fotos: [ogFallback], foto_principal: ogFallback }
       return { fotos: [], foto_principal: null }
     }
@@ -1090,7 +1096,7 @@ export async function analisarImovelCompleto(url, claudeKey, openaiKey, parametr
   // Modo teste: retorna dados simulados sem chamar API
   const MODO_TESTE = localStorage.getItem('axis-modo-teste') === 'true'
   if (MODO_TESTE) {
-    console.warn('[AXIS] MODO TESTE — sem chamadas de API')
+    // [AXIS] modo teste ativo
     return {
       titulo: 'Imóvel de Teste',
       score_total: 7.5, recomendacao: 'AGUARDAR',
@@ -1147,7 +1153,7 @@ export async function analisarImovelCompleto(url, claudeKey, openaiKey, parametr
     try {
       progress('🤖 Gemini 1.5-Flash analisando imóvel (~R$ 0,01)...')
       const analiseGemini = await analisarComGemini(url, geminiKey, parametros, progress)
-      logUsoGemini(imovelId, analiseGemini.titulo || imovelTitulo, analiseGemini._modelo_usado || 'gemini-1.5-flash').catch(() => {})
+      logUsoGemini(imovelId, analiseGemini.titulo || imovelTitulo, analiseGemini._modelo_usado || 'gemini-1.5-flash').catch(e => console.warn('[AXIS] logUsoGemini:', e.message))
       import('./supabase.js').then(async ({ logAtividade, supabase: sb }) => {
         const { data: { user } } = await sb.auth.getUser()
         if (user) logAtividade(user.id, 'analise_criada', 'imovel', null, { url, titulo: analiseGemini.titulo, modelo: 'gemini-flash' })

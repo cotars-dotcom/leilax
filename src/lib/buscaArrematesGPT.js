@@ -139,7 +139,6 @@ async function salvarCacheBusca(imovel, resultado) {
         notas: a.data ? `Data: ${a.data}` : null,
       }, { onConflict: 'imovel_axis_id,endereco,valor_avaliacao,lance_final', ignoreDuplicates: true })
     }
-    console.log('[AXIS] Cache arremates salvo:', imovel.codigo_axis, arremates.length, 'arremates')
   } catch(e) {
     console.warn('[AXIS] salvarCacheBusca:', e.message)
   }

@@ -357,7 +357,6 @@ export async function criarOuAtualizarCardImovel(imovel, listId, boardId, key, t
         !c.closed && c.name.includes(imovel.codigo_axis)
       )
       if (cardExistente) {
-        console.log(`[AXIS] Card encontrado pelo código ${imovel.codigo_axis} — atualizando`)
         try {
           const { updateTrelloCardId } = await import('./supabase.js')
           await updateTrelloCardId(imovel.id, cardExistente.id, null, listId)

@@ -1042,7 +1042,7 @@ function PropCard({p,onNav}) {
             // Calcular on-the-fly para mercado direto
             const pp=parseFloat(eMercado?(p.preco_pedido||p.valor_minimo):p.valor_minimo)||0
             const vm=parseFloat(p.valor_mercado_estimado)||0
-            if(pp>0&&vm>0){const d=((vm-pp)/vm*100).toFixed(1);return parseFloat(d)>0?`${d}%`:`${d}%`}
+            if(pp>0&&vm>0){const d=((vm-pp)/vm*100).toFixed(1);const dN=parseFloat(d);return dN>0?`${d}%`:dN<-2?`+${Math.abs(dN).toFixed(1)}% acima`:'—'}
             return scoreDelta&&scoreDelta>0?`~${scoreDelta}%`:"—"
           })()}</div>
         </div>
@@ -1057,7 +1057,7 @@ function PropCard({p,onNav}) {
             // Calcular on-the-fly: mercado × 0.80 - custos fixos
             const vm=parseFloat(p.valor_mercado_estimado)||0
             const pp=parseFloat(eMercado?(p.preco_pedido||p.valor_minimo):p.valor_minimo)||0
-            if(vm>0){const taxas=eMercado?0.035:0.105;const mao=Math.round(vm*0.80-pp*taxas);return mao>0?`R$ ${mao.toLocaleString('pt-BR')}`:"—"}
+            if(vm>0){const taxas=eMercado?0.035:0.105;const mao=Math.round(vm*0.80-(pp*taxas+1500));return mao>0?`R$ ${mao.toLocaleString('pt-BR')}`:"—"}
             return "—"
           })()}</div>
         </div>

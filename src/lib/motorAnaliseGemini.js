@@ -276,9 +276,9 @@ async function chamarGemini(prompt, geminiKey) {
   let tentativas = 0
   for (const modelo of MODELOS) {
     try {
-      console.log('[AXIS Gemini] Tentando modelo:', modelo, `(${++tentativas}/${MODELOS.length})`)
+      tentativas++
       const resultado = await chamarGeminiModelo(prompt, geminiKey, modelo)
-      console.log('[AXIS Gemini] Sucesso com:', modelo)
+      
       return { resultado, modeloUsado: modelo }
     } catch(e) {
       console.warn('[AXIS Gemini] Falhou com', modelo, ':', e.message.substring(0, 100))
