@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react"
 import { C, K, btn, fmtC, fmtD, card, recColor, scoreColor, scoreLabel } from "../appConstants.js"
 import { ArrowUpRight, Bell, TrendingUp, AlertTriangle, Package, Clock } from "lucide-react"
 import { supabase } from '../lib/supabase.js'
+import { isMercadoDireto } from '../lib/detectarFonte.js'
 
 // Inline ScoreRing (used by PropCard)
 function ScoreRing({score,size=80}) {
@@ -33,7 +34,7 @@ function PropCard({p,onNav,isPhone=false}) {
   const fmtM2 = v => v ? `R$ ${Math.round(v).toLocaleString('pt-BR')}/m²` : '—'
   const dataLeilao = p.data_leilao ? new Date(p.data_leilao).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit'}) : null
   const numLeilao = p.num_leilao ? `${p.num_leilao}º LEILÃO` : null
-  const eMercado = p.tipo_transacao === 'mercado_direto'
+  const eMercado = isMercadoDireto(p.fonte_url, p.tipo_transacao)
   const scoreDelta = p.preco_m2_imovel && p.preco_m2_mercado
     ? ((1 - p.preco_m2_imovel/p.preco_m2_mercado)*100).toFixed(0) : null
 

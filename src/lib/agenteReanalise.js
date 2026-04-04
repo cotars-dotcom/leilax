@@ -12,7 +12,7 @@ async function _getJurimetria() {
   try {
     const { getJurimetriaVara } = await import('./supabase.js')
     return await getJurimetriaVara()
-  } catch(e) { return [] }
+  } catch(e) { console.warn('[AXIS] Jurimetria indisponível:', e.message); return [] }
 }
 
 export async function reAnalisarComGemini(imovelAtualParam, geminiKey, parametros, onProgress) {

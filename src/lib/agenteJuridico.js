@@ -12,7 +12,7 @@ async function _getRiscos() {
     const { getRiscosJuridicos } = await import('./supabase.js')
     const d = await getRiscosJuridicos()
     if (d && d.length > 0) return d
-  } catch(e) {}
+  } catch(e) { console.warn('[AXIS] Riscos jurídicos do banco indisponível, usando fallback local:', e.message) }
   const { RISCOS_JURIDICOS } = await import('../data/riscos_juridicos.js')
   return RISCOS_JURIDICOS
 }
