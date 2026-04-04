@@ -958,6 +958,7 @@ export async function getImoveisComTrello() {
     .from('imoveis')
     .select('id, codigo_axis, trello_card_id, trello_card_url, trello_list_id')
     .not('trello_card_id', 'is', null)
+    .or('status_operacional.eq.ativo,status_operacional.is.null')
   return data || []
 }
 

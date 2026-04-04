@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { C, RED, ESTRATEGIA_CONFIG } from "../appConstants.js"
 import { isMercadoDireto } from '../lib/detectarFonte.js'
+import { CUSTOS_LEILAO, CUSTOS_MERCADO } from '../lib/constants.js'
 
 export default function CalculadoraROI({ imovel }) {
   const [entrada, setEntrada] = useState(30)
@@ -12,12 +13,13 @@ export default function CalculadoraROI({ imovel }) {
   const precoAquisicao = eMercado
     ? (parseFloat(imovel.preco_pedido) || parseFloat(imovel.valor_minimo) || 0)
     : (parseFloat(imovel.valor_minimo) || 0)
-  const comissao    = eMercado ? 0 : precoAquisicao * 0.05
-  const itbi        = precoAquisicao * ((imovel.itbi_pct || (eMercado ? 3 : 2)) / 100)
-  const doc         = precoAquisicao * 0.005
+  const _tab = eMercado ? CUSTOS_MERCADO : CUSTOS_LEILAO
+  const comissao    = precoAquisicao * ((imovel.comissao_leiloeiro_pct ?? _tab.comissao_leiloeiro_pct) / 100)
+  const itbi        = precoAquisicao * ((imovel.itbi_pct ?? _tab.itbi_pct) / 100)
+  const doc         = precoAquisicao * (_tab.documentacao_pct / 100)
   const reforma     = imovel.custo_reforma_calculado || imovel.custo_reforma_previsto || 0
-  const advogado      = eMercado ? 0 : precoAquisicao * 0.02
-  const registro      = 1500
+  const advogado    = precoAquisicao * (_tab.advogado_pct / 100)
+  const registro    = _tab.registro_fixo
   const custoJuridico = imovel.custo_juridico_estimado || 0
   const custoTotal    = precoAquisicao + comissao + itbi + doc + advogado + registro + reforma + custoJuridico
   const vmercado = imovel.valor_mercado_estimado || imovel.valor_pos_reforma_estimado
@@ -71,7 +73,7 @@ export default function CalculadoraROI({ imovel }) {
         {[
           [eMercado ? 'Preço aquisição' : 'Lance mínimo', fmt(precoAquisicao)],
           ...(eMercado ? [] : [['Comissão leiloeiro (5%)', fmt(comissao)]]),
-          [`ITBI (${imovel.itbi_pct || (eMercado ? 3 : 2)}%)`, fmt(itbi)],
+          [`ITBI (${imovel.itbi_pct ?? _tab.itbi_pct}%)`, fmt(itbi)],
           ['Documentação (0,5%)', fmt(doc)],
           ...(eMercado ? [] : [['Honorários advocacia (2%)', fmt(advogado)]]),
           ['Registro cartório', fmt(registro)],

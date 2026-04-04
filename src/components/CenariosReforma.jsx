@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { C, K, fmtC, btn, card } from '../appConstants.js'
 import { useReforma } from '../hooks/useReforma.jsx'
 import { isMercadoDireto } from '../lib/detectarFonte.js'
+import { CUSTOS_LEILAO, CUSTOS_MERCADO } from '../lib/constants.js'
 import {
   ESCOPOS,
   CUSTO_M2_SINAPI,
@@ -29,12 +30,13 @@ export default function CenariosReforma({ imovel, isAdmin }) {
 
   const classeLabel = { A_prime:'A — Prime', B_medio_alto:'B — Médio-Alto', C_intermediario:'C — Intermediário', D_popular:'D — Popular' }[classe]
 
-  // Parâmetros de transação — mercado direto: sem comissão de leiloeiro
-  const comissao = eMercado ? 0 : precoAquisicao * 0.05
-  const itbi = precoAquisicao * 0.03
-  const doc = precoAquisicao * 0.005
-  const adv = eMercado ? 0 : precoAquisicao * 0.02
-  const reg = 1500
+  // Parâmetros de transação — fonte: constants.js
+  const _tab = eMercado ? CUSTOS_MERCADO : CUSTOS_LEILAO
+  const comissao = precoAquisicao * ((p.comissao_leiloeiro_pct ?? _tab.comissao_leiloeiro_pct) / 100)
+  const itbi = precoAquisicao * ((p.itbi_pct ?? _tab.itbi_pct) / 100)
+  const doc = precoAquisicao * (_tab.documentacao_pct / 100)
+  const adv = precoAquisicao * (_tab.advogado_pct / 100)
+  const reg = _tab.registro_fixo
 
   const cenarios = useMemo(() => {
     return ESCOPOS.map(esc => {
