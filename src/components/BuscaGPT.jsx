@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useIsMobile } from "../hooks/useIsMobile.js";
+import { MODELOS_GEMINI } from "../lib/constants.js";
 
 const K = {
   bg:"#080B10", s1:"#111620", s2:"#171E2C", bd:"#1C2438",
@@ -33,7 +34,7 @@ Para cada imóvel retorne SOMENTE JSON válido (sem markdown):
   ]
 }`
   const r = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${MODELOS_GEMINI[0]}:generateContent?key=${geminiKey}`,
     { method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ contents:[{parts:[{text:prompt}]}], generationConfig:{temperature:0.2, maxOutputTokens:2000} }),
       signal: AbortSignal.timeout(40000) }

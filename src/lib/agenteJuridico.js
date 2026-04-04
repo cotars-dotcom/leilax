@@ -351,27 +351,35 @@ Identifique riscos, processos, dívidas e situação jurídica.
 Retorne APENAS JSON com: tipo_documento, resumo, riscos_identificados (array com risco_id/descricao/gravidade/impacto_score), pontos_positivos, alertas_criticos, score_juridico_sugerido, score_juridico_delta, recomendacao_juridica, parecer.`
 
   try {
-    const r = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${geminiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [
-            { inline_data: { mime_type: 'application/pdf', data: base64 } },
-            { text: prompt }
-          ]}],
-          generationConfig: { temperature: 0.1, maxOutputTokens: 2048 }
-        }),
-        signal: AbortSignal.timeout(60000)
-      }
-    )
-    if (!r.ok) throw new Error(`Gemini PDF ${r.status}`)
-    const data = await r.json()
-    const txt = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
-    const match = txt.replace(/```json|```/g, '').trim().match(/\{[\s\S]*\}/)
-    if (!match) throw new Error('JSON inválido')
-    return JSON.parse(match[0])
+    const { MODELOS_GEMINI_PRO, parseJSONResposta } = await import('./constants.js')
+    let resultado = null
+    for (const modelo of MODELOS_GEMINI_PRO) {
+      try {
+        const r = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${geminiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [
+                { inline_data: { mime_type: 'application/pdf', data: base64 } },
+                { text: prompt }
+              ]}],
+              generationConfig: { temperature: 0.1, maxOutputTokens: 2048 }
+            }),
+            signal: AbortSignal.timeout(60000)
+          }
+        )
+        if (r.ok) {
+          const data = await r.json()
+          const txt = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+          resultado = parseJSONResposta(txt)
+          resultado._modelo = modelo
+          break
+        }
+      } catch(e) { console.warn(`[AXIS jurídico PDF] ${modelo}:`, e.message) }
+    }
+    return resultado
   } catch(e) {
     console.warn('[AXIS jurídico] Gemini PDF:', e.message)
     return null

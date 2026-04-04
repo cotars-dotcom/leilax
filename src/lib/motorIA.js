@@ -617,7 +617,7 @@ Use apenas tags de texto: [CRITICO] [ATENCAO] [OK] [INFO]
     headers: {
       'Content-Type': 'application/json',
       'x-api-key': claudeKey,
-      'anthropic-version': '2023-06-01',
+      'anthropic-version': ANTHROPIC_VERSION,
       'anthropic-dangerous-direct-browser-access': 'true'
     },
     body: JSON.stringify({
@@ -984,7 +984,7 @@ Retorne SOMENTE este JSON (sem texto adicional):
     if (geminiKey) {
       try {
         const geminiRes = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1006,7 +1006,7 @@ Retorne SOMENTE este JSON (sem texto adicional):
             if (fotos.length > 0 || fotoPrincipal) {
               try {
                 const { logUsoChamadaAPI } = await import('./supabase')
-                logUsoChamadaAPI({ tipo: 'fotos', modelo: 'gemini-1.5-flash', tokensInput: 0, tokensOutput: 0, modoTeste: localStorage.getItem('axis-modo-teste') === 'true' })
+                logUsoChamadaAPI({ tipo: 'fotos', modelo: 'gemini-2.0-flash', tokensInput: 0, tokensOutput: 0, modoTeste: localStorage.getItem('axis-modo-teste') === 'true' })
               } catch(e) { console.warn('[AXIS motorIA] Log uso Gemini:', e.message) }
               return { fotos, foto_principal: fotoPrincipal }
             }
@@ -1025,7 +1025,7 @@ Retorne SOMENTE este JSON (sem texto adicional):
       headers: {
         'Content-Type': 'application/json',
         'x-api-key': claudeKey,
-        'anthropic-version': '2023-06-01',
+        'anthropic-version': ANTHROPIC_VERSION,
         'anthropic-dangerous-direct-browser-access': 'true'
       },
       body: JSON.stringify({
@@ -1148,7 +1148,7 @@ export async function analisarImovelCompleto(url, claudeKey, openaiKey, parametr
     try {
       progress('🤖 Gemini 1.5-Flash analisando imóvel (~R$ 0,01)...')
       const analiseGemini = await analisarComGemini(url, geminiKey, parametros, progress)
-      logUsoGemini(imovelId, analiseGemini.titulo || imovelTitulo, analiseGemini._modelo_usado || 'gemini-1.5-flash').catch(e => console.warn('[AXIS] logUsoGemini:', e.message))
+      logUsoGemini(imovelId, analiseGemini.titulo || imovelTitulo, analiseGemini._modelo_usado || 'gemini-2.0-flash').catch(e => console.warn('[AXIS] logUsoGemini:', e.message))
       import('./supabase.js').then(async ({ logAtividade, supabase: sb }) => {
         const { data: { user } } = await sb.auth.getUser()
         if (user) logAtividade(user.id, 'analise_criada', 'imovel', null, { url, titulo: analiseGemini.titulo, modelo: 'gemini-flash' })

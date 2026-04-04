@@ -156,7 +156,7 @@ Retorne APENAS JSON com os campos atualizados:
   const MODELOS_GEMINI = ['gemini-1.5-flash', 'gemini-1.5-pro']  // 2.0-flash: 404 em contas novas
   let data = null
   let ultimoErro = null
-  let modeloUsado = 'gemini-1.5-flash'
+  let modeloUsado = 'gemini-2.0-flash'
 
   for (const modelo of MODELOS_GEMINI) {
     progress(`Gemini revalidando análise (${modelo})...`)

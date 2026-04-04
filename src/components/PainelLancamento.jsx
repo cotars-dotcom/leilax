@@ -420,7 +420,7 @@ export default function PainelLancamento({ imovel }) {
 
       {/* Nota de custos */}
       <div style={{ marginTop: 10, fontSize: 9.5, color: C.hint, lineHeight: 1.5 }}>
-        Premissas: comissão 5% · ITBI 2% · doc 0,5% · honorário adv 2% · registro R$1.500 · IRPF 15% (isenção ≤ R$440k) · corretagem venda 6%
+        Premissas: comissão 5% · ITBI 3% · doc 0,5% · honorário adv 2% · registro R$1.500 · IRPF 15% (isenção ≤ R$440k) · corretagem venda 6%
       </div>
     </div>
   )

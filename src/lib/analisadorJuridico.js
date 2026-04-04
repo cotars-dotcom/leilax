@@ -3,6 +3,7 @@
 
 import { RISCOS_JURIDICOS } from '../data/riscos_juridicos.js'
 import { salvarDocumentoJuridico } from './supabase.js'
+import { ANTHROPIC_VERSION } from './constants.js'
 
 const CLAUDE_MODEL = 'claude-sonnet-4-20250514'
 const GPT_MODEL    = 'gpt-4o'
@@ -73,7 +74,7 @@ Retorne APENAS JSON válido:
       headers: {
         'Content-Type': 'application/json',
         'x-api-key': claudeKey,
-        'anthropic-version': '2023-06-01',
+        'anthropic-version': ANTHROPIC_VERSION,
         'anthropic-dangerous-direct-browser-access': 'true'
       },
       body: JSON.stringify({
@@ -204,7 +205,7 @@ Consolide e retorne APENAS JSON:
       headers: {
         'Content-Type': 'application/json',
         'x-api-key': claudeKey,
-        'anthropic-version': '2023-06-01',
+        'anthropic-version': ANTHROPIC_VERSION,
         'anthropic-dangerous-direct-browser-access': 'true'
       },
       body: JSON.stringify({
