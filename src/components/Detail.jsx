@@ -420,6 +420,74 @@ function AbaJuridica({ imovel, onReclassificado }) {
     } catch {}
   }
 
+  // ── Analisar doc já salvo no banco (sem análise) via Jina + Gemini ──
+  async function handleAnalisarDoc(doc) {
+    const geminiKey = localStorage.getItem('axis-gemini-key') || ''
+    const claudeKey = localStorage.getItem('axis-api-key') || ''
+    if (!geminiKey && !claudeKey) {
+      setErro('Configure Gemini ou Claude no painel Admin → API Keys')
+      return
+    }
+    const urlDoc = doc.url_origem || doc.url
+    if (!urlDoc) {
+      setErro('Documento sem URL — faça upload manual do PDF')
+      return
+    }
+    setAnalisando(true)
+    setErro('')
+    setResultado(null)
+    try {
+      setProgresso(`📥 Baixando ${doc.nome || doc.tipo} via Jina...`)
+      const { baixarViaJina, analisarTextoJuridicoGemini } = await import('../lib/agenteJuridico.js')
+      const texto = await baixarViaJina(urlDoc, setProgresso)
+      if (!texto || texto.length < 100) {
+        setErro(`Não foi possível ler o PDF — tente download manual e upload aqui`)
+        setAnalisando(false)
+        setProgresso('')
+        return
+      }
+      setProgresso(`🤖 Analisando ${doc.nome || doc.tipo} com IA (~30s)...`)
+      const analise = await analisarTextoJuridicoGemini(texto, doc.nome || doc.tipo, imovel, geminiKey || claudeKey)
+      if (!analise) {
+        setErro('IA não retornou análise — tente novamente')
+        setAnalisando(false)
+        setProgresso('')
+        return
+      }
+      // Atualizar doc no banco
+      const { salvarDocumentoJuridico } = await import('../lib/supabase.js')
+      await salvarDocumentoJuridico({
+        id: doc.id,
+        imovel_id: imovel.id,
+        tipo: doc.tipo,
+        nome: doc.nome,
+        url_origem: urlDoc,
+        conteudo_texto: texto.substring(0, 5000),
+        analise_ia: analise.parecer || analise.resumo || JSON.stringify(analise).substring(0, 500),
+        analise_estruturada: analise,
+        riscos_encontrados: analise.riscos_identificados || [],
+        score_juridico_sugerido: analise.score_juridico_sugerido || null,
+        impacto_score: analise.score_juridico_delta || 0,
+        recomendacao_juridica: analise.recomendacao_juridica || null,
+        pontos_positivos: analise.pontos_positivos || [],
+        alertas_criticos: analise.alertas_criticos || [],
+        responsabilidade_debitos: analise.responsabilidade_debitos || null,
+        ocupacao_confirmada: analise.ocupacao_confirmada || null,
+        prazo_liberacao_meses: analise.prazo_liberacao_meses || null,
+        processado: true,
+        status: 'analisado',
+        analisado_em: new Date().toISOString(),
+      })
+      setProgresso(`✅ ${doc.nome || doc.tipo} analisado com sucesso!`)
+      setResultado(analise)
+      await carregarDocs()
+    } catch (e) {
+      setErro(`Erro ao analisar: ${e.message}`)
+    }
+    setAnalisando(false)
+    setTimeout(() => setProgresso(''), 3000)
+  }
+
   async function handleUpload(e) {
     const files = Array.from(e.target.files)
     if (!files.length) return
@@ -625,9 +693,27 @@ function AbaJuridica({ imovel, onReclassificado }) {
       {/* Lista de documentos */}
       {docs.length > 0 && (
         <div>
-          <p style={{ fontSize: 11.5, fontWeight: 600, color: K.t3, textTransform: 'uppercase', letterSpacing: '0.6px', margin: '0 0 10px' }}>
-            {docs.length} documento(s) anexado(s)
-          </p>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <p style={{ fontSize: 11.5, fontWeight: 600, color: K.t3, textTransform: 'uppercase', letterSpacing: '0.6px', margin: 0 }}>
+              {docs.length} documento(s) anexado(s)
+            </p>
+            {docs.filter(d => !d.analise_ia && (d.url_origem || d.url)).length > 1 && (
+              <button
+                onClick={async () => {
+                  const pendentes = docs.filter(d => !d.analise_ia && (d.url_origem || d.url))
+                  for (const doc of pendentes) await handleAnalisarDoc(doc)
+                }}
+                disabled={analisando}
+                style={{
+                  padding: '4px 12px', borderRadius: 6,
+                  background: `${K.teal}15`, border: `1px solid ${K.teal}40`,
+                  color: K.teal, fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                }}
+              >
+                🤖 Analisar Todos ({docs.filter(d => !d.analise_ia && (d.url_origem || d.url)).length})
+              </button>
+            )}
+          </div>
           {docs.map(doc => (
             <div key={doc.id} style={{
               ...card(), marginBottom: 10,
@@ -658,6 +744,27 @@ function AbaJuridica({ imovel, onReclassificado }) {
               {doc.analise_ia && (
                 <p style={{ margin: '6px 0 0', fontSize: 12.5, color: K.tx, lineHeight: 1.5 }}>
                   {doc.analise_ia}
+                </p>
+              )}
+              {!doc.analise_ia && (doc.url_origem || doc.url) && (
+                <button
+                  onClick={() => handleAnalisarDoc(doc)}
+                  disabled={analisando}
+                  style={{
+                    marginTop: 8, padding: '6px 14px', borderRadius: 6,
+                    background: analisando ? K.s2 : `${K.teal}15`,
+                    border: `1px solid ${K.teal}40`,
+                    color: K.teal, fontSize: 12, fontWeight: 600,
+                    cursor: analisando ? 'wait' : 'pointer',
+                    display: 'flex', alignItems: 'center', gap: 6,
+                  }}
+                >
+                  🤖 Analisar com IA
+                </button>
+              )}
+              {!doc.analise_ia && !(doc.url_origem || doc.url) && (
+                <p style={{ margin: '6px 0 0', fontSize: 11.5, color: K.amb, fontStyle: 'italic' }}>
+                  ⚠️ Sem análise — faça upload do PDF para analisar
                 </p>
               )}
               {doc.riscos_encontrados?.length > 0 && (

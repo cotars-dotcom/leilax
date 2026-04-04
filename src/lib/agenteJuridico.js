@@ -281,6 +281,20 @@ JURIMETRIA DAS VARAS BH (estimativa de prazo):
 - TRT-3 geral: 90d | TRT-3 Penhora: 240d | Extrajudicial Caixa: 90d
 - TJMG Cível Imissão: 180d | TJMG Geral: 270d | TJMG Fiscal: 360d
 
+JURISPRUDÊNCIA ATUALIZADA (2024-2026):
+- STJ Tema 1.134 (out/2024): arrematante NÃO responde por tributos anteriores, mesmo com previsão no edital. Sub-rogação ocorre sobre o preço (CTN art.130, §único). Modulação: editais publicados após ata de julgamento.
+- STJ REsp 2.096.465/SP (mai/2024): vedação ao preço vil (< 50% avaliação, CPC art.891) aplica-se TAMBÉM a leilão extrajudicial (alienação fiduciária). Lei 14.711/2023 consolida.
+- STJ REsp 1.672.508/SP: arrematante responde por dívida condominial anterior SOMENTE se constar no edital.
+- STJ AgInt AREsp 2.527.075/SP (mai/2024): arrematante responde por condominiais pós-arrematação mesmo sem imissão na posse.
+- TJMG (2025): imissão na posse — taxa de ocupação de 1% do valor/mês desde consolidação até imissão efetiva (art. 37-A, Lei 9.514/97).
+- Bem de família: proteção inoponível ao credor fiduciário; alegação não cabe após arrematação (STJ consolidado).
+
+CUSTOS PÓS-ARREMATAÇÃO BH/MG:
+- ITBI BH: 3% sobre valor do lance (Tema 1.113 STJ)
+- Comissão leiloeiro: 5% (CPC art.904)
+- Registro cartório MG: ~R$5.035 para imóvel R$350-420k (Portaria 8.664/CGJ/2025)
+- Honorários advocatícios BH: R$2.000-5.000 (registro e posse)
+
 BASE DE RISCOS DO SISTEMA AXIS:
 ${RISCOS_REFERENCIA}
 
