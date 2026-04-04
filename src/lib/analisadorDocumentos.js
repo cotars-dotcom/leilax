@@ -3,8 +3,7 @@
 // Usa Claude Sonnet para extrair informações de PDFs via base64
 // ═══════════════════════════════════════════════════════════════
 import { salvarDocumentoJuridico } from './supabase.js'
-
-const CLAUDE_MODEL = 'claude-sonnet-4-20250514'
+import { CLAUDE_MODEL, ANTHROPIC_VERSION } from './constants.js'
 
 async function fetchPdfBase64(url) {
   try {
@@ -25,7 +24,7 @@ async function chamarClaude(apiKey, pdfBase64, prompt, maxTokens) {
     headers: {
       'Content-Type': 'application/json',
       'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
+      'anthropic-version': ANTHROPIC_VERSION,
       'anthropic-dangerous-direct-browser-access': 'true',
     },
     body: JSON.stringify({

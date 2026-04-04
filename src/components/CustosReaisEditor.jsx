@@ -5,6 +5,7 @@
  */
 import { useState, useEffect } from 'react'
 import { C, K, card, btn, inp } from '../appConstants.js'
+import { CUSTOS_LEILAO } from '../lib/constants.js'
 
 const fmt = v => v ? `R$ ${Math.round(v).toLocaleString('pt-BR')}` : '—'
 
@@ -58,15 +59,15 @@ export default function CustosReaisEditor({ imovel, onUpdateProp, isAdmin }) {
       })
       // Recalcular custo total com valores reais
       const lance = parseFloat(imovel.preco_pedido || imovel.valor_minimo) || 0
-      const comissao = lance * ((imovel.comissao_leiloeiro_pct || 5) / 100)
-      const itbi = lance * ((imovel.itbi_pct || 2) / 100)
+      const comissao = lance * ((imovel.comissao_leiloeiro_pct || CUSTOS_LEILAO.comissao_leiloeiro * 100) / 100)
+      const itbi = lance * ((imovel.itbi_pct || CUSTOS_LEILAO.itbi * 100) / 100)
       const reformaReal = updates.custo_reforma_real || parseFloat(imovel.custo_reforma) || 0
       const juridicoReal = updates.custo_juridico_real || parseFloat(imovel.custo_juridico_estimado) || 0
       const regReal = updates.custo_regularizacao_real || parseFloat(imovel.custo_regularizacao) || 0
       const ocupacaoReal = updates.custo_ocupacao_real || 0
       const debitoCond = updates.debitos_condominio_real || 0
       const debitoIPTU = updates.debitos_iptu_real || 0
-      const custoTotalReal = lance + comissao + itbi + reformaReal + juridicoReal + regReal + ocupacaoReal + debitoCond + debitoIPTU + 1500
+      const custoTotalReal = lance + comissao + itbi + reformaReal + juridicoReal + regReal + ocupacaoReal + debitoCond + debitoIPTU + CUSTOS_LEILAO.registro
       updates.custo_total_real = Math.round(custoTotalReal)
       updates.custos_confirmados = true
 

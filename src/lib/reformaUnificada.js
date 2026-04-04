@@ -1,5 +1,6 @@
 /**
  * AXIS — Custos de Reforma Unificados (SINAPI-MG 2026)
+ * Taxas de transação obtidas de src/lib/constants.js (CUSTO_MULT_LEILAO).
  *
  * FONTE DE VERDADE para custos de reforma em toda a plataforma.
  * Usado por:
@@ -10,6 +11,8 @@
  *
  * Resolve o conflito de valores entre painéis — todos usam SINAPI como fallback.
  */
+
+import { CUSTO_MULT_LEILAO, AXIS_CUSTOS } from './constants.js'
 
 // Custo/m² por escopo e classe (SINAPI-MG 2026) — tabela única
 export const CUSTO_M2_SINAPI = {
@@ -193,12 +196,12 @@ export function avaliarViabilidadeReforma(valorMercado, precoCompra, area, preco
     const valorPosReforma = Math.round(valorMercado * fv)
     const valorizacaoAbsoluta = valorPosReforma - valorMercado
 
-    // Custos totais (compra + reforma + taxas ~10%)
-    const taxas = Math.round(precoCompra * 0.10)
+    // Custos totais: compra + reforma + taxas (CUSTO_MULT_LEILAO = 10.5%) + registro
+    const taxas = Math.round(precoCompra * CUSTO_MULT_LEILAO) + AXIS_CUSTOS.registro
     const custoTotal = precoCompra + custoReforma + taxas
 
     // Lucro e ROI
-    const lucroFlip = valorPosReforma * 0.94 - custoTotal // 6% corretagem
+    const lucroFlip = valorPosReforma * (1 - AXIS_CUSTOS.corretagem_venda) - custoTotal
     const roiFlip = custoTotal > 0 ? (lucroFlip / custoTotal * 100) : 0
 
     // Eficiência: quanto cada R$1 de reforma gera de valorização

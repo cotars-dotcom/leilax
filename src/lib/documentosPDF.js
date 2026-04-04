@@ -4,6 +4,7 @@
  */
 
 import { supabase } from './supabase.js'
+import { CLAUDE_HAIKU, ANTHROPIC_VERSION, GEMINI_FALLBACK } from './constants.js'
 
 // ─── DOWNLOAD DO PDF VIA FETCH ─────────────────────────────────────────────
 export async function baixarPDFParaBlob(url, onProgress) {
@@ -168,7 +169,7 @@ Retorne APENAS JSON válido com esta estrutura EXATA:
   if (gKey) {
     try {
       const r = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${gKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_FALLBACK}:generateContent?key=${gKey}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -185,7 +186,7 @@ Retorne APENAS JSON válido com esta estrutura EXATA:
         const match = txt.replace(/```json|```/g, '').trim().match(/\{[\s\S]*\}/)
         if (match) {
           const res = JSON.parse(match[0])
-          res._modelo = 'gemini-1.5-flash'
+          res._modelo = GEMINI_FALLBACK
           return res
         }
       }
@@ -224,9 +225,9 @@ Retorne APENAS JSON válido com esta estrutura EXATA:
     try {
       const r = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
-        headers: { 'Content-Type':'application/json', 'x-api-key':cKey, 'anthropic-version':'2023-06-01' },
+        headers: { 'Content-Type':'application/json', 'x-api-key':cKey, 'anthropic-version':ANTHROPIC_VERSION },
         body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
+          model: CLAUDE_HAIKU,
           max_tokens: 3000,
           messages: [{ role: 'user', content: prompt }]
         }),

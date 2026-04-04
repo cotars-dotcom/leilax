@@ -17,6 +17,8 @@ async function _getRiscos() {
   return RISCOS_JURIDICOS
 }
 
+import { CLAUDE_HAIKU, ANTHROPIC_VERSION } from './constants.js'
+
 // ─── PADRÕES ESPECÍFICOS POR LEILOEIRO ──────────────────────────────────────
 
 const PADROES_LEILOEIRO = {
@@ -341,9 +343,9 @@ Analise juridicamente este documento e retorne APENAS JSON válido (sem markdown
       try {
         const r2 = await fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
-          headers: { 'Content-Type':'application/json','x-api-key':claudeKey,'anthropic-version':'2023-06-01' },
+          headers: { 'Content-Type':'application/json','x-api-key':claudeKey,'anthropic-version':ANTHROPIC_VERSION },
           body: JSON.stringify({
-            model:'claude-haiku-4-5-20251001', max_tokens:2048,
+            model:CLAUDE_HAIKU, max_tokens:2048,
             messages:[{role:'user',content:`${prompt}\n\nTexto: ${texto.substring(0,4000)}`}]
           }),
           signal: AbortSignal.timeout(45000)

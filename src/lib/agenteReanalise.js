@@ -7,6 +7,7 @@
  */
 
 import { calcularScore, validarECorrigirAnalise } from './motorIA.js'
+import { SCORE_PESOS } from './constants.js'
 
 async function _getJurimetria() {
   try {
@@ -279,10 +280,7 @@ Retorne APENAS JSON com os campos atualizados:
   }
 
   // Recalcular score total com os pesos corretos
-  const pesos = {
-    localizacao: 0.20, desconto: 0.18, juridico: 0.18,
-    ocupacao: 0.15, liquidez: 0.15, mercado: 0.14
-  }
+  const pesos = SCORE_PESOS
   const scoreCalc =
     (analiseAtualizada.score_localizacao || 0) * pesos.localizacao +
     (analiseAtualizada.score_desconto || 0)    * pesos.desconto +

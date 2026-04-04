@@ -85,39 +85,10 @@ export const card = () => ({ background: '#FFFFFF', borderRadius: 12, padding: '
 export const ESTRATEGIA_CONFIG = { flip_rapido: { emoji: '🔄', label: 'Flip Rápido', color: '#05A86D' }, renda_passiva: { emoji: '🏠', label: 'Renda Passiva', color: '#002B80' }, airbnb: { emoji: '🌟', label: 'Airbnb', color: '#E1B31A' }, reforma_revenda: { emoji: '🏗️', label: 'Reforma + Venda', color: '#05A86D' }, locacao_longa: { emoji: '📋', label: 'Locação Longa', color: '#002B80' } }
 export const DEMANDA_MAP = { alta: 'Alta', media: 'Média', baixa: 'Baixa' }
 
-// ─── CUSTOS DE TRANSAÇÃO IMOBILIÁRIA (fonte única de verdade) ─────────────────
-// Altere AQUI para propagar para todos os painéis automaticamente
-export const AXIS_CUSTOS = {
-  // Leilão judicial
-  comissao_leiloeiro: 0.05,  // 5% — comissão do leiloeiro sobre o lance
-  itbi_leilao:        0.03,  // 3% — ITBI BH (municipal); cidades fora de BH usam 2%
-  itbi_mercado:       0.03,  // 3% — ITBI para compra de mercado direto
-  itbi_outros_mg:     0.02,  // 2% — ITBI demais municípios MG
-  doc:                0.005, // 0.5% — escritura/documentação
-  adv:                0.02,  // 2% — honorário advocatício (apenas leilão)
-  registro:           1500,  // R$1.500 — registro em cartório (fixo)
-  // Venda
-  corretagem_venda:   0.06,  // 6% — corretagem na revenda
-  // Ocupação/Renda
-  vacancia_anual:     0.06,  // 6% — vacância estimada ao ano
-  manutencao_anual:   0.005, // 0.5% — manutenção sobre custo total ao ano
-  // IRPF
-  irpf_pct:           0.15,  // 15% — ganho de capital
-  isencao_irpf:       440000,// R$440k — teto isenção (único imóvel PF)
-}
-
-// Multiplier total para custo estimado (quando custo_total_aquisicao não está salvo)
-// leilão: comissao 5% + ITBI 3% + doc 0.5% + adv 2% = 10.5% + R$1.500 fixo
-// mercado: ITBI 3% + doc 0.5% = 3.5% + R$1.500 fixo
-export const CUSTO_MULT_LEILAO  = AXIS_CUSTOS.comissao_leiloeiro + AXIS_CUSTOS.itbi_leilao + AXIS_CUSTOS.doc + AXIS_CUSTOS.adv  // 0.105
-export const CUSTO_MULT_MERCADO = AXIS_CUSTOS.itbi_mercado + AXIS_CUSTOS.doc  // 0.035
-
-// Pesos do score (única fonte de verdade — usada em motorIA.js e motorAnaliseGemini.js)
-export const SCORE_PESOS = {
-  localizacao: 0.20,
-  desconto:    0.18,
-  juridico:    0.18,
-  ocupacao:    0.15,
-  liquidez:    0.15,
-  mercado:     0.14,
-}
+// ─── CONSTANTES FINANCEIRAS E IA ─────────────────────────────────────────────
+// Re-exportadas de src/lib/constants.js — NÃO editar aqui, editar lá.
+export { AXIS_CUSTOS, CUSTO_MULT_LEILAO, CUSTO_MULT_MERCADO, SCORE_PESOS,
+  CUSTOS_LEILAO, CUSTOS_MERCADO, CLAUDE_MODEL, CLAUDE_HAIKU, ANTHROPIC_VERSION,
+  MODELOS_GEMINI, GEMINI_DEFAULT, GEMINI_FALLBACK,
+  calcularCustosAquisicao, calcularScoreTotal
+} from './lib/constants.js'

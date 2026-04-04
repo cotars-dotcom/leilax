@@ -1,5 +1,6 @@
 // AXIS v2.0 — Supabase Client
 import { createClient } from '@supabase/supabase-js'
+import { SCORE_PESOS } from './constants.js'
 
 // Cache simples em memória para reduzir chamadas redundantes
 const _cache = {}
@@ -229,7 +230,7 @@ export async function saveImovelCompleto(imovel, userId) {
             }
           }
           // Proteção de score_total: recalcular com pesos se scores individuais foram mantidos
-          const pesosScore = {score_localizacao:0.20,score_desconto:0.18,score_juridico:0.18,score_ocupacao:0.15,score_liquidez:0.15,score_mercado:0.14}
+          const pesosScore = {score_localizacao:SCORE_PESOS.localizacao,score_desconto:SCORE_PESOS.desconto,score_juridico:SCORE_PESOS.juridico,score_ocupacao:SCORE_PESOS.ocupacao,score_liquidez:SCORE_PESOS.liquidez,score_mercado:SCORE_PESOS.mercado}
           if (SCORES_PROTEGIDOS.some(s => payload[s] === atual[s])) {
             const novoTotal = SCORES_PROTEGIDOS.slice(0,-1).reduce((acc,s) => acc + (parseFloat(payload[s]||0) * (pesosScore[s]||0)), 0)
             if (novoTotal > 0) payload.score_total = parseFloat(novoTotal.toFixed(2))

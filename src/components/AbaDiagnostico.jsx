@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { C } from '../appConstants.js'
 import { supabase, loadApiKeys } from '../lib/supabase.js'
+import { CLAUDE_HAIKU, ANTHROPIC_VERSION, GEMINI_FALLBACK } from '../lib/constants.js'
 
 const CARD = { background:'#fff', border:`1px solid ${C.borderW}`, borderRadius:10, padding:'12px 14px', marginBottom:10 }
 const TAG_OK = { background:'#ECFDF5', color:'#065F46', fontSize:10, fontWeight:700, padding:'2px 8px', borderRadius:4, display:'inline-block' }
@@ -73,14 +74,14 @@ export default function AbaDiagnostico({ session, isPhone }) {
     if (keys.geminiKey) {
       const t0 = Date.now()
       try {
-        const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${keys.geminiKey}`, {
+        const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_FALLBACK}:generateContent?key=${keys.geminiKey}`, {
           method:'POST', headers:{'Content-Type':'application/json'},
           body: JSON.stringify({ contents:[{parts:[{text:'Responda: OK'}]}], generationConfig:{maxOutputTokens:5} }),
           signal: AbortSignal.timeout(8000)
         })
         const d = await r.json()
         if (d.error) res.gemini = { status:'erro', detalhe: d.error.message?.substring(0,80), latencia: Date.now()-t0 }
-        else res.gemini = { status:'ok', modelo:'gemini-1.5-flash', latencia: Date.now()-t0, custo:'~R$0,01' }
+        else res.gemini = { status:'ok', modelo:GEMINI_FALLBACK, latencia: Date.now()-t0, custo:'~R$0,01' }
       } catch(e) { res.gemini = { status:'erro', detalhe: e.message?.substring(0,60) } }
     } else { res.gemini = { status:'vazio' } }
 
@@ -119,8 +120,8 @@ export default function AbaDiagnostico({ session, isPhone }) {
       const t0 = Date.now()
       try {
         const r = await fetch('https://api.anthropic.com/v1/messages', {
-          method:'POST', headers:{'Content-Type':'application/json','x-api-key':keys.claudeKey,'anthropic-version':'2023-06-01'},
-          body: JSON.stringify({ model:'claude-haiku-4-5-20251001', max_tokens:5, messages:[{role:'user',content:'OK'}] }),
+          method:'POST', headers:{'Content-Type':'application/json','x-api-key':keys.claudeKey,'anthropic-version':ANTHROPIC_VERSION},
+          body: JSON.stringify({ model:CLAUDE_HAIKU, max_tokens:5, messages:[{role:'user',content:'OK'}] }),
           signal: AbortSignal.timeout(8000)
         })
         const d = await r.json()

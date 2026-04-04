@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, lazy, Suspense } from "react"
-import { C, K, RED, btn, inp, card, fmtC, fmtD, scoreColor, scoreLabel, recColor, mapDisplay, normalizarTextoAlerta, ESTRATEGIA_CONFIG, LIQUIDEZ_MAP } from "../appConstants.js"
+import { C, K, RED, btn, inp, card, fmtC, fmtD, scoreColor, scoreLabel, recColor, mapDisplay, normalizarTextoAlerta, ESTRATEGIA_CONFIG, LIQUIDEZ_MAP, CUSTOS_LEILAO, CUSTOS_MERCADO, CUSTO_MULT_LEILAO, CUSTO_MULT_MERCADO } from "../appConstants.js"
 import { supabase } from "../lib/supabase.js"
 // motorIA: import dinâmico em handleReanalyze
 // trelloService: import dinâmico em handleTrello
@@ -1819,10 +1819,10 @@ for (const s of SCORES) {
           {(()=>{
             const eMerc=isMercadoDireto(p.fonte_url,p.tipo_transacao)
             const precoBase=parseFloat(eMerc?(p.preco_pedido||p.valor_minimo):p.valor_minimo)||0
-            const custoCalc=p.custo_total_aquisicao||(precoBase>0?Math.round(precoBase*(1+(eMerc?0.035:0.105))+1500):0)
+            const custoCalc=p.custo_total_aquisicao||(precoBase>0?Math.round(precoBase*(1+(eMerc?CUSTO_MULT_MERCADO:CUSTO_MULT_LEILAO))+CUSTOS_LEILAO.registro):0)
             return custoCalc>0?<>
             <div style={{fontWeight:"600",color:K.amb,marginBottom:"10px",fontSize:"13px"}}>🧾 Custo total {p.custo_total_aquisicao?'real':'estimado'}</div>
-            {[[eMerc?"Preço pedido":"Lance mínimo",fmtC(precoBase)],...(!eMerc?[["Comissão leiloeiro",fmtC(precoBase*(p.comissao_leiloeiro_pct||5)/100)]]:[]),["ITBI",fmtC(precoBase*(p.itbi_pct||(eMerc?3:2))/100)],["Doc + Registro",fmtC(precoBase*0.005+1500)],...(!eMerc?[["Advogado (2%)",fmtC(precoBase*0.02)]]:[]),["Regularização",fmtC(p.custo_regularizacao)]].filter(([,v])=>v&&v!=="R$ 0"&&v!=="R$ NaN").map(([l,v])=>(
+            {[[eMerc?"Preço pedido":"Lance mínimo",fmtC(precoBase)],...(!eMerc?[["Comissão leiloeiro",fmtC(precoBase*(p.comissao_leiloeiro_pct||CUSTOS_LEILAO.comissao_leiloeiro*100)/100)]]:[]),["ITBI",fmtC(precoBase*(p.itbi_pct||(eMerc?CUSTOS_MERCADO.itbi*100:CUSTOS_LEILAO.itbi*100))/100)],["Doc + Registro",fmtC(precoBase*CUSTOS_LEILAO.doc+CUSTOS_LEILAO.registro)],...(!eMerc?[["Advogado (2%)",fmtC(precoBase*CUSTOS_LEILAO.adv)]]:[]),["Regularização",fmtC(p.custo_regularizacao)]].filter(([,v])=>v&&v!=="R$ 0"&&v!=="R$ NaN").map(([l,v])=>(
               <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"4px 0",fontSize:"12px"}}>
                 <span style={{color:K.t3}}>{l}</span><span style={{color:K.tx}}>{v}</span>
               </div>

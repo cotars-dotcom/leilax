@@ -6,7 +6,7 @@
 // ═══════════════════════════════════════════════════════════════
 
 import { detectarRegiao, getMercado } from '../data/mercado_regional.js'
-import { SCORE_PESOS } from '../appConstants.js'
+import { SCORE_PESOS, CUSTO_MULT_LEILAO, CUSTOS_LEILAO, calcularCustosAquisicao } from './constants.js'
 import { analisarComGemini, logUsoGemini } from './motorAnaliseGemini.js'
 import {
   BAIRROS_BH,
@@ -19,11 +19,13 @@ import {
 import { calcularCustoReforma, verificarSobrecapitalizacao } from '../data/custos_reforma.js'
 import { calcularCustoJuridico } from '../data/riscos_juridicos.js'
 
-const CLAUDE_MODEL = 'claude-sonnet-4-20250514'
-const GPT_MODEL_MARKET  = 'gpt-4o-mini'   // comparáveis e pesquisa de mercado (~16x mais barato)
-const GPT_MODEL_COMPLEX = 'gpt-4o'        // fallback se mini falhar ou retornar sem dados
-
 import { detectarTipoTransacao, isMercadoDireto } from './detectarFonte.js'
+import {
+  CLAUDE_MODEL, CLAUDE_HAIKU, ANTHROPIC_VERSION,
+  GPT_MODEL_MARKET, GPT_MODEL_COMPLEX,
+  GEMINI_FALLBACK,
+} from './constants.js'
+// GPT_MODEL_MARKET e GPT_MODEL_COMPLEX são importados de constants.js acima
 
 const REGRAS_MODALIDADE_TEXTO = `
 REGRAS CRÍTICAS POR MODALIDADE (APLIQUE SEMPRE):
@@ -617,7 +619,7 @@ Use apenas tags de texto: [CRITICO] [ATENCAO] [OK] [INFO]
     headers: {
       'Content-Type': 'application/json',
       'x-api-key': claudeKey,
-      'anthropic-version': '2023-06-01',
+      'anthropic-version': ANTHROPIC_VERSION,
       'anthropic-dangerous-direct-browser-access': 'true'
     },
     body: JSON.stringify({
@@ -721,7 +723,7 @@ export function validarECorrigirAnalise(analise) {
 
   // Fallback MAO: garantir sempre preenchido mesmo se IA não calculou
   if (!analise.mao_flip && analise.valor_mercado_estimado) {
-    const custos = (analise.custo_reforma_estimado || 0) + (analise.valor_minimo || 0) * 0.10
+    const custos = (analise.custo_reforma_estimado || 0) + (analise.valor_minimo || 0) * CUSTO_MULT_LEILAO
     analise.mao_flip = Math.round((analise.valor_mercado_estimado * 0.80) - custos)
   }
   if (!analise.mao_locacao && analise.aluguel_mensal_estimado) {
@@ -855,11 +857,10 @@ export function validarECorrigirAnalise(analise) {
 
   // 5. Custo total deve incluir comissão
   if (analise.valor_minimo && !analise.custo_total_aquisicao) {
-    const comissao = analise.valor_minimo * ((analise.comissao_leiloeiro_pct || 5) / 100)
-    const itbi = analise.valor_minimo * ((analise.itbi_pct || 2) / 100)
-    analise.custo_total_aquisicao = Math.round(
-      analise.valor_minimo + comissao + itbi + (analise.custo_regularizacao || 15000)
-    )
+    const _c = calcularCustosAquisicao(analise.valor_minimo, false, {
+      itbi_pct: analise.itbi_pct, comissao_leiloeiro_pct: analise.comissao_leiloeiro_pct
+    })
+    analise.custo_total_aquisicao = Math.round(_c.custoTotalAquisicao + (analise.custo_regularizacao || 0))
   }
 
   // 6. Score de ocupação — "nunca habitado" ou desocupado deve ter score alto
@@ -989,7 +990,7 @@ Retorne SOMENTE este JSON (sem texto adicional):
     if (geminiKey) {
       try {
         const geminiRes = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_FALLBACK}:generateContent?key=${geminiKey}`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1011,7 +1012,7 @@ Retorne SOMENTE este JSON (sem texto adicional):
             if (fotos.length > 0 || fotoPrincipal) {
               try {
                 const { logUsoChamadaAPI } = await import('./supabase')
-                logUsoChamadaAPI({ tipo: 'fotos', modelo: 'gemini-1.5-flash', tokensInput: 0, tokensOutput: 0, modoTeste: localStorage.getItem('axis-modo-teste') === 'true' })
+                logUsoChamadaAPI({ tipo: 'fotos', modelo: GEMINI_FALLBACK, tokensInput: 0, tokensOutput: 0, modoTeste: localStorage.getItem('axis-modo-teste') === 'true' })
               } catch(e) { console.warn('[AXIS motorIA] Log uso Gemini:', e.message) }
               return { fotos, foto_principal: fotoPrincipal }
             }
@@ -1030,11 +1031,11 @@ Retorne SOMENTE este JSON (sem texto adicional):
       headers: {
         'Content-Type': 'application/json',
         'x-api-key': claudeKey,
-        'anthropic-version': '2023-06-01',
+        'anthropic-version': ANTHROPIC_VERSION,
         'anthropic-dangerous-direct-browser-access': 'true'
       },
       body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
+        model: CLAUDE_HAIKU,
         max_tokens: 500,
         tools: [{ type: 'web_search_20250305', name: 'web_search' }],
         messages: [{ role: 'user', content: promptFotos }]
@@ -1153,7 +1154,7 @@ export async function analisarImovelCompleto(url, claudeKey, openaiKey, parametr
     try {
       progress('🤖 Gemini 1.5-Flash analisando imóvel (~R$ 0,01)...')
       const analiseGemini = await analisarComGemini(url, geminiKey, parametros, progress)
-      logUsoGemini(imovelId, analiseGemini.titulo || imovelTitulo, analiseGemini._modelo_usado || 'gemini-1.5-flash').catch(e => console.warn('[AXIS] logUsoGemini:', e.message))
+      logUsoGemini(imovelId, analiseGemini.titulo || imovelTitulo, analiseGemini._modelo_usado || GEMINI_FALLBACK).catch(e => console.warn('[AXIS] logUsoGemini:', e.message))
       import('./supabase.js').then(async ({ logAtividade, supabase: sb }) => {
         const { data: { user } } = await sb.auth.getUser()
         if (user) logAtividade(user.id, 'analise_criada', 'imovel', null, { url, titulo: analiseGemini.titulo, modelo: 'gemini-flash' })
