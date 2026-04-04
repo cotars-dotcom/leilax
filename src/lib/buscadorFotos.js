@@ -430,17 +430,10 @@ Para QuintoAndar: fotos em quintoandar.imgix.net
   "foto_principal": "URL ou null",
   "fotos": ["url1", "url2"]
 }`
-      const r = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`,
-        { method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ contents:[{parts:[{text:prompt}]}], generationConfig:{temperature:0.1, maxOutputTokens:300} }),
-          signal: AbortSignal.timeout(20000) }
-      )
-      if (r.ok) {
-        const data = await r.json()
-        const txt = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
-        const match = txt.match(/\{[\s\S]*\}/)
-        if (match) {
+      const { chamarGeminiCascata } = await import('./constants.js')
+      const { texto: gemTxt } = await chamarGeminiCascata(prompt, geminiKey, { maxTokens: 300, timeout: 20000 })
+      const match = gemTxt.match(/\{[\s\S]*\}/)
+      if (match) {
           const result = JSON.parse(match[0])
           const fotos = (result.fotos || [])
             .filter(f => f?.startsWith('http') && !isUrlBanida(f))
@@ -452,7 +445,6 @@ Para QuintoAndar: fotos em quintoandar.imgix.net
             return { fotos, foto_principal: principal, fonte: 'gemini' }
           }
         }
-      }
     } catch(e) { console.warn('[AXIS fotos Gemini]', e.message) }
   }
 

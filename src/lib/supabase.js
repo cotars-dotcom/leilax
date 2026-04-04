@@ -1,5 +1,6 @@
 // AXIS v2.0 — Supabase Client
 import { createClient } from '@supabase/supabase-js'
+import { SCORE_PESOS, CUSTO_POR_TOKEN } from './constants.js'
 
 // Cache simples em memória para reduzir chamadas redundantes
 const _cache = {}
@@ -228,8 +229,8 @@ export async function saveImovelCompleto(imovel, userId) {
               }
             }
           }
-          // Proteção de score_total: recalcular com pesos se scores individuais foram mantidos
-          const pesosScore = {score_localizacao:0.20,score_desconto:0.18,score_juridico:0.18,score_ocupacao:0.15,score_liquidez:0.15,score_mercado:0.14}
+          // Proteção de score_total: recalcular com pesos (fonte: constants.js)
+          const pesosScore = Object.fromEntries(Object.entries(SCORE_PESOS).map(([k,v]) => [`score_${k}`, v]))
           if (SCORES_PROTEGIDOS.some(s => payload[s] === atual[s])) {
             const novoTotal = SCORES_PROTEGIDOS.slice(0,-1).reduce((acc,s) => acc + (parseFloat(payload[s]||0) * (pesosScore[s]||0)), 0)
             if (novoTotal > 0) payload.score_total = parseFloat(novoTotal.toFixed(2))
@@ -1037,17 +1038,8 @@ export async function logUsoChamadaAPI({
   imovelId = null, imovelTitulo = null, modoTeste = false, sucesso = true
 }) {
   try {
-    const PRECOS = {
-      'claude-sonnet-4-20250514': { input: 3.00, output: 15.00 },
-      'claude-haiku-4-5-20251001': { input: 1.00, output: 5.00 },
-      'gpt-4o': { input: 2.50, output: 10.00 },
-      'gpt-4o-mini': { input: 0.15, output: 0.60 },
-      'gemini-2.0-flash': { input: 0.075, output: 0.30 },
-      'gemini-1.5-flash': { input: 0.075, output: 0.30 },
-      'gemini-2.0-flash-lite': { input: 0.038, output: 0.15 },
-      'deepseek-chat': { input: 0.27, output: 1.10 },
-    }
-    const preco = PRECOS[modelo] || { input: 3.00, output: 15.00 }
+    // Preços de API (fonte: constants.js)
+    const preco = CUSTO_POR_TOKEN[modelo] || { input: 3.00, output: 15.00 }
     const custoUSD = (tokensInput / 1_000_000) * preco.input +
                      (tokensOutput / 1_000_000) * preco.output
     const { data: { user } } = await supabase.auth.getUser()

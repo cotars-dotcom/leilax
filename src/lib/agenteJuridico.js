@@ -202,20 +202,14 @@ Retorne APENAS JSON:
     {"url": "URL completa do PDF", "tipo": "edital|matricula|processo|certidao|outro", "nome": "nome descritivo"}
   ]
 }`
-      const r = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`,
-        { method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ contents:[{parts:[{text:prompt}]}], generationConfig:{temperature:0.1, maxOutputTokens:1024} }),
-          signal: AbortSignal.timeout(30000) }
-      )
-      if (r.ok) {
-        const data = await r.json()
-        const txt = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
-        const match = txt.replace(/```json|```/g,'').trim().match(/\{[\s\S]*\}/)
-        if (match) {
-          const result = JSON.parse(match[0])
-          linksEncontrados = result.documentos || []
-        }
+      const { chamarGeminiCascata, parseJSONResposta } = await import('./constants.js')
+      const { texto: geminiTxt } = await chamarGeminiCascata(prompt, geminiKey, {
+        maxTokens: 1024, timeout: 30000
+      })
+      const match = geminiTxt.replace(/```json|```/g,'').trim().match(/\{[\s\S]*\}/)
+      if (match) {
+        const result = JSON.parse(match[0])
+        linksEncontrados = result.documentos || []
       }
     } catch(e) { console.warn('[AXIS Gemini links]', e.message) }
   }
@@ -315,35 +309,21 @@ Analise juridicamente este documento e retorne APENAS JSON válido (sem markdown
 }`
 
   try {
-    const r = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.1, maxOutputTokens: 2048 }
-        }),
-        signal: AbortSignal.timeout(45000)
-      }
-    )
-    if (!r.ok) throw new Error(`Gemini ${r.status}`)
-    const data = await r.json()
-    const txt = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
-    const match = txt.replace(/```json|```/g, '').trim().match(/\{[\s\S]*\}/)
-    if (!match) throw new Error('JSON inválido')
-    return JSON.parse(match[0])
+    const { chamarGeminiCascata, parseJSONResposta, CLAUDE_HAIKU, ANTHROPIC_VERSION } = await import('./constants.js')
+    const { texto } = await chamarGeminiCascata(prompt, geminiKey, { maxTokens: 2048, timeout: 45000 })
+    return parseJSONResposta(texto)
   } catch(e) {
     console.warn('[AXIS jurídico] Gemini análise:', e.message)
     // Fallback: tentar com Claude se disponível
     const claudeKey = typeof localStorage !== 'undefined' ? localStorage.getItem('axis-api-key') : null
     if (claudeKey && !geminiKey?.startsWith('sk-ant')) {
       try {
+        const { CLAUDE_HAIKU: _haiku, ANTHROPIC_VERSION: _av, parseJSONResposta: _parse } = await import('./constants.js')
         const r2 = await fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
-          headers: { 'Content-Type':'application/json','x-api-key':claudeKey,'anthropic-version':'2023-06-01' },
+          headers: { 'Content-Type':'application/json','x-api-key':claudeKey,'anthropic-version':_av },
           body: JSON.stringify({
-            model:'claude-haiku-4-5-20251001', max_tokens:2048,
+            model:_haiku, max_tokens:2048,
             messages:[{role:'user',content:`${prompt}\n\nTexto: ${texto.substring(0,4000)}`}]
           }),
           signal: AbortSignal.timeout(45000)
@@ -351,8 +331,7 @@ Analise juridicamente este documento e retorne APENAS JSON válido (sem markdown
         if (r2.ok) {
           const d2 = await r2.json()
           const txt2 = d2.content?.[0]?.text || ''
-          const m2 = txt2.replace(/\`\`\`json|\`\`\`/g,'').trim().match(/\{[\s\S]*\}/)
-          if (m2) return JSON.parse(m2[0])
+          return _parse(txt2)
         }
       } catch(e2) { console.warn('[AXIS jurídico] Claude fallback:', e2.message) }
     }

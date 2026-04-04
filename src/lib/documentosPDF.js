@@ -164,31 +164,14 @@ Retorne APENAS JSON válido com esta estrutura EXATA:
   "score_juridico_delta": 0.0
 }`
 
-  // Tentar Gemini primeiro
+  // Tentar Gemini primeiro (cascata de modelos)
   if (gKey) {
     try {
-      const r = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${gKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { temperature: 0.1, maxOutputTokens: 3000 }
-          }),
-          signal: AbortSignal.timeout(60000)
-        }
-      )
-      if (r.ok) {
-        const data = await r.json()
-        const txt = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
-        const match = txt.replace(/```json|```/g, '').trim().match(/\{[\s\S]*\}/)
-        if (match) {
-          const res = JSON.parse(match[0])
-          res._modelo = 'gemini-1.5-flash'
-          return res
-        }
-      }
+      const { chamarGeminiCascata, parseJSONResposta } = await import('./constants.js')
+      const { texto, modelo } = await chamarGeminiCascata(prompt, gKey, { maxTokens: 3000, timeout: 60000 })
+      const res = parseJSONResposta(texto)
+      res._modelo = modelo
+      return res
     } catch(e) { console.warn('[AXIS análise doc] Gemini:', e.message) }
   }
 
@@ -219,14 +202,15 @@ Retorne APENAS JSON válido com esta estrutura EXATA:
     } catch(e) { console.warn('[AXIS análise doc] DeepSeek:', e.message) }
   }
 
-  // Fallback Claude Haiku
+  // Fallback Claude Haiku (constantes centralizadas)
   if (cKey) {
     try {
+      const { CLAUDE_HAIKU: _haiku, ANTHROPIC_VERSION: _av, parseJSONResposta: _parse } = await import('./constants.js')
       const r = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
-        headers: { 'Content-Type':'application/json', 'x-api-key':cKey, 'anthropic-version':'2023-06-01' },
+        headers: { 'Content-Type':'application/json', 'x-api-key':cKey, 'anthropic-version':_av },
         body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
+          model: _haiku,
           max_tokens: 3000,
           messages: [{ role: 'user', content: prompt }]
         }),
@@ -478,27 +462,35 @@ export async function processarDocumentoCompleto({ url, nome, tipo, imovel, gemi
 Analise este documento (${nome}) do imóvel: ${imovel.titulo || ''} | Processo: ${imovel.processos_ativos || '?'}
 Retorne APENAS JSON:
 {"tipo_documento":"edital|matricula|processo|certidao|outro","titulo_documento":"","resumo_executivo":"3-5 linhas","informacoes_principais":{"processo_numero":"","vara":"","exequente":"","executado":"","matricula_numero":"","cartorio":"","proprietario_atual":"","debitos_declarados":"","gravames":""},"metricas_viabilidade":{"score_geral":7.0,"score_titulo":7.0,"score_debitos":6.0,"score_processos":7.0,"score_ocupacao":5.0,"score_documentacao":8.0,"justificativa":""},"riscos_identificados":[{"categoria":"","descricao":"","gravidade":"alto","impacto_financeiro_estimado":0,"acao_recomendada":""}],"pontos_positivos":[],"alertas_criticos":[],"responsabilidade_debitos":"sub_rogado|arrematante","explicacao_responsabilidade":"","ocupacao_confirmada":"incerto","prazo_liberacao_estimado_meses":0,"recomendacao_juridica":"favoravel|neutro|desfavoravel","parecer_final":"4-6 linhas","score_juridico_sugerido":7.0,"score_juridico_delta":0.0}`
-      const r = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${geminiKey}`,
-        {
-          method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({
-            contents:[{parts:[
-              {inline_data:{mime_type: download.contentType || 'application/pdf', data: base64}},
-              {text: prompt}
-            ]}],
-            generationConfig:{temperature:0.1, maxOutputTokens:3000}
-          }),
-          signal: AbortSignal.timeout(120000)
-        }
-      )
-      if (r.ok) {
+      const { MODELOS_GEMINI_PRO } = await import('./constants.js')
+      let r = null
+      let modeloVision = null
+      for (const modelo of MODELOS_GEMINI_PRO) {
+        try {
+          r = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${geminiKey}`,
+            {
+              method:'POST', headers:{'Content-Type':'application/json'},
+              body: JSON.stringify({
+                contents:[{parts:[
+                  {inline_data:{mime_type: download.contentType || 'application/pdf', data: base64}},
+                  {text: prompt}
+                ]}],
+                generationConfig:{temperature:0.1, maxOutputTokens:3000}
+              }),
+              signal: AbortSignal.timeout(120000)
+            }
+          )
+          if (r.ok) { modeloVision = modelo; break }
+        } catch(e) { console.warn(`[AXIS Vision] ${modelo}:`, e.message) }
+      }
+      if (r?.ok) {
         const data = await r.json()
         const txt = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
         const match = txt.replace(/```json|```/g,'').trim().match(/\{[\s\S]*\}/)
         if (match) {
           analise = JSON.parse(match[0])
-          analise._modelo = 'gemini-1.5-pro-vision'
+          analise._modelo = modeloVision + '-vision'
           onProgress?.(`✅ ${nome} — Vision OK, score: ${analise.metricas_viabilidade?.score_geral || '?'}/10`)
         }
       } else {

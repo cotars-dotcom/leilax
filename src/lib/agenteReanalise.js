@@ -278,11 +278,9 @@ Retorne APENAS JSON com os campos atualizados:
     _modelo_usado: modeloUsado,
   }
 
-  // Recalcular score total com os pesos corretos
-  const pesos = {
-    localizacao: 0.20, desconto: 0.18, juridico: 0.18,
-    ocupacao: 0.15, liquidez: 0.15, mercado: 0.14
-  }
+  // Recalcular score total com os pesos corretos (fonte: constants.js)
+  const { SCORE_PESOS: _pesos } = await import('./constants.js')
+  const pesos = _pesos
   const scoreCalc =
     (analiseAtualizada.score_localizacao || 0) * pesos.localizacao +
     (analiseAtualizada.score_desconto || 0)    * pesos.desconto +
