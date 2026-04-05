@@ -1660,15 +1660,7 @@ export default function App() {
   const isViewer = !isAdmin && profile?.role === 'viewer'
   const podeEditar = isAdmin
   const podeSoVer = !isAdmin
-  // Sprint 10: Rota pública — renderizar SharedViewer SEM autenticação
-  if (shareToken) {
-    return <Suspense fallback={<div style={{display:'flex',height:'100dvh',justifyContent:'center',alignItems:'center',color:'#002B80',fontSize:14}}>Carregando...</div>}>
-      <LazySharedViewer token={shareToken} />
-    </Suspense>
-  }
-  if (authLoading) return <div style={{display:'flex',flexDirection:'column',height:'100dvh',background:C.offwhite,justifyContent:'center',alignItems:'center',color:C.navy,fontFamily:"'Inter',system-ui,sans-serif",fontSize:'16px',fontWeight:'700'}}>Carregando...</div>
-  if (!session) return <Login />
-  if (profile && !profile.ativo) return <div style={{display:'flex',height:'100dvh',background:C.offwhite,justifyContent:'center',alignItems:'center',color:'#E5484D',fontFamily:"'Inter',system-ui,sans-serif",flexDirection:'column',gap:'12px'}}><div style={{fontSize:'16px',fontWeight:'700'}}>Acesso desativado</div><div style={{fontSize:'13px',color:C.muted}}>Contate o administrador</div></div>
+  // ALL hooks MUST be before any conditional return (React Rules of Hooks)
   const [view,setView]=useState("dashboard")
   const [vp,setVp]=useState({})
   const [props,setProps]=useState([])
@@ -1678,19 +1670,18 @@ export default function App() {
   const [showTrello,setShowTrello]=useState(false)
   const [showApiKey,setShowApiKey]=useState(false)
   const [showTrelloModal,setShowTrelloModal]=useState(false)
-const [parametrosBanco,setParametrosBanco]=useState([])
-const [criteriosBanco,setCriteriosBanco]=useState([])
+  const [parametrosBanco,setParametrosBanco]=useState([])
+  const [criteriosBanco,setCriteriosBanco]=useState([])
   const [apiOk,setApiKey]=useState(localStorage.getItem("axis-api-key"))
   const isMobile = useIsMobile(900)
   const isPhone  = useIsMobile(480)
-useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("parametros_score").select("*");if(pr)setParametrosBanco(pr);const{data:cr}=await supabase.from("criterios_avaliacao").select("*");if(cr)setCriteriosBanco(cr)}catch(e){console.warn("parametros:",e)}}lp()
+  useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("parametros_score").select("*");if(pr)setParametrosBanco(pr);const{data:cr}=await supabase.from("criterios_avaliacao").select("*");if(cr)setCriteriosBanco(cr)}catch(e){console.warn("parametros:",e)}}lp()
   // Seed automático de dados de referência (só se tabelas estiverem vazias)
   import('./lib/supabase.js').then(({ seedMercadoRegional, seedRiscosJuridicos }) => {
     seedMercadoRegional().catch(() => {})
     seedRiscosJuridicos().catch(() => {})
   })
-},[])
-
+  },[])
   // Garante IDs fixos dos boards AXIS no localStorage
   useEffect(() => {
     try {
@@ -1718,9 +1709,6 @@ useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("param
     }).catch(()=>{})
   },[session])
 
-  const showToast=(msg,c)=>{setToast({msg,c:c||K.teal});setTimeout(()=>setToast(null),4500)}
-  const nav=(v,p={})=>{React.startTransition(()=>{setView(v);setVp(p)})}
-
   useEffect(()=>{(async()=>{
     // Migração: leilax-* → axis-* (preservar dados do rebrand)
     const MIGRATE = [['leilax-props','axis-props'],['leilax-trello','axis-trello'],['leilax-api-key','axis-api-key'],['leilax-openai-key','axis-openai-key']]
@@ -1730,50 +1718,40 @@ useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("param
     }
     const t=await stLoad("axis-trello")
     if(t)setTrello(t); React.startTransition(()=>setL(true))
-    // Mostrar modal de API key se não tiver
     if(!localStorage.getItem("axis-api-key")) setTimeout(()=>setShowApiKey(true),1000)
-    // Carregar imóveis: Supabase como fonte primária, localStorage como fallback
     if(session) {
       try {
-        // Migração única: localStorage → Supabase (usa saveImovelCompleto com payload seguro)
         if(!localStorage.getItem('axis-migracao-concluida')){
           const local=JSON.parse(localStorage.getItem('axis-props')||'[]')
           if(local.length>0){
-            console.debug(`[AXIS] Migrando ${local.length} imóveis locais para Supabase...`)
             const{saveImovelCompleto}=await import('./lib/supabase.js')
             let ok=0
-            for(const im of local){try{await saveImovelCompleto(im,session.user.id);ok++}catch(e){console.warn('[AXIS] Migração falhou:',im.id,e.message,e)}}
-            console.debug(`[AXIS] Migração: ${ok}/${local.length} imóveis salvos no Supabase`)
-            // Só marcar concluída se pelo menos 1 migrou com sucesso
+            for(const im of local){try{await saveImovelCompleto(im,session.user.id);ok++}catch(e){}}
             if(ok>0) localStorage.setItem('axis-migracao-concluida','true')
-          } else {
-            localStorage.setItem('axis-migracao-concluida','true')
-          }
+          } else { localStorage.setItem('axis-migracao-concluida','true') }
         }
-        // Carregar do Supabase
         const{getImoveisAtivos:gi}=await import('./lib/supabase.js')
         const data=await gi()
-        if(data&&data.length>0){
-          setProps(data)
-          stSave("axis-props",data) // cache local
-        } else {
-          // Fallback: tentar cache local
-          const cache=JSON.parse(localStorage.getItem('axis-props')||'[]')
-          if(cache.length>0) setProps(cache)
-        }
-      } catch(e) {
-        console.error('[AXIS] Supabase indisponível, usando cache local:',e)
-        const cache=JSON.parse(localStorage.getItem('axis-props')||'[]')
-        if(cache.length>0) setProps(cache)
-      }
-    } else {
-      const cache=await stLoad("axis-props")
-      if(cache) setProps(cache)
-    }
+        if(data&&data.length>0){ setProps(data); stSave("axis-props",data) }
+        else { const cache=JSON.parse(localStorage.getItem('axis-props')||'[]'); if(cache.length>0) setProps(cache) }
+      } catch(e) { const cache=JSON.parse(localStorage.getItem('axis-props')||'[]'); if(cache.length>0) setProps(cache) }
+    } else { const cache=await stLoad("axis-props"); if(cache) setProps(cache) }
   })()},[])
-
   useEffect(()=>{if(loaded&&props.length>0)stSave("axis-props",props)},[props,loaded])
   useEffect(()=>{if(loaded&&trello)stSave("axis-trello",trello)},[trello,loaded])
+
+  // Sprint 10: Rota pública — renderizar SharedViewer SEM autenticação
+  if (shareToken) {
+    return <Suspense fallback={<div style={{display:'flex',height:'100dvh',justifyContent:'center',alignItems:'center',color:'#002B80',fontSize:14}}>Carregando...</div>}>
+      <LazySharedViewer token={shareToken} />
+    </Suspense>
+  }
+  if (authLoading) return <div style={{display:'flex',flexDirection:'column',height:'100dvh',background:C.offwhite,justifyContent:'center',alignItems:'center',color:C.navy,fontFamily:"'Inter',system-ui,sans-serif",fontSize:'16px',fontWeight:'700'}}>Carregando...</div>
+  if (!session) return <Login />
+  if (profile && !profile.ativo) return <div style={{display:'flex',height:'100dvh',background:C.offwhite,justifyContent:'center',alignItems:'center',color:'#E5484D',fontFamily:"'Inter',system-ui,sans-serif",flexDirection:'column',gap:'12px'}}><div style={{fontSize:'16px',fontWeight:'700'}}>Acesso desativado</div><div style={{fontSize:'13px',color:C.muted}}>Contate o administrador</div></div>
+
+  const showToast=(msg,c)=>{setToast({msg,c:c||K.teal});setTimeout(()=>setToast(null),4500)}
+  const nav=(v,p={})=>{React.startTransition(()=>{setView(v);setVp(p)})}
 
   const addProp=async(p)=>{
     // Garantir ID
