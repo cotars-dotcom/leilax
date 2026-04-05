@@ -42,7 +42,7 @@ export async function baixarPDFParaBlob(url, onProgress) {
   try {
     onProgress?.('🔄 Tentando via proxy Jina...')
     const r2 = await fetch(`https://r.jina.ai/${url}`, {
-      headers: { 'Accept': 'text/plain', 'X-Return-Format': 'text' },
+      headers: { 'Accept': 'text/plain', 'X-Return-Format': 'markdown' },
       signal: AbortSignal.timeout(30000)
     })
     if (r2.ok) {
@@ -402,7 +402,7 @@ export async function processarDocumentoCompleto({ url, nome, tipo, imovel, gemi
     // Tentar via Jina como texto
     try {
       const r = await fetch(`https://r.jina.ai/${url}`, {
-        headers: { 'Accept': 'text/plain', 'X-Return-Format': 'text' },
+        headers: { 'Accept': 'text/plain', 'X-Return-Format': 'markdown' },
         signal: AbortSignal.timeout(30000)
       })
       if (r.ok) textoParaAnalise = await r.text()

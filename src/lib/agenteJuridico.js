@@ -150,7 +150,8 @@ export async function baixarViaJina(url, onProgress) {
   try {
     onProgress?.(`Jina lendo: ${url.split('/').pop().substring(0, 40)}`)
     const jinaUrl = `https://r.jina.ai/${url}`
-    // Usar markdown para capturar links completos [texto](url) — essencial para Marco Antônio
+    // IMPORTANTE: usar markdown para preservar encoding UTF-8 (acentos pt-BR)
+    // O formato 'text' do Jina strip acentos → Gemini interpreta como "documento corrompido"
     const r = await fetch(jinaUrl, {
       headers: {
         'Accept': 'text/plain',
