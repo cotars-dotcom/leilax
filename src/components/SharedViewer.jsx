@@ -6,7 +6,6 @@
 import { useState, useEffect } from 'react'
 import { getImovelPorToken } from '../lib/supabase.js'
 import { isMercadoDireto } from '../lib/detectarFonte.js'
-import { calcularCustosAquisicao } from '../lib/constants.js'
 
 const fmt = v => v ? `R$ ${Math.round(v).toLocaleString('pt-BR')}` : '—'
 const pct = v => v != null ? `${Number(v).toFixed(1)}%` : '—'
