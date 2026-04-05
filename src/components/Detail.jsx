@@ -52,6 +52,8 @@ const ESCOPOS_INFO = {
 }
 
 
+const Bdg = ({c,ch}) => <span style={{display:"inline-block",fontSize:"10px",fontWeight:"700",padding:"2px 8px",borderRadius:"5px",textTransform:"uppercase",letterSpacing:".5px",background:`${c}12`,color:c}}>{ch}</span>
+
 // Normaliza título longo do portal para "Apt 2q 43m² — Bairro, Cidade" (mesmo padrão do card)
 function formatTitulo(p) {
   const t = p?.titulo || 'Imóvel'
