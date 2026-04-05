@@ -432,12 +432,13 @@ function AbaJuridica({ imovel, onReclassificado }) {
     setErro('')
     setResultado(null)
     try {
-      const { analisarTextoJuridicoGemini } = await import('../lib/agenteJuridico.js')
+      const { analisarTextoJuridicoGemini, isTextoLegivel, analisarPDFBase64Gemini } = await import('../lib/agenteJuridico.js')
       let texto = null
+      let analise = null
       let urlDoc = doc.url_origem || doc.url
 
-      // CAMINHO 1: Se já tem texto salvo, analisar direto (sem re-download)
-      if (doc.conteudo_texto && doc.conteudo_texto.length > 100) {
+      // CAMINHO 1: Texto salvo E legível → análise direta
+      if (doc.conteudo_texto && doc.conteudo_texto.length > 100 && isTextoLegivel(doc.conteudo_texto)) {
         texto = doc.conteudo_texto
         setProgresso(`📄 Usando texto salvo (${(texto.length / 1000).toFixed(0)}k chars) — sem re-download`)
       }
@@ -445,24 +446,51 @@ function AbaJuridica({ imovel, onReclassificado }) {
       else if (urlDoc) {
         setProgresso(`📥 Baixando ${doc.nome || doc.tipo} via Jina...`)
         const { baixarViaJina } = await import('../lib/agenteJuridico.js')
-        texto = await baixarViaJina(urlDoc, setProgresso)
+        const textoJina = await baixarViaJina(urlDoc, setProgresso)
+        if (textoJina && textoJina.length > 100 && isTextoLegivel(textoJina)) {
+          texto = textoJina
+        }
       }
 
-      if (!texto || texto.length < 100) {
-        setErro('Sem texto e sem URL — faça upload manual do PDF')
-        setAnalisando(false)
-        setProgresso('')
-        return
+      // CAMINHO 3: Texto corrompido/criptografado → PDF Vision (Gemini base64)
+      if (!texto && urlDoc && geminiKey) {
+        setProgresso(`🔬 Texto ilegível — tentando Gemini Vision direto no PDF...`)
+        try {
+          // Buscar o PDF como ArrayBuffer e converter para base64
+          const pdfUrl = doc.url_storage || urlDoc
+          const resp = await fetch(pdfUrl.startsWith('http') ? pdfUrl : `https://r.jina.ai/${urlDoc}`, {
+            signal: AbortSignal.timeout(30000)
+          })
+          if (resp.ok) {
+            const buf = await resp.arrayBuffer()
+            const bytes = new Uint8Array(buf)
+            let binary = ''
+            for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
+            const base64 = btoa(binary)
+            setProgresso(`🤖 Analisando PDF via Gemini Vision (~45s)...`)
+            analise = await analisarPDFBase64Gemini(base64, doc.nome || doc.tipo, imovel, geminiKey)
+            if (analise) {
+              analise._via = 'gemini-vision-pdf'
+            }
+          }
+        } catch (e) {
+          console.warn('[AXIS] Vision fallback:', e.message)
+        }
       }
 
-      setProgresso(`🤖 Analisando ${doc.nome || doc.tipo} com IA (~30s)...`)
-      const analise = await analisarTextoJuridicoGemini(texto, doc.nome || doc.tipo, imovel, geminiKey || claudeKey)
+      // CAMINHO 4: Texto legível → análise por texto
+      if (!analise && texto) {
+        setProgresso(`🤖 Analisando ${doc.nome || doc.tipo} com IA (~30s)...`)
+        analise = await analisarTextoJuridicoGemini(texto, doc.nome || doc.tipo, imovel, geminiKey || claudeKey)
+      }
+
       if (!analise) {
-        setErro('IA não retornou análise — tente novamente')
+        setErro('Não foi possível analisar — texto corrompido e PDF Vision falhou. Tente upload manual.')
         setAnalisando(false)
         setProgresso('')
         return
       }
+
       // Atualizar doc no banco
       const { salvarDocumentoJuridico } = await import('../lib/supabase.js')
       await salvarDocumentoJuridico({
@@ -471,7 +499,7 @@ function AbaJuridica({ imovel, onReclassificado }) {
         tipo: doc.tipo,
         nome: doc.nome,
         url_origem: urlDoc,
-        conteudo_texto: texto.substring(0, 5000),
+        conteudo_texto: texto ? texto.substring(0, 5000) : doc.conteudo_texto,
         analise_ia: analise.parecer || analise.resumo || JSON.stringify(analise).substring(0, 500),
         analise_estruturada: analise,
         riscos_encontrados: analise.riscos_identificados || [],
@@ -489,7 +517,7 @@ function AbaJuridica({ imovel, onReclassificado }) {
         status: 'analisado',
         analisado_em: new Date().toISOString(),
       })
-      setProgresso(`✅ ${doc.nome || doc.tipo} analisado com sucesso!`)
+      setProgresso(`✅ ${doc.nome || doc.tipo} analisado com sucesso${analise._via ? ' (Vision)' : ''}!`)
       setResultado(analise)
       await carregarDocs()
     } catch (e) {

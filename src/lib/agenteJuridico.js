@@ -7,6 +7,17 @@
  * Custo: ~R$ 0,02 por análise completa.
  */
 
+// ─── DETECÇÃO DE TEXTO CORROMPIDO ─────────────────────────────────────────────
+// PDFs criptografados/scanned retornam bytes binários via Jina.
+// Se >30% dos chars são non-printable, o texto é lixo.
+export function isTextoLegivel(texto) {
+  if (!texto || texto.length < 50) return false
+  const amostra = texto.substring(0, 500)
+  const naoImprimiveis = (amostra.match(/[^\x20-\x7E\xA0-\xFF\u00C0-\u024F\n\r\t ]/g) || []).length
+  const ratio = naoImprimiveis / amostra.length
+  return ratio < 0.3 // <30% de lixo = legível
+}
+
 async function _getRiscos() {
   try {
     const { getRiscosJuridicos } = await import('./supabase.js')

@@ -508,8 +508,9 @@ export default function AbaJuridicaAgente({ imovel, isAdmin, onReclassificado })
       const { oKey: openaiKeyDoc } = await syncChaves()
       let res = null
 
-      // CAMINHO 1: Se já tem texto salvo, analisar direto (sem re-download)
-      if (doc.conteudo_texto && doc.conteudo_texto.length > 100) {
+      // CAMINHO 1: Se já tem texto salvo E LEGÍVEL, analisar direto (sem re-download)
+      const { isTextoLegivel } = await import('../lib/agenteJuridico.js')
+      if (doc.conteudo_texto && doc.conteudo_texto.length > 100 && isTextoLegivel(doc.conteudo_texto)) {
         setProgresso(`📄 Usando texto salvo (${(doc.conteudo_texto.length / 1000).toFixed(0)}k chars)...`)
         const { analisarTextoJuridicoGemini } = await import('../lib/agenteJuridico.js')
         const analise = await analisarTextoJuridicoGemini(doc.conteudo_texto, doc.nome || doc.tipo, imovel, gKey)
@@ -543,6 +544,46 @@ export default function AbaJuridicaAgente({ imovel, isAdmin, onReclassificado })
           openaiKey: openaiKeyDoc,
           onProgress: setProgresso
         })
+        // Se processou mas o texto é ilegível, tentar Vision
+        if (res && res.conteudo_texto && !isTextoLegivel(res.conteudo_texto) && !res.analise_estruturada) {
+          res = null // forçar fallback Vision
+        }
+      }
+
+      // CAMINHO 2.5: PDF Vision (texto corrompido → enviar PDF base64 ao Gemini Pro)
+      if (!res && (doc.url_storage || doc.url_origem || doc.url) && gKey) {
+        setProgresso(`🔬 Texto ilegível — Gemini Vision direto no PDF...`)
+        try {
+          const { analisarPDFBase64Gemini } = await import('../lib/agenteJuridico.js')
+          const pdfUrl = doc.url_storage || doc.url_origem || doc.url
+          const resp = await fetch(pdfUrl.startsWith('http') ? pdfUrl : `https://r.jina.ai/${pdfUrl}`, {
+            signal: AbortSignal.timeout(30000)
+          })
+          if (resp.ok) {
+            const buf = await resp.arrayBuffer()
+            const bytes = new Uint8Array(buf)
+            let binary = ''
+            for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
+            const base64 = btoa(binary)
+            setProgresso(`🤖 Gemini Vision analisando PDF (~45s)...`)
+            const analise = await analisarPDFBase64Gemini(base64, doc.nome || doc.tipo, imovel, gKey)
+            if (analise) {
+              res = {
+                analise_ia: analise.parecer || analise.resumo || JSON.stringify(analise).substring(0,500),
+                resumo_executivo: analise.resumo,
+                riscos_encontrados: analise.riscos_identificados || [],
+                score_juridico_sugerido: analise.score_juridico_sugerido,
+                score_viabilidade: analise.score_juridico_sugerido,
+                responsabilidade_debitos: analise.responsabilidade_debitos,
+                ocupacao_confirmada: analise.ocupacao_confirmada,
+                recomendacao_juridica: analise.recomendacao_juridica,
+                pontos_positivos: analise.pontos_positivos || [],
+                alertas_criticos: analise.alertas_criticos || [],
+                analise_estruturada: { ...analise, _via: 'gemini-vision-pdf' },
+              }
+            }
+          }
+        } catch(e) { console.warn('[AXIS] Vision fallback:', e.message) }
       }
 
       // CAMINHO 3: Sem URL no doc — re-scrape a página fonte para descobrir URL do PDF
