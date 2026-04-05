@@ -9,22 +9,33 @@ import { supabase } from './supabase.js'
 export async function baixarPDFParaBlob(url, onProgress) {
   onProgress?.(`📥 Baixando PDF: ${url.split('/').pop().substring(0, 40)}...`)
   
-  // Tentar fetch direto primeiro (PDF como binário)
-  try {
-    const r = await fetch(url, {
-      signal: AbortSignal.timeout(30000),
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; AXIS/1.0)' }
-    })
-    if (r.ok) {
-      const contentType = r.headers.get('content-type') || ''
-      const blob = await r.blob()
-      if (blob.size > 1000) {
-        onProgress?.(`✅ PDF baixado: ${(blob.size / 1024).toFixed(0)}KB`)
-        return { blob, contentType: contentType || 'application/pdf', tamanho: blob.size }
+  // Domínios que bloqueiam CORS — ir direto pro Jina
+  const CORS_BLOCKED = ['suporteleiloes.com.br', 'marcoantonioleiloeiro.com.br', 
+    'superbid.net', 'sold.com.br', 'megaleiloes.com.br', 'portalzuk.com.br',
+    'lancenoleilao.com.br', 'leilaovip.com.br']
+  const urlLower = url.toLowerCase()
+  const corsBlocked = CORS_BLOCKED.some(d => urlLower.includes(d))
+
+  // Tentar fetch direto primeiro (só se não for CORS-blocked)
+  if (!corsBlocked) {
+    try {
+      const r = await fetch(url, {
+        signal: AbortSignal.timeout(30000),
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; AXIS/1.0)' }
+      })
+      if (r.ok) {
+        const contentType = r.headers.get('content-type') || ''
+        const blob = await r.blob()
+        if (blob.size > 1000) {
+          onProgress?.(`✅ PDF baixado: ${(blob.size / 1024).toFixed(0)}KB`)
+          return { blob, contentType: contentType || 'application/pdf', tamanho: blob.size }
+        }
       }
+    } catch(e) {
+      console.warn('[AXIS PDF] Fetch direto:', e.message)
     }
-  } catch(e) {
-    console.warn('[AXIS PDF] Fetch direto:', e.message)
+  } else {
+    onProgress?.('🔄 PDF de leiloeiro — usando extração Jina...')
   }
   
   // Fallback: Jina como proxy para CORS
