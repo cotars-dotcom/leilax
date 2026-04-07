@@ -1066,7 +1066,9 @@ function PropCard({p,onNav}) {
       </div>
       {/* ScoreRing */}
       <div style={{flexShrink:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",marginTop:isPhone?4:0,alignSelf:isPhone?"flex-end":"flex-start"}}>
-        <ScoreRing score={sc} size={isPhone?58:64}/>
+        {sc > 0 ? <ScoreRing score={sc} size={isPhone?58:64}/>
+          : <div style={{width:isPhone?58:64,height:isPhone?58:64,borderRadius:'50%',border:'2px dashed #D4D4D8',display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,color:C.muted,textAlign:'center',lineHeight:1.2}}>N/A</div>
+        }
       </div>
     </div>
 

@@ -178,14 +178,14 @@ export function parseJSONResposta(texto) {
 /** Calcula breakdown completo dos custos de aquisição */
 export function calcularBreakdownFinanceiro(lance, imovel = {}, eMercado = false) {
   const custos = eMercado ? CUSTOS_MERCADO : CUSTOS_LEILAO
-  const comissaoPct = imovel.comissao_leiloeiro_pct || custos.comissao
-  const itbiPct = imovel.itbi_pct || custos.itbi
-  const docPct = custos.documentacao + custos.registro
-  const advPct = custos.advogado || 0
+  const comissaoPct = (imovel.comissao_leiloeiro_pct || custos.comissao_leiloeiro_pct || 5) / 100
+  const itbiPct = (imovel.itbi_pct || custos.itbi_pct || 3) / 100
+  const docPct = (custos.documentacao_pct || 0.5) / 100
+  const advPct = (custos.advogado_pct || 0) / 100
   
   const comissao = lance * comissaoPct
   const itbi = lance * itbiPct
-  const doc = lance * docPct
+  const doc = lance * docPct + (custos.registro_fixo || 1500)
   const advogado = lance * advPct
   const reforma = parseFloat(imovel.custo_reforma_estimado || imovel.custo_reforma_calculado || 0)
   const totalCustos = comissao + itbi + doc + advogado
@@ -206,16 +206,20 @@ export function calcularBreakdownFinanceiro(lance, imovel = {}, eMercado = false
 
 /** Calcula ROI e cenários de saída */
 export function calcularROI(investimentoTotal, valorMercado, aluguelMensal = 0) {
+  if (!investimentoTotal || investimentoTotal <= 0 || !valorMercado || valorMercado <= 0) {
+    return { lucro: 0, roi: 0, invalido: true, cenarios: { realista: { valor: 0, roi: 0 }, otimista: { valor: 0, roi: 0 }, vendaRapida: { valor: 0, roi: 0 } }, locacao: null }
+  }
   const lucro = valorMercado - investimentoTotal
-  const roi = investimentoTotal > 0 ? (lucro / investimentoTotal) * 100 : 0
+  const roi = (lucro / investimentoTotal) * 100
+  const safeRoi = v => Math.max(-100, Math.min(999, Math.round(v * 10) / 10))
   
   return {
     lucro: Math.round(lucro),
-    roi: Math.round(roi * 10) / 10,
+    roi: safeRoi(roi),
     cenarios: {
-      realista: { valor: Math.round(valorMercado), roi: Math.round(roi * 10) / 10 },
-      otimista: { valor: Math.round(valorMercado * 1.15), roi: Math.round(((valorMercado * 1.15 - investimentoTotal) / investimentoTotal) * 1000) / 10 },
-      vendaRapida: { valor: Math.round(valorMercado * 0.9), roi: Math.round(((valorMercado * 0.9 - investimentoTotal) / investimentoTotal) * 1000) / 10 },
+      realista: { valor: Math.round(valorMercado), roi: safeRoi(roi) },
+      otimista: { valor: Math.round(valorMercado * 1.15), roi: safeRoi(((valorMercado * 1.15 - investimentoTotal) / investimentoTotal) * 100) },
+      vendaRapida: { valor: Math.round(valorMercado * 0.9), roi: safeRoi(((valorMercado * 0.9 - investimentoTotal) / investimentoTotal) * 100) },
     },
     locacao: aluguelMensal > 0 ? {
       aluguelMensal: Math.round(aluguelMensal),
