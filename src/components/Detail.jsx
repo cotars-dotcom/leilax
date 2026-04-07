@@ -10,6 +10,7 @@ import PainelLeilao from './PainelLeilao.jsx'
 const AbaJuridicaAgente = lazy(() => import('./AbaJuridicaAgente.jsx'))
 import { buscarArrematesSimilares, carregarCacheArremates } from '../lib/buscaArrematesGPT.js'
 import PainelLancamento from './PainelLancamento.jsx'
+import PainelInvestimento from './PainelInvestimento.jsx'
 import PainelRentabilidade from './PainelRentabilidade.jsx'
 import { isMercadoDireto } from '../lib/detectarFonte.js'
 import { calcularCustosAquisicao } from '../lib/constants.js'
@@ -1263,6 +1264,8 @@ for (const s of SCORES) {
       <ReformaProvider imovel={p}>
         {/* Mostrar PainelLancamento só para leilões */}
         {!isMercadoDireto(p.fonte_url, p.tipo_transacao) && <PainelLancamento imovel={p}/>}
+        {/* Sprint 11: Breakdown financeiro + ROI + Preditor de Concorrência */}
+        <PainelInvestimento imovel={p} />
         {/* Mercado direto: badge de oportunidade */}
         {isMercadoDireto(p.fonte_url, p.tipo_transacao) && p.preco_pedido > 0 && (
           <div style={{...card(),marginBottom:'14px',padding:'12px 14px',background:'#FFFBEB',border:'1.5px solid #F59E0B'}}>

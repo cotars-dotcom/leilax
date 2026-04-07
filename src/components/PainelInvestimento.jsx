@@ -1,0 +1,240 @@
+/**
+ * AXIS — Painel de Investimento (Sprint 11)
+ * Breakdown financeiro + ROI + Preditor de Concorrência
+ * Inspirado no Leilão Ninja, com melhorias AXIS
+ */
+import { useState } from 'react'
+import { C, K, fmtC, card } from '../appConstants.js'
+import { isMercadoDireto } from '../lib/detectarFonte.js'
+import { calcularBreakdownFinanceiro, calcularROI, calcularPreditorConcorrencia } from '../lib/constants.js'
+
+const fmt = v => v ? `R$ ${Math.round(v).toLocaleString('pt-BR')}` : '—'
+const pct = v => v != null ? `${Number(v).toFixed(1)}%` : '—'
+
+function BarraVisual({ label, valor, total, cor }) {
+  const w = total > 0 ? Math.min(100, (valor / total) * 100) : 0
+  return (
+    <div style={{ marginBottom: 6 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 2 }}>
+        <span style={{ color: C.muted }}>{label}</span>
+        <span style={{ fontWeight: 700, color: cor || C.navy }}>{fmt(valor)}</span>
+      </div>
+      <div style={{ height: 6, background: `${cor || C.navy}15`, borderRadius: 3 }}>
+        <div style={{ height: '100%', width: `${w}%`, background: cor || C.navy, borderRadius: 3, transition: 'width .3s' }} />
+      </div>
+    </div>
+  )
+}
+
+export default function PainelInvestimento({ imovel }) {
+  const [expandido, setExpandido] = useState(false)
+  const [lanceSimulado, setLanceSimulado] = useState(null)
+  const p = imovel
+  const eMercado = isMercadoDireto(p.fonte_url, p.tipo_transacao)
+  const lance = lanceSimulado || parseFloat(p.preco_pedido || p.valor_minimo) || 0
+  const mercado = parseFloat(p.valor_mercado_estimado) || 0
+  
+  if (!lance || !mercado) return null
+  
+  const bd = calcularBreakdownFinanceiro(lance, p, eMercado)
+  const roi = calcularROI(bd.investimentoTotal, mercado, parseFloat(p.aluguel_mensal_estimado) || 0)
+  const preditor = !eMercado ? calcularPreditorConcorrencia(
+    parseFloat(p.valor_minimo) || lance,
+    mercado,
+    bd.totalCustos + bd.reforma
+  ) : []
+
+  const roiColor = roi.roi > 20 ? '#065F46' : roi.roi > 10 ? '#D97706' : roi.roi > 0 ? '#92400E' : '#991B1B'
+  const roiBg = roi.roi > 20 ? '#ECFDF5' : roi.roi > 10 ? '#FEF3C7' : roi.roi > 0 ? '#FFFBEB' : '#FEF2F2'
+
+  return (
+    <div style={{ ...card(), marginBottom: 14, overflow: 'hidden' }}>
+      {/* Header com ROI destaque */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 18px', background: roiBg, borderBottom: `1px solid ${C.borderW}` }}>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: C.navy }}>💰 Análise de Investimento</div>
+          <div style={{ fontSize: 10, color: C.muted, marginTop: 2 }}>Breakdown completo · ROI · Preditor</div>
+        </div>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 28, fontWeight: 800, color: roiColor, lineHeight: 1 }}>
+            {roi.roi > 0 ? '+' : ''}{roi.roi}%
+          </div>
+          <div style={{ fontSize: 9, color: roiColor, fontWeight: 600, textTransform: 'uppercase' }}>ROI estimado</div>
+        </div>
+      </div>
+
+      <div style={{ padding: '14px 18px' }}>
+        {/* Grid principal: Breakdown + Resumo */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 14 }}>
+          {/* Coluna esquerda: Breakdown de custos */}
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: C.navy, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '.3px' }}>
+              Custos de Aquisição
+            </div>
+            <BarraVisual label={`Lance ${eMercado ? '(pedido)' : '(mínimo)'}`} valor={bd.lance} total={mercado} cor="#002B80" />
+            <BarraVisual label={`Comissão ${eMercado ? '' : 'leiloeiro '}(${(bd.comissao.pct * 100).toFixed(0)}%)`} valor={bd.comissao.valor} total={mercado} cor="#7C3AED" />
+            <BarraVisual label={`ITBI (${(bd.itbi.pct * 100).toFixed(0)}%)`} valor={bd.itbi.valor} total={mercado} cor="#0891B2" />
+            <BarraVisual label={`Doc + Registro (${(bd.documentacao.pct * 100).toFixed(1)}%)`} valor={bd.documentacao.valor} total={mercado} cor="#6366F1" />
+            {!eMercado && bd.advogado.valor > 0 && (
+              <BarraVisual label={`Advogado (${(bd.advogado.pct * 100).toFixed(0)}%)`} valor={bd.advogado.valor} total={mercado} cor="#D946EF" />
+            )}
+            {bd.reforma > 0 && (
+              <BarraVisual label="Reforma estimada" valor={bd.reforma} total={mercado} cor="#F59E0B" />
+            )}
+            <div style={{ borderTop: `1px solid ${C.borderW}`, paddingTop: 6, marginTop: 4 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 700 }}>
+                <span style={{ color: C.navy }}>Investimento Total</span>
+                <span style={{ color: C.navy }}>{fmt(bd.investimentoTotal)}</span>
+              </div>
+              <div style={{ fontSize: 9, color: C.muted, marginTop: 2 }}>
+                Custos = {bd.pctCustosSobreLance}% sobre o lance
+              </div>
+            </div>
+          </div>
+
+          {/* Coluna direita: Cenários */}
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: C.navy, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '.3px' }}>
+              Cenários de Saída
+            </div>
+            {[
+              { label: '📈 Otimista (+15%)', ...roi.cenarios.otimista, cor: '#065F46' },
+              { label: '📊 Realista', ...roi.cenarios.realista, cor: '#002B80' },
+              { label: '⚡ Venda rápida (-10%)', ...roi.cenarios.vendaRapida, cor: roi.cenarios.vendaRapida.roi >= 0 ? '#D97706' : '#991B1B' },
+            ].map(c => (
+              <div key={c.label} style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                padding: '8px 10px', borderRadius: 8, marginBottom: 4,
+                background: c.roi >= 0 ? `${c.cor}08` : '#FEF2F210',
+                border: `1px solid ${c.roi >= 0 ? `${c.cor}20` : '#FCA5A530'}`
+              }}>
+                <div>
+                  <div style={{ fontSize: 10.5, color: C.muted }}>{c.label}</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: C.navy }}>{fmt(c.valor)}</div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: c.cor }}>
+                    {c.roi > 0 ? '+' : ''}{c.roi}%
+                  </div>
+                  <div style={{ fontSize: 9, color: C.muted }}>
+                    {fmt(c.valor - bd.investimentoTotal)}
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {/* Locação */}
+            {roi.locacao && (
+              <div style={{
+                padding: '8px 10px', borderRadius: 8, marginTop: 4,
+                background: '#F0FDF4', border: '1px solid #BBF7D020'
+              }}>
+                <div style={{ fontSize: 10.5, color: '#065F46', fontWeight: 600 }}>🏠 Locação</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
+                  <div>
+                    <div style={{ fontSize: 9, color: C.muted }}>Aluguel</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: '#065F46' }}>{fmt(roi.locacao.aluguelMensal)}/mês</div>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: 9, color: C.muted }}>Yield</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: '#065F46' }}>{roi.locacao.yieldAnual}% a.a.</div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: 9, color: C.muted }}>Payback</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: '#065F46' }}>{Math.round(roi.locacao.paybackMeses / 12)} anos</div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Preditor de Concorrência */}
+        {preditor.length > 0 && (
+          <>
+            <div onClick={() => setExpandido(!expandido)} style={{
+              cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              padding: '10px 0', borderTop: `1px solid ${C.borderW}`, marginTop: 4
+            }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: C.navy }}>
+                🎯 Preditor de Concorrência
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{
+                  fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10,
+                  background: preditor.find(n => n.label === 'Break-even')?.numLances > 20 ? '#ECFDF5' : preditor.find(n => n.label === 'Break-even')?.numLances > 10 ? '#FEF3C7' : '#FEF2F2',
+                  color: preditor.find(n => n.label === 'Break-even')?.numLances > 20 ? '#065F46' : preditor.find(n => n.label === 'Break-even')?.numLances > 10 ? '#D97706' : '#991B1B',
+                }}>
+                  até {preditor.find(n => n.label === 'Break-even')?.numLances || 0} lances até break-even
+                </span>
+                <span style={{ fontSize: 10, color: C.muted }}>{expandido ? '▲' : '▼'}</span>
+              </div>
+            </div>
+
+            {expandido && (
+              <div style={{ paddingBottom: 4 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8, marginBottom: 10 }}>
+                  {preditor.map(n => {
+                    const cor = n.alvo >= 0.20 ? '#7C3AED' : n.alvo >= 0.10 ? '#065F46' : '#D97706'
+                    return (
+                      <div key={n.label} style={{
+                        padding: '10px 12px', borderRadius: 10,
+                        background: `${cor}08`, border: `1px solid ${cor}20`,
+                        textAlign: 'center'
+                      }}>
+                        <div style={{ fontSize: 9, fontWeight: 600, color: cor, textTransform: 'uppercase', marginBottom: 4 }}>{n.label}</div>
+                        <div style={{ fontSize: 22, fontWeight: 800, color: cor, lineHeight: 1 }}>{n.numLances}</div>
+                        <div style={{ fontSize: 9, color: C.muted, marginTop: 2 }}>lances de R$ 5k</div>
+                        <div style={{ fontSize: 10, color: C.navy, fontWeight: 600, marginTop: 4 }}>
+                          até {fmt(n.lanceAtual)}
+                        </div>
+                        <div style={{ fontSize: 9, color: '#065F46' }}>
+                          lucro {fmt(n.lucro)}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+                <div style={{ fontSize: 10, color: C.muted, lineHeight: 1.5, padding: '6px 0' }}>
+                  💡 Cada lance = R$ 5.000 de incremento. Base: valor de mercado {fmt(mercado)}, custos {fmt(bd.totalCustos + bd.reforma)}.
+                  {preditor.find(n => n.label === 'Break-even')?.numLances > 15 
+                    ? ' Excelente margem — você pode competir com confiança.'
+                    : preditor.find(n => n.label === 'Break-even')?.numLances > 5
+                    ? ' Margem moderada — defina seu lance máximo antes do leilão.'
+                    : ' Margem apertada — cuidado para não ultrapassar o break-even.'}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Info adicional: parcelamento e condomínio */}
+        {(p.parcelamento_aceito || p.nome_condominio || p.elevador === false) && (
+          <div style={{ borderTop: `1px solid ${C.borderW}`, paddingTop: 10, marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {p.parcelamento_aceito && (
+              <span style={{ fontSize: 9.5, padding: '3px 8px', borderRadius: 5, background: '#DBEAFE', color: '#1D4ED8', fontWeight: 600 }}>
+                💳 Parcelável
+              </span>
+            )}
+            {p.nome_condominio && (
+              <span style={{ fontSize: 9.5, padding: '3px 8px', borderRadius: 5, background: '#F3F4F6', color: '#374151', fontWeight: 600 }}>
+                🏢 {p.nome_condominio}
+              </span>
+            )}
+            {p.elevador === false && (
+              <span style={{ fontSize: 9.5, padding: '3px 8px', borderRadius: 5, background: '#FEF3C7', color: '#92400E', fontWeight: 600 }}>
+                ⚠️ Sem elevador
+              </span>
+            )}
+            {p.distribuicao_pavimentos && (
+              <span style={{ fontSize: 9.5, padding: '3px 8px', borderRadius: 5, background: '#F3F4F6', color: '#374151' }}
+                title={p.distribuicao_pavimentos}>
+                🏗️ {p.distribuicao_pavimentos.split('|').length} pavimentos
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
