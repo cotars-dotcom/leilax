@@ -47,14 +47,14 @@ export const MULT_CUSTO_RAPIDO = {
 
 // ─── MODELOS IA — CASCATA ────────────────────────────────────────
 export const MODELOS_GEMINI = [
-  'gemini-2.0-flash',
-  'gemini-2.0-flash-exp',
-  'gemini-1.5-flash',
+  'gemini-2.5-flash',
+  'gemini-2.5-flash-lite',
+  'gemini-2.0-flash',        // fallback — desliga jun/2026
 ]
 
 export const MODELOS_GEMINI_PRO = [
-  'gemini-1.5-pro',
-  'gemini-1.5-flash',
+  'gemini-2.5-pro',
+  'gemini-2.5-flash',
 ]
 
 export const CLAUDE_MODEL = 'claude-sonnet-4-20250514'
@@ -67,6 +67,9 @@ export const CUSTO_POR_TOKEN = {
   'claude-haiku-4-5-20251001': { input: 1.00,  output: 5.00 },
   'deepseek-chat':             { input: 0.14,  output: 0.28 },
   'gpt-4o-mini':               { input: 0.15,  output: 0.60 },
+  'gemini-2.5-flash':          { input: 0.15,  output: 0.60 },
+  'gemini-2.5-flash-lite':     { input: 0.075, output: 0.30 },
+  'gemini-2.5-pro':            { input: 1.25,  output: 10.00 },
   'gemini-2.0-flash':          { input: 0.075, output: 0.30 },
   'gemini-1.5-flash':          { input: 0.075, output: 0.30 },
   'gemini-2.0-flash-lite':     { input: 0.038, output: 0.15 },

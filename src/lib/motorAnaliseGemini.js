@@ -267,7 +267,7 @@ async function chamarGeminiModelo(prompt, geminiKey, modelo) {
 async function chamarGemini(prompt, geminiKey) {
   // Cascade expandida: tenta variantes de nome do modelo
   // Cascata centralizada de constants.js
-  const MODELOS = [...MODELOS_GEMINI, 'gemini-1.5-flash-latest', 'gemini-1.5-pro']
+  const MODELOS = [...MODELOS_GEMINI]
   let ultimoErro = null
   let tentativas = 0
   for (const modelo of MODELOS) {
@@ -301,7 +301,7 @@ async function chamarGemini(prompt, geminiKey) {
 // Quando o Jina falha em extrair dados (SPAs como QuintoAndar), usa o Gemini
 // com Google Search Retrieval para buscar os dados reais do anúncio na web.
 async function chamarGeminiComGrounding(url, geminiKey, camposBasicos, contextoMercado) {
-  const modelo = 'gemini-2.0-flash' // grounding só funciona com 2.0+
+  const modelo = MODELOS_GEMINI[0] // grounding só funciona com 2.0+
   const prompt = `Você é um analista imobiliário expert em BH/MG.
 
 Preciso que você busque informações REAIS sobre este imóvel na web:
@@ -398,7 +398,7 @@ Retorne APENAS o JSON, sem markdown, sem explicação.`
 // ─── MOTOR PRINCIPAL ─────────────────────────────────────────────────────────
 export async function analisarComGemini(url, geminiKey, parametros, onProgress, imovelContexto = null) {
   const erros = []
-  let _modeloGemini = 'gemini-1.5-flash' // default, atualizado após chamada
+  let _modeloGemini = MODELOS_GEMINI[0] // default, atualizado após chamada
 
   // PASSO 1: Scrape com Jina (grátis)
   onProgress?.('Coletando dados do imóvel (Jina AI)...')
@@ -464,7 +464,7 @@ export async function analisarComGemini(url, geminiKey, parametros, onProgress, 
     onProgress?.('🔍 Buscando dados via Google Search (Gemini Grounding)...')
     try {
       analiseGemini = await chamarGeminiComGrounding(url, geminiKey, camposBasicos, contextoMercado)
-      _modeloGemini = analiseGemini._modelo_usado || 'gemini-2.0-flash+grounding'
+      _modeloGemini = analiseGemini._modelo_usado || MODELOS_GEMINI[0]
       console.log('[AXIS] Grounding sucesso — dados encontrados via Google Search')
     } catch(e) {
       erros.push(`Gemini Grounding falhou: ${e.message}`)
@@ -679,7 +679,7 @@ export async function analisarComGemini(url, geminiKey, parametros, onProgress, 
 }
 
 // ─── LOG DE USO ───────────────────────────────────────────────────────────────
-export async function logUsoGemini(imovelId, titulo, modelo = 'gemini-1.5-flash', sucesso = true) {
+export async function logUsoGemini(imovelId, titulo, modelo = MODELOS_GEMINI[0], sucesso = true) {
   try {
     const { logUsoChamadaAPI } = await import('./supabase.js')
     await logUsoChamadaAPI({
