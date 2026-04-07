@@ -127,7 +127,7 @@ function NotasPrivadas({ imovelId }) {
   const [saved, setSaved] = useState(false)
   const save = (v) => { localStorage.setItem(key, v); setSaved(true); setTimeout(() => setSaved(false), 1500) }
   return (
-    <div style={{...card(), marginBottom:'14px', border:'1px solid #FEF3C7', background:'#FFFBEB'}}>
+    <div style={{background:'#FFFBEB', borderRadius:12, padding:'16px', border:'1px solid #FEF3C7', marginBottom:'14px'}}>
       <div style={{fontWeight:600,color:'#92400E',marginBottom:8,fontSize:13,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
         <span>📝 Notas privadas</span>
         <span style={{fontSize:10,color:'#A16207',fontWeight:400}}>🔒 Somente neste dispositivo</span>
