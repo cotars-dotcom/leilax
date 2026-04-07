@@ -625,7 +625,7 @@ export default function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze
       try {
         // Buscar todos os imóveis ativos (não filtrar por cidade — buscar regional MG)
         const { data } = await sb.from('imoveis')
-          .select('id,titulo,bairro,cidade,area_m2,area_privativa_m2,quartos,vagas,valor_minimo,valor_avaliacao,preco_m2_imovel,score_total,recomendacao,foto_principal,fonte_url,tipo_transacao,num_leilao,data_leilao,desconto_percentual,preco_pedido,status_operacional')
+          .select('id,titulo,bairro,cidade,area_m2,area_privativa_m2,quartos,vagas,valor_minimo,valor_avaliacao,preco_m2_imovel,score_total,recomendacao,foto_principal,fonte_url,tipo_transacao,num_leilao,praca,data_leilao,desconto_percentual,preco_pedido,status_operacional')
           .neq('id', p.id)
           .gt('valor_minimo', 0)
           .not('status_operacional', 'in', '("arquivado","arrematado","vendido")')
@@ -1301,7 +1301,7 @@ for (const s of SCORES) {
       <div style={{display:"grid",gridTemplateColumns:isPhone?"1fr":"1fr 1fr",gap:"14px",marginBottom:"14px"}}>
         <div style={card()}>
           <div style={{fontWeight:"600",color:K.wh,marginBottom:"12px",fontSize:"13px"}}>💰 Valores</div>
-          {[["Avaliação",fmtC(p.valor_avaliacao),K.t2],[isMercadoDireto(p.fonte_url,p.tipo_transacao)?"Preço pedido":"Lance mínimo",fmtC(isMercadoDireto(p.fonte_url,p.tipo_transacao)?(p.preco_pedido||p.valor_minimo):p.valor_minimo),K.amb],["Desconto",p.desconto_percentual?`${p.desconto_percentual}%`:(p.desconto_sobre_mercado_pct_calculado?`${p.desconto_sobre_mercado_pct_calculado}%`:"—"),K.grn],["Preço/m² imóvel",p.preco_m2_imovel?`R$ ${Math.round(p.preco_m2_imovel).toLocaleString('pt-BR')}/m²`:"—",K.teal],["Preço/m² mercado",p.preco_m2_mercado?`R$ ${Math.round(p.preco_m2_mercado).toLocaleString('pt-BR')}/m²`:"—",K.t2],["Aluguel estimado",fmtC(p.aluguel_mensal_estimado)+"/mês",K.pur],...(p.fator_homogenizacao&&p.fator_homogenizacao<1?[["Fator homogeneização",`${(p.fator_homogenizacao*100).toFixed(0)}%`,"#92400E"]]:[])].map(([l,v,c])=>(
+          {[["Avaliação",fmtC(p.valor_avaliacao),K.t2],[isMercadoDireto(p.fonte_url,p.tipo_transacao)?"Preço pedido":"Lance mínimo",fmtC(isMercadoDireto(p.fonte_url,p.tipo_transacao)?(p.preco_pedido||p.valor_minimo):p.valor_minimo),K.amb],["Desc. s/avaliação",p.desconto_percentual?`${p.desconto_percentual}%`:"—",K.grn],["Desc. s/mercado",p.desconto_sobre_mercado_pct_calculado?`${parseFloat(p.desconto_sobre_mercado_pct_calculado).toFixed(1)}%`:"—",K.grn],["Preço/m² imóvel",p.preco_m2_imovel?`R$ ${Math.round(p.preco_m2_imovel).toLocaleString('pt-BR')}/m²`:"—",K.teal],["Preço/m² mercado",p.preco_m2_mercado?`R$ ${Math.round(p.preco_m2_mercado).toLocaleString('pt-BR')}/m²`:"—",K.t2],["Aluguel estimado",fmtC(p.aluguel_mensal_estimado)+"/mês",K.pur],...(p.fator_homogenizacao&&p.fator_homogenizacao<1?[["Fator homogeneização",`${(p.fator_homogenizacao*100).toFixed(0)}%`,"#92400E"]]:[])].map(([l,v,c])=>(
             <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:`1px solid ${K.bd}`}}>
               <span style={{fontSize:"12px",color:K.t3}}>{l}</span><span style={{fontSize:"12.5px",fontWeight:"600",color:c}}>{v}</span>
             </div>
@@ -1394,7 +1394,7 @@ for (const s of SCORES) {
                         <span style={{fontSize:9,fontWeight:700,padding:'1px 6px',borderRadius:3,
                           background:op._isLeilao ? '#FEF3C7' : '#DBEAFE',
                           color:op._isLeilao ? '#92400E' : '#1D4ED8'}}>
-                          {op._isLeilao ? `🔨 ${op.num_leilao || ''}º LEILÃO` : '🏠 MERCADO'}
+                          {op._isLeilao ? `🔨 ${op.praca ? op.praca+'ª PRAÇA' : (op.num_leilao ? op.num_leilao+'º LEILÃO' : 'LEILÃO')}` : '🏠 MERCADO'}
                         </span>
                         {op.score_total >= 7 && <span style={{fontSize:9,fontWeight:700,color:'#065F46'}}>⭐ {op.score_total.toFixed(1)}</span>}
                       </div>

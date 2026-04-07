@@ -1037,10 +1037,12 @@ function PropCard({p,onNav}) {
           <div style={{fontSize:"12px",fontWeight:"800",color:K.amb}}>{fmtM(eMercado ? (p.preco_pedido || p.valor_minimo) : p.valor_minimo)}</div>
         </div>
         <div style={{background:K.s2,borderRadius:6,padding:"7px 9px"}}>
-          <div style={{fontSize:"8.5px",color:K.t3,marginBottom:1,textTransform:"uppercase",letterSpacing:.3}}>Desconto</div>
+          <div style={{fontSize:"8.5px",color:K.t3,marginBottom:1,textTransform:"uppercase",letterSpacing:.3}}>{p.desconto_percentual > 0 && p.desconto_sobre_mercado_pct_calculado > 0 ? 'Desc. s/mercado' : 'Desconto'}</div>
           <div style={{fontSize:"12px",fontWeight:"800",color:K.grn}}>{(()=>{
+            // Priorizar desconto sobre mercado (mais relevante para investidor)
+            const dMerc = parseFloat(p.desconto_sobre_mercado_pct_calculado) || 0
+            if(dMerc > 0) return `${dMerc.toFixed(1)}%`
             if(p.desconto_percentual&&p.desconto_percentual>0) return `${p.desconto_percentual}%`
-            if(p.desconto_sobre_mercado_pct_calculado&&p.desconto_sobre_mercado_pct_calculado>0) return `${p.desconto_sobre_mercado_pct_calculado}%`
             // Calcular on-the-fly para mercado direto
             const pp=parseFloat(eMercado?(p.preco_pedido||p.valor_minimo):p.valor_minimo)||0
             const vm=parseFloat(p.valor_mercado_estimado)||0
