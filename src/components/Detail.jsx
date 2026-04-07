@@ -1182,13 +1182,69 @@ for (const s of SCORES) {
           <Bdg c={p.financiavel?K.blue:K.t3} ch={p.financiavel?"Financiável":"Sem financ."}/>
           {p.fgts_aceito&&<Bdg c={K.pur} ch="FGTS"/>}
           <Bdg c={K.t3} ch={p.modalidade||"—"}/>
+          {p.parcelamento_aceito&&<Bdg c="#2563EB" ch="💳 Parcelável"/>}
+          {p.elevador===false&&<Bdg c="#D97706" ch="⚠️ Sem elevador"/>}
+          {p.praca&&<Bdg c={p.praca>=2?"#D97706":"#065F46"} ch={`${p.praca}ª Praça`}/>}
         </div>
+      </div>
+      {/* Sprint 12: Cards de atributos do imóvel (estilo Ninja) */}
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(110px, 1fr))',gap:8,marginBottom:16}}>
+        {[
+          {icon:'📐',label:'Área',value:parseFloat(p.area_construida_m2||p.area_privativa_m2||p.area_m2)?`${Math.round(parseFloat(p.area_construida_m2||p.area_privativa_m2||p.area_m2))} m²`:'—',sub:p.area_construida_m2?'construída':'total'},
+          {icon:'🛏',label:'Quartos',value:p.quartos||'—',sub:p.suites?`${p.suites} suíte${p.suites>1?'s':''}`:null},
+          {icon:'🚿',label:'Banheiros',value:p.banheiros||'—'},
+          {icon:'🚗',label:'Vagas',value:p.vagas||'—'},
+          ...(p.nome_condominio?[{icon:'🏢',label:'Condomínio',value:p.nome_condominio.split('(')[0].trim().substring(0,20),sub:p.condominio_mensal?`R$ ${Math.round(p.condominio_mensal)}/mês`:null}]:[]),
+          ...(p.roi_estimado?[{icon:'📈',label:'ROI',value:`${p.roi_estimado}%`,sub:'estimado'}]:[]),
+        ].map((a,i) => (
+          <div key={i} style={{background:'#fff',border:`1px solid ${C.borderW}`,borderRadius:10,padding:'10px 12px',textAlign:'center'}}>
+            <div style={{fontSize:20,marginBottom:2}}>{a.icon}</div>
+            <div style={{fontSize:14,fontWeight:700,color:C.navy}}>{a.value}</div>
+            <div style={{fontSize:9.5,color:C.muted,textTransform:'uppercase',letterSpacing:'.3px'}}>{a.label}</div>
+            {a.sub&&<div style={{fontSize:8.5,color:C.hint,marginTop:1}}>{a.sub}</div>}
+          </div>
+        ))}
       </div>
       {p.alertas?.length>0&&<div style={{background:`${K.red}10`,border:`1px solid ${K.red}30`,borderRadius:"8px",padding:"14px",marginBottom:"14px"}}>
         <div style={{fontSize:"11px",color:K.red,fontWeight:"700",textTransform:"uppercase",letterSpacing:"1px",marginBottom:"8px"}}>🚨 Alertas Críticos</div>
         {p.alertas.map((a,i)=><div key={i} style={{fontSize:"12.5px",color:K.tx,marginBottom:"4px"}}>• {normalizarTextoAlerta(a)}</div>)}
       </div>}
       {/* Estratégia recomendada badge */}
+      {/* Sprint 12: Info cards extras */}
+      {(p.distribuicao_pavimentos || p.parcelamento_detalhes || p.processo_numero || p.coproprietarios) && (
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:14}}>
+          {p.processo_numero && (
+            <div style={{background:'#F0F4FF',border:'1px solid #002B8020',borderRadius:8,padding:'8px 12px',cursor:'pointer'}}
+              onClick={() => { navigator.clipboard?.writeText(p.processo_numero); }}>
+              <div style={{fontSize:9,color:C.muted,textTransform:'uppercase'}}>⚖️ Processo</div>
+              <div style={{fontSize:11.5,fontWeight:600,color:C.navy,fontFamily:'monospace'}}>{p.processo_numero}</div>
+              <div style={{fontSize:8,color:C.hint}}>clique p/ copiar</div>
+            </div>
+          )}
+          {p.parcelamento_detalhes && (
+            <div style={{background:'#EFF6FF',border:'1px solid #2563EB20',borderRadius:8,padding:'8px 12px'}}>
+              <div style={{fontSize:9,color:C.muted,textTransform:'uppercase'}}>💳 Parcelamento</div>
+              <div style={{fontSize:11,color:'#1D4ED8',lineHeight:1.4}}>{p.parcelamento_detalhes.substring(0,120)}</div>
+            </div>
+          )}
+          {p.distribuicao_pavimentos && (
+            <div style={{background:'#F8FAFC',border:`1px solid ${C.borderW}`,borderRadius:8,padding:'8px 12px',gridColumn:p.processo_numero&&p.parcelamento_detalhes?'1 / -1':'auto'}}>
+              <div style={{fontSize:9,color:C.muted,textTransform:'uppercase'}}>🏗️ Distribuição</div>
+              <div style={{fontSize:11,color:C.navy,lineHeight:1.5}}>
+                {p.distribuicao_pavimentos.split('|').map((pav,i) => (
+                  <div key={i}>• {pav.trim()}</div>
+                ))}
+              </div>
+            </div>
+          )}
+          {p.coproprietarios && (
+            <div style={{background:'#FEF3C7',border:'1px solid #F59E0B30',borderRadius:8,padding:'8px 12px'}}>
+              <div style={{fontSize:9,color:'#92400E',textTransform:'uppercase'}}>⚠️ Coproprietário</div>
+              <div style={{fontSize:11,color:'#78350F',lineHeight:1.4}}>{p.coproprietarios.substring(0,100)}</div>
+            </div>
+          )}
+        </div>
+      )}
       {p.estrategia_recomendada_detalhe?.tipo && (() => {
         const cfg = ESTRATEGIA_CONFIG[p.estrategia_recomendada_detalhe.tipo]
         return cfg ? (
@@ -1596,5 +1652,37 @@ for (const s of SCORES) {
       </>}
     </div>
     {modoAoVivo && <ModoAoVivo imovel={p} onClose={() => setModoAoVivo(false)} />}
+    {/* Sprint 12: Botão flutuante de exportação */}
+    <div style={{position:'fixed',bottom:20,right:20,zIndex:50,display:'flex',flexDirection:'column',gap:8,alignItems:'flex-end'}}>
+      {p.data_leilao && !isMercadoDireto(p.fonte_url, p.tipo_transacao) && (() => {
+        const [y,m,d] = p.data_leilao.split('-').map(Number)
+        const dl = new Date(y, m-1, d); dl.setHours(0,0,0,0)
+        const hoje = new Date(); hoje.setHours(0,0,0,0)
+        const diff = Math.round((dl - hoje) / 86400000)
+        if (diff < 0 || diff > 7) return null
+        return (
+          <div style={{
+            background: diff <= 1 ? '#DC2626' : '#D97706', color:'#fff',
+            padding:'6px 14px', borderRadius:20, fontSize:11, fontWeight:700,
+            boxShadow:'0 4px 15px rgba(0,0,0,0.2)', animation: diff <= 1 ? 'pulse 2s infinite' : 'none'
+          }}>
+            🔨 {diff === 0 ? 'LEILÃO HOJE!' : diff === 1 ? 'LEILÃO AMANHÃ!' : `Leilão em ${diff} dias`}
+          </div>
+        )
+      })()}
+      <button onClick={async () => {
+        const { exportarPDFImovel } = await import('./ExportarPDF.jsx')
+        exportarPDFImovel(p)
+      }} style={{
+        width:48, height:48, borderRadius:'50%', border:'none',
+        background:'#002B80', color:'#fff', fontSize:20, cursor:'pointer',
+        boxShadow:'0 4px 15px rgba(0,43,128,0.4)', display:'flex', alignItems:'center', justifyContent:'center',
+        transition:'transform .2s',
+      }}
+      onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.1)'}
+      onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+      title="Exportar / Imprimir"
+      >🖨️</button>
+    </div>
   </div>
 }
