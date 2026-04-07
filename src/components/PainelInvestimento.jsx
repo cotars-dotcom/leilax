@@ -53,7 +53,16 @@ export default function PainelInvestimento({ imovel }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 18px', background: roiBg, borderBottom: `1px solid ${C.borderW}` }}>
         <div>
           <div style={{ fontSize: 13, fontWeight: 700, color: C.navy }}>💰 Análise de Investimento</div>
-          <div style={{ fontSize: 10, color: C.muted, marginTop: 2 }}>Breakdown completo · ROI · Preditor</div>
+          <div style={{ fontSize: 10, color: C.muted, marginTop: 2 }}>
+            Breakdown · ROI · Preditor
+            {p.data_leilao && !eMercado && (() => {
+              const [y,m,d] = p.data_leilao.split('-').map(Number)
+              const dl = new Date(y, m-1, d); dl.setHours(0,0,0,0)
+              const hoje = new Date(); hoje.setHours(0,0,0,0)
+              const diff = Math.round((dl - hoje) / 86400000)
+              return diff >= 0 ? ` · 🔨 ${diff === 0 ? 'HOJE' : diff === 1 ? 'AMANHÃ' : `D-${diff}`}` : ''
+            })()}
+          </div>
         </div>
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: 28, fontWeight: 800, color: roiColor, lineHeight: 1 }}>
@@ -64,6 +73,30 @@ export default function PainelInvestimento({ imovel }) {
       </div>
 
       <div style={{ padding: '14px 18px' }}>
+        {/* Simulador de lance — Sprint 12 */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, padding: '10px 12px', background: '#F8FAFC', borderRadius: 8, border: `1px solid ${C.borderW}` }}>
+          <div style={{ fontSize: 10, fontWeight: 600, color: C.navy, whiteSpace: 'nowrap' }}>🎯 Simular lance:</div>
+          <input
+            type="range"
+            min={parseFloat(p.valor_minimo) || lance}
+            max={Math.round(mercado * 1.1)}
+            step={5000}
+            value={lance}
+            onChange={e => setLanceSimulado(Number(e.target.value))}
+            style={{ flex: 1, accentColor: '#002B80', cursor: 'pointer' }}
+          />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: C.navy, minWidth: 95, textAlign: 'right' }}>
+              R$ {Math.round(lance / 1000)}k
+            </span>
+            {lanceSimulado && (
+              <button onClick={() => setLanceSimulado(null)} style={{
+                background: 'none', border: `1px solid ${C.borderW}`, borderRadius: 4,
+                fontSize: 9, padding: '2px 6px', cursor: 'pointer', color: C.muted
+              }}>↩ mín</button>
+            )}
+          </div>
+        </div>
         {/* Grid principal: Breakdown + Resumo */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 14 }}>
           {/* Coluna esquerda: Breakdown de custos */}
