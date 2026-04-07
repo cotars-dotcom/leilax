@@ -338,6 +338,7 @@ Analise juridicamente este documento e retorne APENAS JSON válido (sem markdown
   "area_construida_m2": null,
   "elevador": null,
   "nome_condominio": null,
+  "timeline_atos": [{"data":"YYYY-MM-DD","tipo":"construcao|venda|financiamento|cancelamento|indisponibilidade|penhora|averbacao","registro":"Av-N ou R.N","descricao":"resumo do ato","valor":null,"partes":"envolvidos","gravidade":"info|atencao|critico"}],
   "parecer": "parecer jurídico completo em 3-5 linhas"
 }`
 
@@ -382,7 +383,8 @@ Analise este documento jurídico (${nomeArq}) do imóvel: ${imovel.titulo || imo
 
 Identifique riscos, processos, dívidas e situação jurídica.
 Extraia também: praça do leilão (1 ou 2), se aceita parcelamento (e condições), coproprietários intimados, área construída, se tem elevador, nome do condomínio/edifício.
-Retorne APENAS JSON com: tipo_documento, resumo, riscos_identificados (array com risco_id/descricao/gravidade/impacto_score), pontos_positivos, alertas_criticos, score_juridico_sugerido, score_juridico_delta, recomendacao_juridica, praca, parcelamento_aceito, parcelamento_detalhes, coproprietarios, area_construida_m2, elevador, nome_condominio, parecer.`
+Se for matrícula, extraia também timeline_atos (array de atos registrais com data YYYY-MM-DD, tipo, registro, descricao, valor, partes, gravidade).
+Retorne APENAS JSON com: tipo_documento, resumo, riscos_identificados (array com risco_id/descricao/gravidade/impacto_score), pontos_positivos, alertas_criticos, score_juridico_sugerido, score_juridico_delta, recomendacao_juridica, praca, parcelamento_aceito, parcelamento_detalhes, coproprietarios, area_construida_m2, elevador, nome_condominio, timeline_atos, parecer.`
 
   try {
     const { MODELOS_GEMINI_PRO, parseJSONResposta } = await import('./constants.js')

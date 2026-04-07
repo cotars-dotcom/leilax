@@ -689,6 +689,22 @@ export default function AbaJuridicaAgente({ imovel, isAdmin, onReclassificado })
             console.debug('[AXIS jurídico] Campos extraídos do edital:', Object.keys(upd))
           }).catch(() => {})
         }
+        // Sprint 12.2: salvar timeline da matrícula
+        if (a.timeline_atos?.length > 0) {
+          const rows = a.timeline_atos.map(ev => ({
+            imovel_id: imovel.id,
+            data_evento: ev.data || null,
+            tipo: ev.tipo || 'outro',
+            registro: ev.registro || null,
+            descricao: ev.descricao || '',
+            valor: ev.valor || null,
+            partes: ev.partes || null,
+            gravidade: ev.gravidade || 'info',
+          }))
+          supabase.from('timeline_matricula').upsert(rows, { onConflict: 'imovel_id,registro', ignoreDuplicates: true })
+            .then(() => console.debug(`[AXIS] ${rows.length} atos da matrícula salvos`))
+            .catch(() => {})
+        }
         setProgresso(`✅ ${doc.nome || doc.tipo} analisado — recarregando...`)
         await carregarDocs()
       } else {
