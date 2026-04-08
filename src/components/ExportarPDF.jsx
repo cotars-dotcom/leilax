@@ -160,7 +160,7 @@ ${(p.fotos?.length > 1) ? `<div style="display:flex;gap:6px;overflow-x:auto;marg
   <div>
     <h1>${tituloCurto}</h1>
     <div class="sub">
-      ${p.codigo_axis ? `<strong>${p.codigo_axis}</strong> · ` : ''}📍 ${[p.bairro, p.cidade].filter(Boolean).join(', ')}/${p.estado || 'MG'}
+      ${p.codigo_axis ? `<strong>${p.codigo_axis}</strong> · ` : ''}📍 ${p.endereco ? p.endereco + ' — ' : ''}${[p.bairro, p.cidade].filter(Boolean).join(', ')}/${p.estado || 'MG'}
       · ${area ? area + 'm²' : ''}${p.quartos ? ' · ' + p.quartos + 'q' : ''}${p.suites ? ' · ' + p.suites + 's' : ''}${p.vagas ? ' · ' + p.vagas + 'v' : ''}${p.condominio_mensal ? ' · Cond. R$ ' + Number(p.condominio_mensal).toLocaleString('pt-BR') : ''}
     </div>
     <div style="margin-top:6px">
@@ -357,11 +357,12 @@ ${(p.fotos?.length > 1) ? `<div style="display:flex;gap:6px;overflow-x:auto;marg
         ['Matrícula', p.matricula_status],
         ['Déb. cond.', p.debitos_condominio],
         ['Déb. IPTU', p.debitos_iptu],
-        ['Responsab.', p.responsabilidade_debitos],
+        ['Responsab.', p.responsabilidade_debitos === 'sub_rogado' ? '✅ Sub-rogados no preço' : p.responsabilidade_debitos === 'exonerado' ? '✅ Arrematante exonerado' : p.responsabilidade_debitos === 'arrematante' ? '⚠️ Arrematante arca' : p.responsabilidade_debitos],
         ['Ocupação', p.ocupacao],
       ].filter(([,v]) => v).map(([l,v]) =>
         `<div class="row"><span class="row-l">${l}</span><span class="row-v">${v}</span></div>`
       ).join('')}
+      ${p.obs_juridicas ? `<div style="margin-top:8px;padding:8px 10px;background:#FEF9C3;border-radius:6px;font-size:10px;line-height:1.5;color:#92400E">${p.obs_juridicas}</div>` : ''}
     </div>
   </div>
 
