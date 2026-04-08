@@ -1948,7 +1948,7 @@ export default function App() {
 {/* FIM SIDEBAR */}
 
     {/* CONTENT */}
-    <div className="axis-main" style={{flex:1,overflowY:"auto",background:C.offwhite,display:"flex",flexDirection:"column",minWidth:0}}>
+    <div className="axis-main" style={{flex:1,overflowY:"auto",background:C.offwhite,display:"flex",flexDirection:"column",minWidth:0,willChange:"transform"}}>
       {view==="dashboard"&&<Suspense fallback={<div style={{padding:40,textAlign:"center",color:C.muted}}>Carregando...</div>}><LazyDashboard props={props} onNav={nav} profile={profile} isMobile={isMobile} isPhone={isPhone}/></Suspense>}
   {view==="novo"&&(isAdmin?<NovoImovel onSave={addProp} onCancel={()=>nav("imoveis")} onNav={nav} trello={trello} parametrosBanco={parametrosBanco} criteriosBanco={criteriosBanco} isPhone={isPhone} existingProps={props}/>:<AcessoNegado mensagem="Análise de imóveis é restrita ao administrador."/>)}
       {view==="imoveis"&&<Lista props={props} onNav={nav} onDelete={delProp} trello={trello} onUpdateProp={(id,updates)=>setProps(ps=>ps.map(p=>p.id===id?{...p,...updates}:p))}/>}

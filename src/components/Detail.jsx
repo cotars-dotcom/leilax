@@ -231,6 +231,8 @@ function GaleriaFotos({ fotos = [], foto_principal = null, url = null, imovelId 
   const [msgFoto, setMsgFoto] = useState('')
   const [fotosLocais, setFotosLocais] = useState(fotos)
   const [principalLocal, setPrincipalLocal] = useState(foto_principal)
+  const [fotoErro, setFotoErro] = useState(false)
+  const [retried, setRetried] = useState(null)
 
   const buscarFotos = async () => {
     if (!url) return
@@ -299,32 +301,34 @@ function GaleriaFotos({ fotos = [], foto_principal = null, url = null, imovelId 
           position: 'relative',
           border: '1px solid #E2E8F0',
         }}>
-          <img
-            src={fotoAtiva}
-            alt="Foto principal"
-            referrerPolicy="no-referrer"
-            crossOrigin="anonymous"
-            style={{
-              maxWidth: '100%',
-              maxHeight: 420,
-              width: 'auto',
-              height: 'auto',
-              objectFit: 'contain',
-              display: 'block',
-            }}
-            onError={e => {
-              // Se falhar com no-referrer, tentar sem política de referrer (origem não enviada)
-              if (!e.target.dataset.retried) {
-                e.target.dataset.retried = '1'
-                e.target.removeAttribute('crossorigin')
-                e.target.referrerPolicy = 'origin'
-                e.target.src = e.target.src + (e.target.src.includes('?') ? '&' : '?') + '_r=' + Date.now()
-              } else {
-                // Fallback final: esconder imagem e mostrar placeholder no container
-                e.target.parentElement.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:200px;color:#94A3B8;gap:8px;"><span style="font-size:36px">🖼️</span><span style="font-size:12px">Foto indisponível — abra o anúncio original</span></div>`
-              }
-            }}
-          />
+          {fotoErro ? (
+            <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',height:200,color:'#94A3B8',gap:8}}>
+              <span style={{fontSize:36}}>🖼️</span>
+              <span style={{fontSize:12}}>Foto indisponível — abra o anúncio original</span>
+            </div>
+          ) : (
+            <img
+              key={fotoAtiva}
+              src={retried === fotoAtiva ? fotoAtiva + (fotoAtiva.includes('?') ? '&' : '?') + '_r=1' : fotoAtiva}
+              alt="Foto principal"
+              referrerPolicy="no-referrer"
+              style={{
+                maxWidth: '100%',
+                maxHeight: 420,
+                width: 'auto',
+                height: 'auto',
+                objectFit: 'contain',
+                display: 'block',
+              }}
+              onError={() => {
+                if (retried !== fotoAtiva) {
+                  setRetried(fotoAtiva)
+                } else {
+                  setFotoErro(true)
+                }
+              }}
+            />
+          )}
         </div>
       )}
       {todasFotosExib.length > 1 && (
@@ -333,24 +337,20 @@ function GaleriaFotos({ fotos = [], foto_principal = null, url = null, imovelId 
           overflowX: 'auto', paddingBottom: 4,
         }}>
           {todasFotosExib.map((foto, i) => (
-            <img
+            <div
               key={i}
-              src={foto}
-              alt={`Foto ${i + 1}`}
-              referrerPolicy="no-referrer"
-              onClick={() => setFotoAtiva(foto)}
-              style={{
-                width: 80, height: 58, flexShrink: 0,
-                borderRadius: 7, objectFit: 'cover',
-                cursor: 'pointer',
-                border: fotoAtiva === foto
-                  ? `2px solid ${C.emerald}`
-                  : '2px solid transparent',
-                opacity: fotoAtiva === foto ? 1 : 0.7,
-                transition: 'all 0.15s',
-              }}
-              onError={e => { e.target.style.display = 'none' }}
-            />
+              onClick={() => { setFotoAtiva(foto); setFotoErro(false); setRetried(null) }}
+              style={{ flexShrink: 0, cursor: 'pointer', borderRadius: 7, overflow: 'hidden',
+                border: fotoAtiva === foto ? `2px solid ${C.emerald}` : '2px solid transparent',
+                opacity: fotoAtiva === foto ? 1 : 0.7, transition: 'all 0.15s' }}>
+              <img
+                src={foto}
+                alt={`Foto ${i + 1}`}
+                referrerPolicy="no-referrer"
+                style={{ width: 80, height: 58, objectFit: 'cover', display: 'block' }}
+                onError={e => { e.target.parentElement.style.display = 'none' }}
+              />
+            </div>
           ))}
         </div>
       )}
@@ -1214,9 +1214,9 @@ for (const s of SCORES) {
 
       {abaDetalhe==='resumo'&&<>
       {p.foto_principal&&(
-        <div style={{width:'100%',minHeight:300,maxHeight:480,borderRadius:12,overflow:'hidden',marginBottom:16,background:'#f0f0f0'}}>
+        <div style={{width:'100%',maxHeight:420,borderRadius:12,overflow:'hidden',marginBottom:16,background:'#f0f0f0',willChange:'transform'}}>
           <img src={p.foto_principal} alt={p.titulo||'Foto'} referrerPolicy="no-referrer"
-            style={{width:'100%',height:'100%',minHeight:300,maxHeight:480,objectFit:'cover'}}
+            style={{width:'100%',height:'auto',maxHeight:420,objectFit:'cover',display:'block'}}
             onError={e=>{e.target.parentElement.style.display='none'}}/>
         </div>
       )}
