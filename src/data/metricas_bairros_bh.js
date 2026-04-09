@@ -170,6 +170,19 @@ export const BAIRROS_BH = [
     yieldBruto:5.30, tendencia12m:8.82, rankingQA:null,
     tipoPreco:'proxy_zona',
     obs:'Polo médico BH — demanda por locação alta' },
+  // Sprint 15B — bairros adicionados para portfólio ativo
+  { key:'bh_bairro_dona_clara', label:'Dona Clara', zona:'Pampulha',
+    precoAnuncioM2:6500, precoContratoM2:5500, classeIpead:2, classeIpeadLabel:'Médio',
+    yieldBruto:5.50, tendencia12m:7.8, rankingQA:null, tipoPreco:'estimativa_anuncios',
+    obs:'Pampulha — próximo Av Sebastião de Brito/Cristiano Machado. Apt 97m² ~R$450k (Chaves na Mão abr/2026)' },
+  { key:'bh_bairro_silveira', label:'Silveira', zona:'Leste',
+    precoAnuncioM2:5500, precoContratoM2:4600, classeIpead:1, classeIpeadLabel:'Popular',
+    yieldBruto:5.30, tendencia12m:6.0, rankingQA:null, tipoPreco:'estimativa_anuncios',
+    obs:'Leste BH — bairro residencial consolidado, preço abaixo da média BH' },
+  { key:'ct_bairro_conquista', label:'Conquista', zona:'Contagem',
+    precoAnuncioM2:6000, precoContratoM2:5200, classeIpead:1, classeIpeadLabel:'Popular',
+    yieldBruto:6.10, tendencia12m:3.3, rankingQA:null, tipoPreco:'proxy_contagem_fipezap',
+    obs:'Contagem/MG — R$5.836/m² médio município (FipeZAP). Tendência +3.3% (abaixo BH)' },
 ]
 
 // Função principal — buscar dados de bairro por nome
