@@ -260,6 +260,29 @@ export function calcularROI(investimentoTotal, valorMercado, aluguelMensal = 0) 
   }
 }
 
+// ─── SPRINT 15b: Custo de Holding ────────────────────────────────────────────
+/**
+ * Calcula custo de holding (IPTU + condomínio) durante o período pré-venda.
+ * Regra BH: IPTU ≈ 35% do condomínio mensal.
+ *
+ * @param {number} condominio   - Condomínio mensal (R$)
+ * @param {number} meses        - Meses de holding (padrão: 4)
+ * @param {number|null} iptuMensal - IPTU mensal real; se null, estima por condomínio * 0.35
+ * @returns {{ condominio, iptuMensal, meses, porMes, total }}
+ */
+export function calcularCustoHolding(condominio = 0, meses = 4, iptuMensal = null) {
+  const cond = Math.round(condominio || 0)
+  const iptu = iptuMensal != null ? Math.round(iptuMensal) : Math.round(cond * 0.35)
+  const porMes = cond + iptu
+  return {
+    condominio: cond,
+    iptuMensal: iptu,
+    meses,
+    porMes,
+    total: Math.round(porMes * meses),
+  }
+}
+
 /** Calcula preditor de concorrência (inspirado no Ninja) */
 export function calcularPreditorConcorrencia(lanceMinimo, valorMercado, custos, incremento = 5000) {
   const niveis = [

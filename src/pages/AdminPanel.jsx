@@ -1,7 +1,85 @@
-import{useState,useEffect}from'react'
+import{useState,useEffect,useMemo}from'react'
 import{getAllProfiles,updateProfile,getParametros,saveParametro,getAtividades}from'../lib/supabase'
 
 const K={bg:'#080B10',s1:'#111620',s2:'#171E2C',bd:'#1C2438',teal:'#00E5BB',red:'#FF4757',tx:'#DDE4F0',t2:'#8896B0',t3:'#3D4E6A',wh:'#FFFFFF',warn:'#FFB627'}
+
+const ACAO_LABELS={
+  analise_criada:'Análise criada',
+  reanalise:'Reanálise',
+  imovel_atualizado:'Imóvel atualizado',
+  campo_editado:'Campo editado',
+  pdf_exportado:'PDF exportado',
+  share_criado:'Link compartilhado',
+  share_revogado:'Link revogado',
+  usuario_role_alterado:'Role alterado',
+  usuario_ativado:'Usuário ativado',
+  usuario_desativado:'Usuário desativado',
+  documento_enviado:'Documento enviado',
+  imovel_deletado:'Imóvel deletado',
+}
+
+function AuditLog({atividades,K,row,filtroAcao,setFiltroAcao,filtroUsuario,setFiltroUsuario,inp}){
+  const acoesUnicas=useMemo(()=>[...new Set(atividades.map(a=>a.acao||a.tipo).filter(Boolean))],[atividades])
+  const usuariosUnicos=useMemo(()=>[...new Set(atividades.map(a=>a.usuario?.nome).filter(Boolean))],[atividades])
+  const filtradas=useMemo(()=>atividades.filter(a=>{
+    if(filtroAcao&&(a.acao||a.tipo)!==filtroAcao)return false
+    if(filtroUsuario&&a.usuario?.nome!==filtroUsuario)return false
+    return true
+  }),[atividades,filtroAcao,filtroUsuario])
+
+  function exportarCSV(){
+    const header='Data,Usuário,Ação,Entidade,Detalhes'
+    const linhas=filtradas.map(a=>[
+      new Date(a.criado_em).toLocaleString('pt-BR'),
+      a.usuario?.nome||'Sistema',
+      ACAO_LABELS[a.acao||a.tipo]||(a.acao||a.tipo||''),
+      a.descricao||a.entidade||'',
+      typeof a.metadata==='string'?a.metadata:JSON.stringify(a.metadata||a.detalhes||''),
+    ].map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(','))
+    const blob=new Blob([[header,...linhas].join('\n')],{type:'text/csv;charset=utf-8'})
+    const url=URL.createObjectURL(blob)
+    const a=document.createElement('a');a.href=url;a.download='axis-auditoria.csv';a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  return<div>
+    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'16px',flexWrap:'wrap',gap:'8px'}}>
+      <div style={{fontWeight:600,fontSize:'14px',color:K.wh}}>{filtradas.length}/{atividades.length} registros</div>
+      <div style={{display:'flex',gap:'8px',flexWrap:'wrap',alignItems:'center'}}>
+        <select value={filtroAcao} onChange={e=>setFiltroAcao(e.target.value)} style={{background:K.s2,border:'1px solid '+K.bd,borderRadius:'7px',padding:'5px 8px',color:K.tx,fontSize:'12px'}}>
+          <option value=''>Todas as ações</option>
+          {acoesUnicas.map(a=><option key={a} value={a}>{ACAO_LABELS[a]||a}</option>)}
+        </select>
+        <select value={filtroUsuario} onChange={e=>setFiltroUsuario(e.target.value)} style={{background:K.s2,border:'1px solid '+K.bd,borderRadius:'7px',padding:'5px 8px',color:K.tx,fontSize:'12px'}}>
+          <option value=''>Todos os usuários</option>
+          {usuariosUnicos.map(u=><option key={u} value={u}>{u}</option>)}
+        </select>
+        {(filtroAcao||filtroUsuario)&&<button onClick={()=>{setFiltroAcao('');setFiltroUsuario('')}} style={{background:'transparent',border:'1px solid '+K.bd,borderRadius:'6px',padding:'4px 8px',color:K.t2,cursor:'pointer',fontSize:'11px'}}>✕ Limpar</button>}
+        <button onClick={exportarCSV} style={{background:K.teal+'15',border:'1px solid '+K.teal,borderRadius:'6px',padding:'5px 10px',color:K.teal,cursor:'pointer',fontSize:'11px',fontWeight:700}}>⬇ CSV</button>
+      </div>
+    </div>
+    {filtradas.length===0&&<div style={{color:K.t3,fontSize:'13px'}}>Nenhuma atividade encontrada.</div>}
+    <div style={{fontFamily:'monospace',fontSize:'12px'}}>
+      {filtradas.map((a,i)=>{
+        const acao=a.acao||a.tipo||''
+        const label=ACAO_LABELS[acao]||acao
+        const acaoCor=acao.includes('criada')||acao.includes('criado')?K.teal:acao.includes('deletado')||acao.includes('revogado')?K.red:K.warn
+        const meta=a.metadata||a.detalhes
+        return<div key={i} style={{...row,padding:'8px 0',flexDirection:'column',alignItems:'flex-start',gap:'3px'}}>
+          <div style={{display:'flex',gap:'10px',alignItems:'center',flexWrap:'wrap'}}>
+            <span style={{color:K.t3,fontSize:'11px'}}>{new Date(a.criado_em).toLocaleString('pt-BR')}</span>
+            <span style={{color:K.teal,fontWeight:600}}>{a.usuario?.nome||'Sistema'}</span>
+            <span style={{background:acaoCor+'20',borderRadius:'4px',padding:'1px 6px',color:acaoCor,fontSize:'11px',fontWeight:600}}>{label}</span>
+            {(a.descricao||a.entidade)&&<span style={{color:K.t2,fontSize:'11px'}}>{a.descricao||a.entidade}</span>}
+          </div>
+          {meta&&<div style={{color:K.t2,paddingLeft:'8px',fontSize:'11px',wordBreak:'break-all'}}>
+            {typeof meta==='string'?meta:Object.entries(meta).map(([k,v])=>`${k}: ${v}`).join(' · ')}
+          </div>}
+        </div>
+      })}
+    </div>
+  </div>
+}
 
 const ROLES=[{id:'viewer',label:'Visualizador'},{id:'analista',label:'Analista'},{id:'admin',label:'Administrador'}]
 
@@ -13,6 +91,8 @@ export default function AdminPanel(){
   const[loading,setLoading]=useState(true)
   const[saving,setSaving]=useState(false)
   const[toast,setToast]=useState('')
+  const[filtroAcao,setFiltroAcao]=useState('')
+  const[filtroUsuario,setFiltroUsuario]=useState('')
 
   useEffect(()=>{loadAll()},[])
 
@@ -112,20 +192,7 @@ export default function AdminPanel(){
         </div>}
       </div>}
 
-      {aba==='atividades'&&<div>
-        <div style={{fontWeight:600,fontSize:'14px',color:K.wh,marginBottom:'16px'}}>Log de Atividades</div>
-        {atividades.length===0&&<div style={{color:K.t3,fontSize:'13px'}}>Nenhuma atividade registrada.</div>}
-        <div style={{fontFamily:'monospace',fontSize:'12px'}}>
-          {atividades.map((a,i)=><div key={i} style={{...row,padding:'8px 0',flexDirection:'column',alignItems:'flex-start',gap:'2px'}}>
-            <div style={{display:'flex',gap:'12px',alignItems:'center'}}>
-              <span style={{color:K.t3}}>{new Date(a.criado_em).toLocaleString('pt-BR')}</span>
-              <span style={{color:K.teal,fontWeight:600}}>{a.usuario?.nome||'Sistema'}</span>
-              <span style={{background:K.s2,borderRadius:'4px',padding:'1px 6px',color:K.tx}}>{a.acao}</span>
-            </div>
-            {a.detalhes&&<div style={{color:K.t2,paddingLeft:'8px'}}>{typeof a.detalhes==='string'?a.detalhes:JSON.stringify(a.detalhes)}</div>}
-          </div>)}
-        </div>
-      </div>}
+      {aba==='atividades'&&<AuditLog atividades={atividades} K={K} row={row} filtroAcao={filtroAcao} setFiltroAcao={setFiltroAcao} filtroUsuario={filtroUsuario} setFiltroUsuario={setFiltroUsuario} inp={inp}/>}
     </div>
 
     {toast&&<div style={{position:'fixed',bottom:'20px',right:'20px',background:K.teal,color:'#000',padding:'10px 18px',borderRadius:'8px',fontWeight:700,fontSize:'13px',zIndex:9999}}>{toast}</div>}

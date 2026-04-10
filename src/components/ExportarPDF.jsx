@@ -266,6 +266,28 @@ ${(p.fotos?.length > 1) ? `<div style="display:flex;gap:6px;overflow-x:auto;marg
     </div>
   </div>
 
+  <!-- Holding cost -->
+  ${holdingTotal > 0 ? `
+  <div class="card" style="margin-bottom:14px;background:#FFFBEB;border-color:#FDE68A">
+    <div class="card-t" style="color:#92400E">🏗️ Custo de Holding (${holdingMeses} meses)</div>
+    <div class="row">
+      <span class="row-l">Condomínio mensal</span>
+      <span class="row-v">${fmt(condoMensal)}/mês</span>
+    </div>
+    <div class="row">
+      <span class="row-l">IPTU estimado</span>
+      <span class="row-v">${fmt(iptuMensal)}/mês</span>
+    </div>
+    <div class="row">
+      <span class="row-l">Custo mensal total</span>
+      <span class="row-v">${fmt(holdingMensal)}/mês</span>
+    </div>
+    <div class="row" style="font-weight:700">
+      <span class="row-l">Holding ${holdingMeses} meses</span>
+      <span class="row-v amber">${fmt(holdingTotal)}</span>
+    </div>
+  </div>` : ''}
+
   <!-- Síntese -->
   ${p.sintese_executiva ? `
   <div class="card" style="margin-bottom:14px;background:#F0F4FF;border-color:#C7D4F8">

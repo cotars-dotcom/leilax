@@ -6,7 +6,7 @@
 import { useState } from 'react'
 import { C, K, fmtC, card } from '../appConstants.js'
 import { isMercadoDireto } from '../lib/detectarFonte.js'
-import { calcularBreakdownFinanceiro, calcularROI, calcularPreditorConcorrencia } from '../lib/constants.js'
+import { calcularBreakdownFinanceiro, calcularROI, calcularPreditorConcorrencia, calcularCustoHolding } from '../lib/constants.js'
 
 const fmt = v => v ? `R$ ${Math.round(v).toLocaleString('pt-BR')}` : '—'
 const pct = v => v != null ? `${Number(v).toFixed(1)}%` : '—'
@@ -29,15 +29,23 @@ function BarraVisual({ label, valor, total, cor }) {
 export default function PainelInvestimento({ imovel }) {
   const [expandido, setExpandido] = useState(false)
   const [lanceSimulado, setLanceSimulado] = useState(null)
+  const [mesesHolding, setMesesHolding] = useState(4)
   const p = imovel
   const eMercado = isMercadoDireto(p.fonte_url, p.tipo_transacao)
   const lance = lanceSimulado || parseFloat(p.preco_pedido || p.valor_minimo) || 0
   const mercado = parseFloat(p.valor_mercado_estimado) || 0
-  
+
   if (!lance || !mercado) return null
-  
+
   const bd = calcularBreakdownFinanceiro(lance, p, eMercado)
+  const holding = calcularCustoHolding(
+    parseFloat(p.condominio_mensal) || 0,
+    mesesHolding,
+    p.iptu_mensal ? parseFloat(p.iptu_mensal) : null
+  )
+  const investimentoComHolding = bd.investimentoTotal + holding.total
   const roi = calcularROI(bd.investimentoTotal, mercado, parseFloat(p.aluguel_mensal_estimado) || 0)
+  const roiComHolding = calcularROI(investimentoComHolding, mercado, parseFloat(p.aluguel_mensal_estimado) || 0)
   const preditor = !eMercado ? calcularPreditorConcorrencia(
     parseFloat(p.valor_minimo) || lance,
     mercado,
@@ -126,6 +134,35 @@ export default function PainelInvestimento({ imovel }) {
                 Custos = {bd.pctCustosSobreLance}% sobre o lance
               </div>
             </div>
+
+            {/* Holding cost */}
+            {holding.porMes > 0 && (
+              <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 8, background: '#FFFBEB', border: '1px solid #FDE68A' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: '#92400E' }}>🏗️ Custo de Holding</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <input
+                      type="number" min={1} max={24} value={mesesHolding}
+                      onChange={e => setMesesHolding(Math.max(1, Math.min(24, Number(e.target.value))))}
+                      style={{ width: 38, textAlign: 'center', fontSize: 11, border: '1px solid #FDE68A', borderRadius: 4, padding: '1px 4px', background: '#FFF' }}
+                    />
+                    <span style={{ fontSize: 10, color: '#92400E' }}>meses</span>
+                  </div>
+                </div>
+                <div style={{ fontSize: 10, color: '#78350F', display: 'flex', justifyContent: 'space-between' }}>
+                  <span>Cond. {fmt(holding.condominio)} + IPTU {fmt(holding.iptuMensal)}/mês</span>
+                  <span style={{ fontWeight: 700 }}>{fmt(holding.total)}</span>
+                </div>
+                {holding.total > 0 && (
+                  <div style={{ marginTop: 5, fontSize: 10, color: '#92400E', borderTop: '1px solid #FDE68A', paddingTop: 4, display: 'flex', justifyContent: 'space-between' }}>
+                    <span>ROI c/ holding</span>
+                    <span style={{ fontWeight: 700, color: roiComHolding.roi >= 0 ? '#065F46' : '#991B1B' }}>
+                      {roiComHolding.roi > 0 ? '+' : ''}{roiComHolding.roi}% ({fmt(investimentoComHolding)} total)
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Coluna direita: Cenários */}
