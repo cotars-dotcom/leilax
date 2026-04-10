@@ -1,7 +1,7 @@
 /**
- * AXIS — Relatório PDF Profissional (Sprint 15B)
- * Gera PDF A4 de 6 páginas via jspdf client-side
- * Páginas: Capa | Resumo Executivo | Investimento | Jurídico | Mercado | Fotos
+ * AXIS IP — Relatorio PDF Profissional v2 (Sprint 15B+)
+ * Design corporativo: cabecalhos navy, KPI boxes, barras score, tabelas zebradas
+ * 6 paginas: Capa | Resumo | Investimento | Juridico | Mercado | Fotos
  */
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
@@ -9,84 +9,95 @@ import { isMercadoDireto } from '../lib/detectarFonte.js'
 import { calcularBreakdownFinanceiro, calcularROI, HOLDING_MESES_PADRAO, IPTU_SOBRE_CONDO_RATIO } from '../lib/constants.js'
 import { CUSTO_M2_SINAPI, FATOR_VALORIZACAO, detectarClasse, avaliarViabilidadeReforma } from '../lib/reformaUnificada.js'
 
-// ── Cores AXIS ────────────────────────────────────────────────────
-const NAVY = [0, 43, 128]
-const GREEN = [6, 95, 70]
-const RED = [153, 27, 27]
-const AMBER = [146, 64, 14]
-const PURPLE = [124, 58, 237]
-const GRAY = [100, 116, 139]
-const LIGHT = [248, 247, 244]
-const WHITE = [255, 255, 255]
+const C = {
+  navy: [0, 43, 128], navyL: [230, 236, 250],
+  green: [6, 95, 70], greenL: [236, 253, 245],
+  red: [153, 27, 27], redL: [254, 226, 226],
+  amber: [146, 64, 14], amberL: [254, 243, 199],
+  purple: [109, 40, 217],
+  gray: [100, 116, 139], grayL: [226, 232, 240],
+  text: [30, 41, 59], textL: [71, 85, 105],
+  bg: [248, 250, 252], white: [255, 255, 255],
+  accent: [14, 165, 233],
+}
 
-const fmt = v => v ? `R$ ${Math.round(v).toLocaleString('pt-BR')}` : '—'
-const pct = v => v != null ? `${Number(v).toFixed(1)}%` : '—'
+const fmt = v => v ? `R$ ${Math.round(v).toLocaleString('pt-BR')}` : '--'
+const pct = v => v != null ? `${Number(v).toFixed(1)}%` : '--'
 
-// ── Converter imagem URL para base64 ─────────────────────────────
 async function imgToBase64(url, timeout = 6000) {
   try {
-    const proxyUrl = `https://wsrv.nl/?url=${encodeURIComponent(url)}&w=600&q=75&output=jpg`
-    const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(timeout) })
+    const res = await fetch(`https://wsrv.nl/?url=${encodeURIComponent(url)}&w=600&q=75&output=jpg`, { signal: AbortSignal.timeout(timeout) })
     if (!res.ok) return null
     const blob = await res.blob()
-    return new Promise((resolve, reject) => {
-      const r = new FileReader()
-      r.onload = () => resolve(r.result)
-      r.onerror = () => reject()
-      r.readAsDataURL(blob)
-    })
+    return new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(r.result); r.onerror = () => reject(); r.readAsDataURL(blob) })
   } catch { return null }
 }
 
-// ── Helpers de desenho ───────────────────────────────────────────
-function drawRodape(doc, p, pageNum, totalPages) {
-  const y = 282
-  doc.setDrawColor(...NAVY)
-  doc.setLineWidth(0.3)
-  doc.line(15, y, 195, y)
-  doc.setFontSize(7)
-  doc.setTextColor(...GRAY)
-  doc.text(`AXIS IP · ${p.codigo_axis || ''} · ${new Date().toLocaleDateString('pt-BR')} · Gerado automaticamente — não constitui parecer jurídico`, 15, y + 4)
-  doc.text(`${pageNum}/${totalPages}`, 195, y + 4, { align: 'right' })
-}
+function scoreColor(v) { return v >= 7 ? C.green : v >= 5 ? C.amber : C.red }
 
-function drawBadge(doc, x, y, text, bg, fg) {
-  const w = doc.getTextWidth(text) + 6
-  doc.setFillColor(...bg)
-  doc.roundedRect(x, y - 4, w, 6, 1.5, 1.5, 'F')
-  doc.setTextColor(...fg)
-  doc.setFontSize(7)
+// === Drawing helpers ===
+function secHeader(doc, y, title) {
+  doc.setFillColor(...C.navy)
+  doc.rect(15, y, 180, 8, 'F')
+  doc.setFontSize(9)
   doc.setFont('helvetica', 'bold')
-  doc.text(text, x + 3, y)
+  doc.setTextColor(...C.white)
+  doc.text(title.toUpperCase(), 20, y + 5.5)
+  return y + 12
+}
+function subH(doc, y, title) {
+  doc.setFontSize(9)
+  doc.setFont('helvetica', 'bold')
+  doc.setTextColor(...C.navy)
+  doc.text(title, 15, y)
+  doc.setDrawColor(...C.grayL)
+  doc.setLineWidth(0.3)
+  doc.line(15, y + 1.5, 195, y + 1.5)
+  return y + 5
+}
+function kpiBox(doc, x, y, w, h, label, value, color, bgColor) {
+  doc.setFillColor(...bgColor)
+  doc.roundedRect(x, y, w, h, 2, 2, 'F')
+  doc.setDrawColor(...color)
+  doc.setLineWidth(0.6)
+  doc.line(x, y + 1, x, y + h - 1)
+  doc.setFontSize(6.5)
+  doc.setFont('helvetica', 'bold')
+  doc.setTextColor(...C.gray)
+  doc.text(label.toUpperCase(), x + 4, y + 5)
+  doc.setFontSize(11)
+  doc.setTextColor(...color)
+  doc.text(value, x + 4, y + 13)
+}
+function rodape(doc, p, pg, tot) {
+  doc.setDrawColor(...C.navy)
+  doc.setLineWidth(0.4)
+  doc.line(15, 282, 195, 282)
+  doc.setFontSize(6.5)
+  doc.setFont('helvetica', 'normal')
+  doc.setTextColor(...C.gray)
+  doc.text(`AXIS IP  |  ${p.codigo_axis || ''}  |  ${new Date().toLocaleDateString('pt-BR')}  |  Gerado automaticamente`, 15, 286)
+  doc.setFont('helvetica', 'bold')
+  doc.text(`${pg}/${tot}`, 195, 286, { align: 'right' })
+}
+function bdg(doc, x, y, text, bg, fg) {
+  doc.setFontSize(7)
+  const w = doc.getTextWidth(text) + 8
+  doc.setFillColor(...bg)
+  doc.roundedRect(x, y - 4.5, w, 7, 2, 2, 'F')
+  doc.setTextColor(...fg)
+  doc.setFont('helvetica', 'bold')
+  doc.text(text, x + 4, y)
   doc.setFont('helvetica', 'normal')
   return w + 2
 }
 
-function scoreColor(v) {
-  if (v >= 7) return GREEN
-  if (v >= 5) return AMBER
-  return RED
-}
-
-function recBadgeColors(rec) {
-  if (rec === 'COMPRAR') return { bg: [236, 253, 245], fg: GREEN, label: 'COMPRAR' }
-  if (rec === 'EVITAR') return { bg: [254, 242, 242], fg: RED, label: 'EVITAR' }
-  return { bg: [254, 249, 195], fg: AMBER, label: 'AGUARDAR' }
-}
-
-// ══════════════════════════════════════════════════════════════════
-// GERADOR PRINCIPAL
-// ══════════════════════════════════════════════════════════════════
+// === MAIN ===
 export async function gerarPDFProfissional(p, onProgress = () => {}) {
-  const doc = new jsPDF('p', 'mm', 'a4') // 210 × 297mm
-  let lastTableY = 0
-  let lastTableResult = null
-  const table = (opts) => {
-    const r = autoTable(doc, opts)
-    lastTableY = r?.finalY ?? (doc.lastAutoTable?.finalY ?? lastTableY)
-    lastTableResult = r
-    return r
-  }
+  const doc = new jsPDF('p', 'mm', 'a4')
+  let lastY = 0
+  const tbl = (opts) => { const r = autoTable(doc, opts); lastY = r?.finalY ?? (doc.lastAutoTable?.finalY ?? lastY); return r }
+
   const eMercado = isMercadoDireto(p.fonte_url, p.tipo_transacao)
   const area = parseFloat(p.area_privativa_m2 || p.area_m2) || 0
   const lance = parseFloat(p.preco_pedido || p.valor_minimo) || 0
@@ -98,591 +109,364 @@ export async function gerarPDFProfissional(p, onProgress = () => {}) {
   const iptuMensal = parseFloat(p.iptu_mensal || 0) || (condoMensal > 0 ? Math.round(condoMensal * IPTU_SOBRE_CONDO_RATIO) : 0)
   const holdingMensal = condoMensal + iptuMensal
   const holdingTotal = HOLDING_MESES_PADRAO * holdingMensal
-  const totalPages = 6
+  const score = parseFloat(p.score_total || 0)
+  const totalPg = 6
 
-  // Pré-carregar fotos
   onProgress('Convertendo fotos...')
   const fotosRaw = [p.foto_principal, ...(p.fotos || [])].filter(Boolean)
   const fotosUnicas = [...new Set(fotosRaw)].slice(0, 8)
-  const fotosB64 = (await Promise.allSettled(fotosUnicas.map(u => imgToBase64(u))))
-    .map(r => r.status === 'fulfilled' ? r.value : null)
-    .filter(Boolean)
+  const fotosB64 = (await Promise.allSettled(fotosUnicas.map(u => imgToBase64(u)))).map(r => r.status === 'fulfilled' ? r.value : null).filter(Boolean)
   const heroImg = fotosB64[0] || null
 
-  // Reformas SINAPI
   const classe = detectarClasse(parseFloat(p.preco_m2_mercado) || 7000)
   const viab = avaliarViabilidadeReforma(mercado, lance, area, parseFloat(p.preco_m2_mercado) || 7000)
   const reformas = ['refresh_giro', 'leve_reforcada_1_molhado', 'pesada'].map((esc, i) => {
     const custoM2 = CUSTO_M2_SINAPI[esc]?.[classe] || 0
     const custo = parseFloat(p[['custo_reforma_basica', 'custo_reforma_media', 'custo_reforma_completa'][i]]) || Math.round(area * custoM2)
     const fv = FATOR_VALORIZACAO[esc] || 1
-    const cenario = ['basica', 'media', 'completa'][i]
-    const v = viab?.[cenario]
-    return { label: ['Básica', 'Média', 'Completa'][i], custo, custoM2, valorizacao: Math.round((fv - 1) * 100), roiFlip: v?.roiFlip || 0, eficiencia: v?.eficiencia || 0 }
+    return { label: ['Basica', 'Media', 'Completa'][i], custo, custoM2, valorizacao: Math.round((fv - 1) * 100) }
   })
 
-  const rec = recBadgeColors(p.recomendacao)
+  const recLabel = p.recomendacao === 'COMPRAR' ? 'COMPRAR' : p.recomendacao === 'EVITAR' ? 'EVITAR' : 'AGUARDAR'
+  const recBg = p.recomendacao === 'COMPRAR' ? C.greenL : p.recomendacao === 'EVITAR' ? C.redL : C.amberL
+  const recFg = p.recomendacao === 'COMPRAR' ? C.green : p.recomendacao === 'EVITAR' ? C.red : C.amber
 
-  // ══════════════════════════════════════════════════════════════
-  // PÁGINA 1 — CAPA
-  // ══════════════════════════════════════════════════════════════
+  // ============ PAGINA 1 — CAPA ============
   onProgress('Gerando capa...')
+  doc.setFillColor(...C.navy)
+  doc.rect(0, 0, 210, 36, 'F')
+  doc.setFillColor(...C.green)
+  doc.rect(0, 36, 210, 1.5, 'F')
 
-  // Fundo navy topo
-  doc.setFillColor(...NAVY)
-  doc.rect(0, 0, 210, 40, 'F')
-
-  // Logo AXIS
-  doc.setFontSize(22)
-  doc.setTextColor(...WHITE)
+  doc.setFontSize(20)
+  doc.setTextColor(...C.white)
   doc.setFont('helvetica', 'bold')
-  doc.text('AXIS IP', 15, 18)
+  doc.text('AXIS IP', 15, 15)
   doc.setFontSize(8)
   doc.setFont('helvetica', 'normal')
-  doc.text('Inteligência Imobiliária', 15, 24)
+  doc.setTextColor(180, 198, 230)
+  doc.text('Inteligencia Imobiliaria', 15, 21)
   doc.setFontSize(7)
-  doc.text('axisip.vercel.app', 15, 30)
-
-  // Código + Data no canto
-  doc.setFontSize(14)
+  doc.text('axisip.vercel.app', 15, 27)
+  doc.setFontSize(16)
   doc.setFont('helvetica', 'bold')
-  doc.text(p.codigo_axis || '', 195, 18, { align: 'right' })
-  doc.setFontSize(8)
+  doc.setTextColor(...C.white)
+  doc.text(p.codigo_axis || '', 195, 15, { align: 'right' })
+  doc.setFontSize(9)
   doc.setFont('helvetica', 'normal')
-  doc.text(new Date().toLocaleDateString('pt-BR'), 195, 25, { align: 'right' })
+  doc.setTextColor(180, 198, 230)
+  doc.text(new Date().toLocaleDateString('pt-BR'), 195, 22, { align: 'right' })
 
-  // Foto principal
-  let yPos = 45
+  let y = 42
   if (heroImg) {
-    try {
-      doc.addImage(heroImg, 'JPEG', 15, yPos, 180, 100)
-      yPos += 105
-    } catch { yPos += 5 }
+    try { doc.addImage(heroImg, 'JPEG', 15, y, 180, 95); doc.setDrawColor(...C.grayL); doc.setLineWidth(0.5); doc.rect(15, y, 180, 95, 'S'); y += 100 } catch { y += 3 }
   } else {
-    doc.setFillColor(...LIGHT)
-    doc.rect(15, yPos, 180, 60, 'F')
-    doc.setTextColor(...GRAY)
-    doc.setFontSize(12)
-    doc.text('Foto não disponível', 105, yPos + 33, { align: 'center' })
-    yPos += 65
+    doc.setFillColor(...C.bg); doc.rect(15, y, 180, 50, 'F'); doc.setTextColor(...C.gray); doc.setFontSize(11); doc.text('Foto nao disponivel', 105, y + 28, { align: 'center' }); y += 55
   }
 
-  // Título
-  doc.setFontSize(16)
-  doc.setTextColor(...NAVY)
+  doc.setFontSize(15)
+  doc.setTextColor(...C.text)
   doc.setFont('helvetica', 'bold')
-  const titulo = p.titulo || 'Imóvel'
-  const tituloLines = doc.splitTextToSize(titulo.length > 80 ? titulo.substring(0, 80) + '...' : titulo, 140)
-  doc.text(tituloLines, 15, yPos + 5)
-  yPos += tituloLines.length * 7 + 4
-
-  // Endereço
-  doc.setFontSize(10)
-  doc.setFont('helvetica', 'normal')
-  doc.setTextColor(...GRAY)
-  const endereco = [p.endereco, p.bairro, p.cidade].filter(Boolean).join(' — ') + `/${p.estado || 'MG'}`
-  doc.text(doc.splitTextToSize(endereco, 140), 15, yPos)
-  yPos += 10
-
-  // Specs
+  const tLines = doc.splitTextToSize((p.titulo || 'Imovel').substring(0, 90), 135)
+  doc.text(tLines, 15, y + 4)
+  y += tLines.length * 6 + 3
   doc.setFontSize(9)
-  doc.setTextColor(...NAVY)
-  const specs = [area ? `${area}m²` : null, p.quartos ? `${p.quartos}q` : null, p.suites ? `${p.suites}s` : null, p.vagas ? `${p.vagas}v` : null, p.condominio_mensal ? `Cond. ${fmt(p.condominio_mensal)}` : null].filter(Boolean).join(' · ')
-  doc.text(specs, 15, yPos)
-  yPos += 10
+  doc.setFont('helvetica', 'normal')
+  doc.setTextColor(...C.gray)
+  doc.text(doc.splitTextToSize([p.endereco, p.bairro, p.cidade].filter(Boolean).join(' -- ') + `/${p.estado || 'MG'}`, 135), 15, y)
+  y += 8
 
-  // Score grande + Badge recomendação
-  const score = parseFloat(p.score_total || 0)
-  doc.setFontSize(48)
+  doc.setFontSize(8.5)
+  doc.setTextColor(...C.textL)
+  doc.text([area ? `${area}m2` : null, p.quartos ? `${p.quartos}q` : null, p.suites ? `${p.suites}s` : null, p.vagas ? `${p.vagas}v` : null, p.condominio_mensal ? `Cond. ${fmt(p.condominio_mensal)}` : null].filter(Boolean).join('  |  '), 15, y)
+  y += 6
+
+  let bx = 15
+  bx += bdg(doc, bx, y, recLabel, recBg, recFg)
+  bx += bdg(doc, bx + 2, y, eMercado ? 'MERCADO DIRETO' : `${p.num_leilao || 1}a PRACA`, eMercado ? [219, 234, 254] : C.greenL, eMercado ? [29, 78, 216] : C.green)
+
+  doc.setFontSize(42)
   doc.setFont('helvetica', 'bold')
   doc.setTextColor(...scoreColor(score))
-  doc.text(score.toFixed(1), 160, yPos + 5, { align: 'center' })
-  doc.setFontSize(9)
-  doc.text('/10', 178, yPos + 5)
+  doc.text(score.toFixed(1), 170, y - 5, { align: 'center' })
+  doc.setFontSize(12)
+  doc.text('/10', 186, y - 5)
   doc.setFontSize(7)
-  doc.setTextColor(...GRAY)
-  doc.text('SCORE AXIS', 160, yPos + 11, { align: 'center' })
+  doc.setTextColor(...C.gray)
+  doc.text('SCORE AXIS', 175, y + 1, { align: 'center' })
+  y += 10
 
-  // Badge recomendação
-  drawBadge(doc, 15, yPos, rec.label, rec.bg, rec.fg)
-  const badgeX = 15 + doc.getTextWidth(rec.label) + 10
-  drawBadge(doc, badgeX, yPos, eMercado ? 'MERCADO DIRETO' : `${p.num_leilao || 1}ª PRAÇA`, eMercado ? [239, 246, 255] : [236, 253, 245], eMercado ? [29, 78, 216] : GREEN)
+  kpiBox(doc, 15, y, 56, 22, eMercado ? 'Preco Pedido' : 'Lance Minimo', fmt(lance), C.amber, C.amberL)
+  kpiBox(doc, 77, y, 56, 22, 'Mercado Estimado', fmt(mercado), C.navy, C.navyL)
+  kpiBox(doc, 139, y, 56, 22, 'Aluguel Estimado', aluguel ? `${fmt(aluguel)}/mes` : '--', C.purple, [243, 232, 255])
 
-  // Valores destaque
-  yPos += 20
-  doc.setFillColor(...LIGHT)
-  doc.roundedRect(15, yPos, 56, 28, 3, 3, 'F')
-  doc.roundedRect(77, yPos, 56, 28, 3, 3, 'F')
-  doc.roundedRect(139, yPos, 56, 28, 3, 3, 'F')
-
-  doc.setFontSize(7)
-  doc.setTextColor(...GRAY)
-  doc.text(eMercado ? 'PREÇO PEDIDO' : 'LANCE MÍNIMO', 43, yPos + 8, { align: 'center' })
-  doc.text('MERCADO EST.', 105, yPos + 8, { align: 'center' })
-  doc.text('ALUGUEL EST.', 167, yPos + 8, { align: 'center' })
-
-  doc.setFontSize(13)
+  y += 28
+  const roiV = roi?.roi ?? 0
+  doc.setFontSize(8)
   doc.setFont('helvetica', 'bold')
-  doc.setTextColor(194, 65, 12)
-  doc.text(fmt(lance), 43, yPos + 19, { align: 'center' })
-  doc.setTextColor(...NAVY)
-  doc.text(fmt(mercado), 105, yPos + 19, { align: 'center' })
-  doc.setTextColor(...PURPLE)
-  doc.text(aluguel ? `${fmt(aluguel)}/mês` : '—', 167, yPos + 19, { align: 'center' })
+  doc.setTextColor(...C.gray)
+  doc.text('ROI Estimado:', 15, y)
+  doc.setTextColor(...(roiV >= 15 ? C.green : roiV >= 0 ? C.amber : C.red))
+  doc.text(`${roiV > 0 ? '+' : ''}${roiV}%`, 45, y)
+  const desc = parseFloat(p.desconto_sobre_mercado_pct_calculado || p.desconto_sobre_mercado_pct) || 0
+  if (desc > 0) { doc.setTextColor(...C.gray); doc.text('Desconto:', 70, y); doc.setTextColor(...C.green); doc.text(`-${desc.toFixed(0)}%`, 91, y) }
+  rodape(doc, p, 1, totalPg)
 
-  drawRodape(doc, p, 1, totalPages)
-
-  // ══════════════════════════════════════════════════════════════
-  // PÁGINA 2 — RESUMO EXECUTIVO
-  // ══════════════════════════════════════════════════════════════
+  // ============ PAGINA 2 — RESUMO ============
   onProgress('Resumo executivo...')
   doc.addPage()
-  yPos = 15
+  y = 15
+  y = secHeader(doc, y, 'Resumo Executivo -- Score AXIS 6D')
 
-  doc.setFontSize(14)
-  doc.setFont('helvetica', 'bold')
-  doc.setTextColor(...NAVY)
-  doc.text('Resumo Executivo', 15, yPos)
-  yPos += 10
-
-  // Scores 6D com barras
   const scores6D = [
-    { l: 'Localização', v: parseFloat(p.score_localizacao) || 0, w: '20%' },
-    { l: 'Desconto', v: parseFloat(p.score_desconto) || 0, w: '18%' },
-    { l: 'Jurídico', v: parseFloat(p.score_juridico) || 0, w: '18%' },
-    { l: 'Ocupação', v: parseFloat(p.score_ocupacao) || 0, w: '15%' },
-    { l: 'Liquidez', v: parseFloat(p.score_liquidez) || 0, w: '15%' },
-    { l: 'Mercado', v: parseFloat(p.score_mercado) || 0, w: '14%' },
+    { l: 'Localizacao', v: parseFloat(p.score_localizacao) || 0, w: 20 },
+    { l: 'Desconto', v: parseFloat(p.score_desconto) || 0, w: 18 },
+    { l: 'Juridico', v: parseFloat(p.score_juridico) || 0, w: 18 },
+    { l: 'Ocupacao', v: parseFloat(p.score_ocupacao) || 0, w: 15 },
+    { l: 'Liquidez', v: parseFloat(p.score_liquidez) || 0, w: 15 },
+    { l: 'Mercado', v: parseFloat(p.score_mercado) || 0, w: 14 },
   ]
-
-  doc.setFontSize(9)
-  doc.setFont('helvetica', 'bold')
-  doc.text('Score por Dimensão', 15, yPos)
-  yPos += 5
-
   scores6D.forEach(s => {
-    doc.setFontSize(8)
+    doc.setFontSize(7.5)
     doc.setFont('helvetica', 'normal')
-    doc.setTextColor(...GRAY)
-    doc.text(`${s.l} (${s.w})`, 15, yPos + 3)
-
-    // Barra background
-    doc.setFillColor(230, 230, 230)
-    doc.roundedRect(60, yPos, 80, 4, 1, 1, 'F')
-    // Barra preenchida
+    doc.setTextColor(...C.textL)
+    doc.text(`${s.l} (${s.w}%)`, 15, y + 3)
+    doc.setFillColor(...C.grayL)
+    doc.roundedRect(55, y, 100, 4.5, 1.5, 1.5, 'F')
     const cor = scoreColor(s.v)
     doc.setFillColor(...cor)
-    doc.roundedRect(60, yPos, Math.max(1, (s.v / 10) * 80), 4, 1, 1, 'F')
-
+    doc.roundedRect(55, y, Math.max(2, (s.v / 10) * 100), 4.5, 1.5, 1.5, 'F')
+    doc.setFontSize(8)
     doc.setFont('helvetica', 'bold')
     doc.setTextColor(...cor)
-    doc.text(s.v.toFixed(1), 145, yPos + 3)
-    yPos += 7
+    doc.text(s.v.toFixed(1), 160, y + 3.5)
+    doc.setFontSize(6)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(...C.gray)
+    doc.text(`(${(s.v * s.w / 100).toFixed(1)}pt)`, 170, y + 3.5)
+    y += 8
   })
 
-  yPos += 5
-
-  // Síntese executiva
-  if (p.sintese_executiva) {
-    doc.setFillColor(240, 244, 255)
-    const sinteseLines = doc.splitTextToSize(p.sintese_executiva, 170)
-    const sinteseH = sinteseLines.length * 4 + 10
-    doc.roundedRect(15, yPos, 180, sinteseH, 2, 2, 'F')
-    doc.setFontSize(8)
-    doc.setFont('helvetica', 'bold')
-    doc.setTextColor(29, 78, 216)
-    doc.text('Síntese Executiva', 20, yPos + 6)
-    doc.setFont('helvetica', 'normal')
-    doc.setTextColor(51, 51, 51)
-    doc.text(sinteseLines, 20, yPos + 12)
-    yPos += sinteseH + 5
-  }
-
-  // Alertas
-  if (p.alertas?.length) {
-    doc.setFillColor(254, 242, 242)
-    const alertas = p.alertas.slice(0, 6).map(a => typeof a === 'string' ? a : a.texto || '')
-    const alertaLines = alertas.map(a => doc.splitTextToSize(`• ${a}`, 168))
-    const totalAlertaLines = alertaLines.reduce((s, l) => s + l.length, 0)
-    const alertaH = totalAlertaLines * 4 + 10
-    doc.roundedRect(15, yPos, 180, alertaH, 2, 2, 'F')
-    doc.setFontSize(8)
-    doc.setFont('helvetica', 'bold')
-    doc.setTextColor(...RED)
-    doc.text('Alertas', 20, yPos + 6)
-    doc.setFont('helvetica', 'normal')
-    doc.setTextColor(51, 51, 51)
-    let ay = yPos + 12
-    alertaLines.forEach(lines => {
-      doc.text(lines, 20, ay)
-      ay += lines.length * 4
-    })
-    yPos += alertaH + 5
-  }
-
-  // Positivos / Negativos
-  if (yPos < 230) {
-    const posNegs = [
-      { title: 'Pontos Positivos', items: (p.positivos || []).slice(0, 4), color: GREEN },
-      { title: 'Pontos de Atenção', items: (p.negativos || []).slice(0, 4), color: RED },
-    ]
-    posNegs.forEach((pn, idx) => {
-      const x = idx === 0 ? 15 : 108
-      doc.setFontSize(8)
-      doc.setFont('helvetica', 'bold')
-      doc.setTextColor(...pn.color)
-      doc.text(pn.title, x, yPos + 4)
-      doc.setFont('helvetica', 'normal')
-      doc.setTextColor(51, 51, 51)
-      let py = yPos + 10
-      pn.items.forEach(item => {
-        const lines = doc.splitTextToSize(`${idx === 0 ? '+' : '−'} ${item}`, 82)
-        doc.text(lines, x, py)
-        py += lines.length * 3.5 + 1
-      })
-    })
-  }
-
-  drawRodape(doc, p, 2, totalPages)
-
-  // ══════════════════════════════════════════════════════════════
-  // PÁGINA 3 — ANÁLISE DE INVESTIMENTO
-  // ══════════════════════════════════════════════════════════════
-  onProgress('Análise de investimento...')
-  doc.addPage()
-  yPos = 15
-
-  doc.setFontSize(14)
-  doc.setFont('helvetica', 'bold')
-  doc.setTextColor(...NAVY)
-  doc.text('Análise de Investimento', 15, yPos)
-  yPos += 10
-
-  // Tabela breakdown custos
+  y += 2
+  doc.setFillColor(...C.bg)
+  doc.roundedRect(15, y, 180, 10, 2, 2, 'F')
   doc.setFontSize(9)
   doc.setFont('helvetica', 'bold')
-  doc.text('Custos de Aquisição', 15, yPos)
-  yPos += 3
+  doc.setTextColor(...C.navy)
+  doc.text('SCORE TOTAL:', 20, y + 6.5)
+  doc.setFontSize(14)
+  doc.setTextColor(...scoreColor(score))
+  doc.text(`${score.toFixed(1)} / 10`, 58, y + 7)
+  doc.setFontSize(8)
+  doc.setFont('helvetica', 'normal')
+  doc.setTextColor(...C.gray)
+  doc.text(`Recomendacao: ${recLabel}`, 110, y + 6.5)
+  y += 15
 
-  const breakdownRows = [
-    [eMercado ? 'Preço pedido' : 'Lance mínimo', fmt(lance)],
-    [`Comissão ${eMercado ? '' : 'leiloeiro '}(${(bd.comissao.pct * 100).toFixed(0)}%)`, fmt(bd.comissao.valor)],
+  if (p.sintese_executiva) {
+    y = subH(doc, y, 'Sintese Executiva')
+    doc.setFontSize(8)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(...C.text)
+    const sl = doc.splitTextToSize(p.sintese_executiva, 175)
+    doc.text(sl.slice(0, 6), 15, y)
+    y += Math.min(sl.length, 6) * 3.8 + 5
+  }
+
+  if (p.alertas?.length) {
+    y = subH(doc, y, 'Alertas')
+    const alertas = p.alertas.slice(0, 5).map(a => typeof a === 'string' ? a : a.texto || '')
+    doc.setFillColor(...C.amberL)
+    const al = alertas.map(a => doc.splitTextToSize(`  ${a}`, 172))
+    const ah = al.reduce((s, l) => s + l.length, 0) * 3.8 + 4
+    doc.roundedRect(15, y - 2, 180, ah, 1.5, 1.5, 'F')
+    doc.setFontSize(7.5)
+    doc.setTextColor(...C.amber)
+    let ay = y + 2
+    al.forEach(lines => { doc.text(lines, 18, ay); ay += lines.length * 3.8 })
+    y += ah + 5
+  }
+
+  if (p.positivos?.length && y < 230) {
+    y = subH(doc, y, 'Pontos Positivos')
+    doc.setFontSize(7.5)
+    doc.setTextColor(...C.green)
+    const pos = (typeof p.positivos === 'string' ? JSON.parse(p.positivos) : p.positivos).slice(0, 5)
+    pos.forEach(item => { const l = doc.splitTextToSize(`[+]  ${item}`, 175); doc.text(l, 15, y); y += l.length * 3.5 + 1.5 })
+    y += 3
+  }
+
+  if (p.negativos?.length && y < 260) {
+    y = subH(doc, y, 'Pontos de Atencao')
+    doc.setFontSize(7.5)
+    doc.setTextColor(...C.red)
+    const neg = (typeof p.negativos === 'string' ? JSON.parse(p.negativos) : p.negativos).slice(0, 5)
+    neg.forEach(item => { const l = doc.splitTextToSize(`[!]  ${item}`, 175); doc.text(l, 15, y); y += l.length * 3.5 + 1.5 })
+  }
+  rodape(doc, p, 2, totalPg)
+
+  // ============ PAGINA 3 — INVESTIMENTO ============
+  onProgress('Analise de investimento...')
+  doc.addPage()
+  y = 15
+  y = secHeader(doc, y, 'Analise de Investimento')
+
+  const bW = 43, bH = 18
+  kpiBox(doc, 15, y, bW, bH, eMercado ? 'Preco' : 'Lance', fmt(lance), C.amber, C.amberL)
+  kpiBox(doc, 60, y, bW, bH, 'Custos Aq.', fmt(bd.totalCustos), C.navy, C.navyL)
+  kpiBox(doc, 105, y, bW, bH, 'Invest. Total', fmt(bd.investimentoTotal + holdingTotal), C.navy, C.bg)
+  kpiBox(doc, 150, y, 45, bH, 'ROI', `${roiV > 0 ? '+' : ''}${roiV}%`, roiV >= 15 ? C.green : roiV >= 0 ? C.amber : C.red, roiV >= 0 ? C.greenL : C.redL)
+  y += bH + 8
+
+  y = subH(doc, y, 'Custos de Aquisicao')
+  const bRows = [
+    [eMercado ? 'Preco pedido' : 'Lance minimo', fmt(lance)],
+    !eMercado && bd.comissao.valor > 0 && [`Comissao leiloeiro (${(bd.comissao.pct * 100).toFixed(0)}%)`, fmt(bd.comissao.valor)],
     [`ITBI (${(bd.itbi.pct * 100).toFixed(0)}%)`, fmt(bd.itbi.valor)],
     ['Doc + Registro', fmt(bd.documentacao.valor)],
-  ]
-  if (!eMercado && bd.advogado.valor > 0) breakdownRows.push([`Advogado (${(bd.advogado.pct * 100).toFixed(0)}%)`, fmt(bd.advogado.valor)])
-  if (bd.reforma > 0) breakdownRows.push(['Reforma estimada', fmt(bd.reforma)])
-  if (holdingTotal > 0) breakdownRows.push([`Holding (${HOLDING_MESES_PADRAO}m × ${fmt(holdingMensal)}/mês)`, fmt(holdingTotal)])
-  breakdownRows.push([{ content: 'INVESTIMENTO TOTAL', styles: { fontStyle: 'bold', textColor: NAVY } }, { content: fmt(bd.investimentoTotal + holdingTotal), styles: { fontStyle: 'bold', textColor: NAVY } }])
+    !eMercado && bd.advogado.valor > 0 && [`Advogado (${(bd.advogado.pct * 100).toFixed(0)}%)`, fmt(bd.advogado.valor)],
+    bd.reforma > 0 && ['Reforma estimada', fmt(bd.reforma)],
+    holdingTotal > 0 && [`Holding (${HOLDING_MESES_PADRAO}m x ${fmt(holdingMensal)}/mes)`, fmt(holdingTotal)],
+  ].filter(Boolean)
+  bRows.push([{ content: 'INVESTIMENTO TOTAL', styles: { fontStyle: 'bold', textColor: C.navy } }, { content: fmt(bd.investimentoTotal + holdingTotal), styles: { fontStyle: 'bold', textColor: C.navy } }])
 
-  table({
-    startY: yPos,
-    head: [],
-    body: breakdownRows,
-    theme: 'plain',
-    styles: { fontSize: 8, cellPadding: 2, textColor: [51, 51, 51] },
-    columnStyles: { 0: { cellWidth: 90 }, 1: { cellWidth: 50, halign: 'right' } },
-    margin: { left: 15, right: 105 },
-    tableWidth: 85,
-  })
+  tbl({ startY: y, head: [], body: bRows, theme: 'striped', styles: { fontSize: 7.5, cellPadding: { top: 2, bottom: 2, left: 3, right: 3 }, textColor: C.text }, alternateRowStyles: { fillColor: C.bg }, columnStyles: { 0: { cellWidth: 85 }, 1: { cellWidth: 45, halign: 'right', fontStyle: 'bold' } }, margin: { left: 15, right: 65 }, tableWidth: 130 })
 
-  // Cenários de saída (lado direito)
-  const exitStartY = yPos
-  doc.setFontSize(9)
+  const eY = y - 5
+  doc.setFontSize(8)
   doc.setFont('helvetica', 'bold')
-  doc.setTextColor(...NAVY)
-  doc.text('Cenários de Saída', 110, exitStartY)
-
-  const exitRows = [
+  doc.setTextColor(...C.navy)
+  doc.text('Cenarios de Saida', 150, eY)
+  tbl({ startY: eY + 3, head: [['Cenario', 'Valor', 'ROI']], body: [
     ['Otimista (+15%)', fmt(roi.cenarios?.otimista?.valor), `${roi.cenarios?.otimista?.roi > 0 ? '+' : ''}${roi.cenarios?.otimista?.roi}%`],
     ['Realista', fmt(roi.cenarios?.realista?.valor), `${roi.cenarios?.realista?.roi > 0 ? '+' : ''}${roi.cenarios?.realista?.roi}%`],
-    ['Venda rápida (-10%)', fmt(roi.cenarios?.vendaRapida?.valor), `${roi.cenarios?.vendaRapida?.roi > 0 ? '+' : ''}${roi.cenarios?.vendaRapida?.roi}%`],
-  ]
+    ['Venda rapida', fmt(roi.cenarios?.vendaRapida?.valor), `${roi.cenarios?.vendaRapida?.roi > 0 ? '+' : ''}${roi.cenarios?.vendaRapida?.roi}%`],
+  ], theme: 'grid', styles: { fontSize: 6.5, cellPadding: 2 }, headStyles: { fillColor: C.navy, textColor: C.white, fontSize: 6 }, margin: { left: 150 }, tableWidth: 45 })
 
-  table({
-    startY: exitStartY + 3,
-    head: [['Cenário', 'Valor', 'ROI']],
-    body: exitRows,
-    theme: 'grid',
-    styles: { fontSize: 7.5, cellPadding: 2 },
-    headStyles: { fillColor: NAVY, textColor: WHITE, fontSize: 7 },
-    margin: { left: 110 },
-    tableWidth: 85,
-  })
-
-  // Locação
   if (roi.locacao) {
-    const locY = lastTableY + 5
-    doc.setFillColor(240, 253, 244)
-    doc.roundedRect(110, locY, 85, 18, 2, 2, 'F')
-    doc.setFontSize(7)
+    const lY = lastY + 4
+    doc.setFillColor(...C.greenL)
+    doc.roundedRect(150, lY, 45, 14, 1.5, 1.5, 'F')
+    doc.setFontSize(6.5)
     doc.setFont('helvetica', 'bold')
-    doc.setTextColor(...GREEN)
-    doc.text('Locação', 114, locY + 5)
+    doc.setTextColor(...C.green)
+    doc.text('Locacao', 153, lY + 5)
     doc.setFont('helvetica', 'normal')
-    doc.text(`Aluguel: ${fmt(roi.locacao.aluguelMensal)}/mês`, 114, locY + 10)
-    doc.text(`Yield: ${roi.locacao.yieldAnual}% a.a. · Payback: ${Math.round(roi.locacao.paybackMeses / 12)} anos`, 114, locY + 15)
+    doc.text(`${fmt(roi.locacao.aluguelMensal)}/mes`, 153, lY + 9)
+    doc.text(`Yield ${roi.locacao.yieldAnual}% | ${Math.round(roi.locacao.paybackMeses / 12)}a`, 153, lY + 13)
   }
 
-  // Cenários de reforma
-  yPos = Math.max(lastTableY + 15, (roi.locacao ? lastTableY + 30 : lastTableY + 10))
-  doc.setFontSize(9)
-  doc.setFont('helvetica', 'bold')
-  doc.setTextColor(...NAVY)
-  doc.text('Cenários de Reforma (SINAPI-MG 2026)', 15, yPos)
-  yPos += 3
-
-  const reformaRows = reformas.map(r => {
-    const custoTotal = lance + bd.totalCustos + r.custo + holdingTotal
-    const valorPos = Math.round(mercado * (1 + r.valorizacao / 100))
-    const roiRef = custoTotal > 0 ? Math.round((valorPos - custoTotal) / custoTotal * 100) : 0
-    return [r.label, fmt(r.custo), `R$ ${r.custoM2}/m²`, `+${r.valorizacao}%`, fmt(custoTotal), fmt(valorPos), `${roiRef > 0 ? '+' : ''}${roiRef}%`]
+  y = Math.max(lastY + 12, eY + 60)
+  y = subH(doc, y, 'Cenarios de Reforma (SINAPI-MG 2026)')
+  const rfRows = reformas.map(r => {
+    const ct = lance + bd.totalCustos + r.custo + holdingTotal
+    const vp = Math.round(mercado * (1 + r.valorizacao / 100))
+    const roiR = ct > 0 ? Math.round((vp - ct) / ct * 100) : 0
+    return [r.label, fmt(r.custo), `R$ ${r.custoM2}/m2`, `+${r.valorizacao}%`, fmt(ct), fmt(vp), `${roiR > 0 ? '+' : ''}${roiR}%`]
   })
+  tbl({ startY: y, head: [['Cenario', 'Custo', 'R$/m2', 'Valoriz.', 'Invest. Total', 'Valor Pos', 'ROI']], body: rfRows, theme: 'grid', styles: { fontSize: 6.5, cellPadding: 2 }, headStyles: { fillColor: C.navy, textColor: C.white, fontSize: 6 }, alternateRowStyles: { fillColor: C.bg }, margin: { left: 15, right: 15 } })
+  rodape(doc, p, 3, totalPg)
 
-  table({
-    startY: yPos,
-    head: [['Cenário', 'Custo', 'R$/m²', 'Valoriz.', 'Invest. Total', 'Valor Pós', 'ROI']],
-    body: reformaRows,
-    theme: 'striped',
-    styles: { fontSize: 7, cellPadding: 2 },
-    headStyles: { fillColor: NAVY, textColor: WHITE, fontSize: 7 },
-    margin: { left: 15, right: 15 },
-  })
-
-  drawRodape(doc, p, 3, totalPages)
-
-  // ══════════════════════════════════════════════════════════════
-  // PÁGINA 4 — ANÁLISE JURÍDICA
-  // ══════════════════════════════════════════════════════════════
-  onProgress('Análise jurídica...')
+  // ============ PAGINA 4 — JURIDICO ============
+  onProgress('Analise juridica...')
   doc.addPage()
-  yPos = 15
+  y = 15
+  y = secHeader(doc, y, 'Analise Juridica')
 
-  doc.setFontSize(14)
-  doc.setFont('helvetica', 'bold')
-  doc.setTextColor(...NAVY)
-  doc.text('Análise Jurídica', 15, yPos)
-  yPos += 10
-
-  // Dados do processo
-  const juridRows = [
+  const jRows = [
     p.processos_ativos && ['Processo', p.processos_ativos],
     p.vara_judicial && ['Vara', p.vara_judicial],
     p.tipo_justica && ['Tribunal', p.tipo_justica],
-    p.matricula_status && ['Matrícula', p.matricula_status],
-    p.ocupacao && ['Ocupação', p.ocupacao],
-    p.ocupacao_fonte && ['Fonte ocupação', p.ocupacao_fonte],
-    ['Responsab. débitos', p.responsabilidade_debitos === 'sub_rogado' ? '[OK] Sub-rogados no preço' : p.responsabilidade_debitos === 'exonerado' ? '[OK] Arrematante exonerado' : p.responsabilidade_debitos === 'arrematante' ? '[!] Arrematante arca' : p.responsabilidade_debitos || '—'],
-    p.responsabilidade_fonte && ['Fonte', p.responsabilidade_fonte],
-    p.debitos_condominio && ['Déb. condomínio', p.debitos_condominio],
-    p.debitos_iptu && ['Déb. IPTU', p.debitos_iptu],
-    !eMercado && ['Comissão leiloeiro', `${p.comissao_leiloeiro_pct || 5}%`],
-    ['Pagamento', p.parcelamento_aceito ? 'Parcelamento aceito' : 'Exclusivamente à vista'],
+    p.matricula_status && ['Matricula', p.matricula_status],
+    p.ocupacao && ['Ocupacao', p.ocupacao],
+    p.ocupacao_fonte && ['Fonte', p.ocupacao_fonte],
+    ['Resp. debitos', p.responsabilidade_debitos === 'sub_rogado' ? 'Sub-rogados no preco' : p.responsabilidade_debitos === 'exonerado' ? 'Arrematante exonerado' : p.responsabilidade_debitos === 'arrematante' ? 'Arrematante arca' : p.responsabilidade_debitos || '--'],
+    p.responsabilidade_fonte && ['Fonte resp.', p.responsabilidade_fonte],
+    p.debitos_condominio && ['Deb. condominio', p.debitos_condominio],
+    p.debitos_iptu && ['Deb. IPTU', p.debitos_iptu],
+    !eMercado && ['Comissao leiloeiro', `${p.comissao_leiloeiro_pct || 5}%`],
+    ['Pagamento', p.parcelamento_aceito ? 'Parcelamento aceito' : 'Exclusivamente a vista'],
   ].filter(Boolean)
 
-  table({
-    startY: yPos,
-    head: [],
-    body: juridRows.map(([l, v]) => {
-      const vStr = typeof v === 'string' ? v : String(v || '—')
-      return [l, vStr.length > 120 ? vStr.substring(0, 120) + '...' : vStr]
-    }),
-    theme: 'plain',
-    styles: { fontSize: 7.5, cellPadding: 2.5, textColor: [51, 51, 51], overflow: 'linebreak' },
-    columnStyles: {
-      0: { cellWidth: 40, fontStyle: 'bold', textColor: GRAY },
-      1: { cellWidth: 140 }
-    },
-    margin: { left: 15, right: 15 },
-  })
+  tbl({ startY: y, head: [], body: jRows.map(([l, v]) => [l, (typeof v === 'string' ? v : String(v || '--')).substring(0, 130)]), theme: 'striped', styles: { fontSize: 7.5, cellPadding: { top: 2.5, bottom: 2.5, left: 4, right: 4 }, textColor: C.text, overflow: 'linebreak' }, alternateRowStyles: { fillColor: C.bg }, columnStyles: { 0: { cellWidth: 35, fontStyle: 'bold', textColor: C.gray }, 1: { cellWidth: 145 } }, margin: { left: 15, right: 15 } })
+  y = lastY + 8
 
-  yPos = lastTableY + 8
-
-  // Observações jurídicas
-  if (p.obs_juridicas && yPos < 240) {
-    doc.setFillColor(254, 249, 195)
-    const obsLines = doc.splitTextToSize(p.obs_juridicas, 170)
-    const obsH = Math.min(obsLines.length * 3.5 + 10, 240 - yPos)
-    doc.roundedRect(15, yPos, 180, obsH, 2, 2, 'F')
-    doc.setFontSize(8)
-    doc.setFont('helvetica', 'bold')
-    doc.setTextColor(...AMBER)
-    doc.text('Observações Jurídicas', 20, yPos + 6)
-    doc.setFont('helvetica', 'normal')
+  if (p.obs_juridicas && y < 240) {
+    y = subH(doc, y, 'Observacoes Juridicas')
+    doc.setFillColor(...C.amberL)
+    const ol = doc.splitTextToSize(p.obs_juridicas, 172)
+    const oh = Math.min(ol.length * 3.5 + 6, 240 - y)
+    doc.roundedRect(15, y - 2, 180, oh, 1.5, 1.5, 'F')
     doc.setFontSize(7)
-    doc.setTextColor(51, 51, 51)
-    doc.text(obsLines.slice(0, Math.floor((obsH - 10) / 3.5)), 20, yPos + 12)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(...C.text)
+    doc.text(ol.slice(0, Math.floor((oh - 4) / 3.5)), 18, y + 2)
   }
+  rodape(doc, p, 4, totalPg)
 
-  drawRodape(doc, p, 4, totalPages)
-
-  // ══════════════════════════════════════════════════════════════
-  // PÁGINA 5 — ANÁLISE DE MERCADO
-  // ══════════════════════════════════════════════════════════════
-  onProgress('Análise de mercado...')
+  // ============ PAGINA 5 — MERCADO ============
+  onProgress('Analise de mercado...')
   doc.addPage()
-  yPos = 15
+  y = 15
+  y = secHeader(doc, y, 'Analise de Mercado')
 
-  doc.setFontSize(14)
-  doc.setFont('helvetica', 'bold')
-  doc.setTextColor(...NAVY)
-  doc.text('Análise de Mercado', 15, yPos)
-  yPos += 10
-
-  // Dados do bairro
-  const mercRows = [
-    ['Preço/m² imóvel', p.preco_m2_imovel ? `R$ ${Math.round(p.preco_m2_imovel).toLocaleString('pt-BR')}/m²` : '—'],
-    ['Preço/m² mercado', p.preco_m2_mercado ? `R$ ${Math.round(p.preco_m2_mercado).toLocaleString('pt-BR')}/m²` : '—'],
+  tbl({ startY: y, head: [['Indicador', 'Valor']], body: [
+    ['Preco/m2 imovel', p.preco_m2_imovel ? `R$ ${Math.round(p.preco_m2_imovel).toLocaleString('pt-BR')}/m2` : '--'],
+    ['Preco/m2 mercado', p.preco_m2_mercado ? `R$ ${Math.round(p.preco_m2_mercado).toLocaleString('pt-BR')}/m2` : '--'],
     ['Desconto s/ mercado', pct(p.desconto_sobre_mercado_pct_calculado || p.desconto_sobre_mercado_pct)],
-    ['Yield bruto', p.yield_bruto_pct ? `${p.yield_bruto_pct}% a.a.` : '—'],
-    ['Tendência', p.mercado_tendencia || '—'],
-    ['Demanda', p.mercado_demanda || '—'],
-    ['Tempo revenda', p.prazo_revenda_meses ? `${p.prazo_revenda_meses} meses` : '—'],
-    ['Liquidez', p.liquidez || '—'],
-  ]
+    ['Yield bruto', p.yield_bruto_pct ? `${p.yield_bruto_pct}% a.a.` : '--'],
+    ['Tendencia', p.mercado_tendencia || '--'],
+    ['Demanda', p.mercado_demanda || '--'],
+    ['Tempo revenda', p.prazo_revenda_meses ? `${p.prazo_revenda_meses} meses` : '--'],
+    ['Liquidez', p.liquidez || '--'],
+  ], theme: 'striped', styles: { fontSize: 7.5, cellPadding: 2.5 }, headStyles: { fillColor: C.navy, textColor: C.white, fontSize: 7 }, alternateRowStyles: { fillColor: C.bg }, margin: { left: 15, right: 105 }, tableWidth: 90 })
 
-  table({
-    startY: yPos,
-    head: [['Indicador', 'Valor']],
-    body: mercRows,
-    theme: 'striped',
-    styles: { fontSize: 8, cellPadding: 2.5 },
-    headStyles: { fillColor: NAVY, textColor: WHITE },
-    margin: { left: 15, right: 105 },
-    tableWidth: 85,
-  })
-
-  // Dados AXIS bairro (lado direito)
   if (p._dados_bairro_axis) {
     const db = p._dados_bairro_axis
-    doc.setFontSize(9)
+    doc.setFontSize(8)
     doc.setFont('helvetica', 'bold')
-    doc.setTextColor(3, 105, 161)
-    doc.text(`Dados AXIS — ${db.label || p.bairro}`, 110, yPos)
-
-    const axisRows = [
+    doc.setTextColor(...C.accent)
+    doc.text(`Dados AXIS -- ${db.label || p.bairro}`, 110, y - 1)
+    const axR = [
       db.classeIpeadLabel && ['Classe IPEAD', db.classeIpeadLabel],
-      db.precoContratoM2 && ['Preço contrato QA', `R$ ${db.precoContratoM2.toLocaleString('pt-BR')}/m²`],
-      db.precoAnuncioM2 && ['Preço anúncio', `R$ ${db.precoAnuncioM2.toLocaleString('pt-BR')}/m²`],
+      db.precoContratoM2 && ['Preco QA', `R$ ${db.precoContratoM2.toLocaleString('pt-BR')}/m2`],
+      db.precoAnuncioM2 && ['Preco anuncio', `R$ ${db.precoAnuncioM2.toLocaleString('pt-BR')}/m2`],
       db.yieldBruto && ['Yield bruto', `${db.yieldBruto}% a.a.`],
-      db.tendencia12m != null && ['Tendência 12m', `${db.tendencia12m}%`],
+      db.tendencia12m != null && ['Tendencia 12m', `${db.tendencia12m}%`],
     ].filter(Boolean)
+    tbl({ startY: y + 2, head: [], body: axR, theme: 'plain', styles: { fontSize: 7, cellPadding: 2, textColor: C.text }, columnStyles: { 0: { cellWidth: 35, textColor: C.gray, fontStyle: 'bold' } }, margin: { left: 110 }, tableWidth: 85 })
+  }
+  y = lastY + 10
 
-    table({
-      startY: yPos + 3,
-      head: [],
-      body: axisRows,
-      theme: 'plain',
-      styles: { fontSize: 7.5, cellPadding: 2, textColor: [51, 51, 51] },
-      columnStyles: { 0: { cellWidth: 38, textColor: GRAY, fontStyle: 'bold' } },
-      margin: { left: 110 },
-      tableWidth: 85,
-    })
+  if (p.comparaveis?.length > 0 && y < 210) {
+    y = subH(doc, y, `Comparaveis (${p.comparaveis.length})`)
+    tbl({ startY: y, head: [['Endereco', 'Area', 'Q', 'Preco', 'R$/m2']], body: p.comparaveis.slice(0, 8).map(c => [(c.descricao || c.endereco || '--').substring(0, 50), c.area_m2 ? `${c.area_m2}m2` : '--', c.quartos || '--', c.valor ? fmt(c.valor) : '--', c.preco_m2 ? `R$ ${Math.round(c.preco_m2).toLocaleString('pt-BR')}` : '--']), theme: 'striped', styles: { fontSize: 6.5, cellPadding: 2 }, headStyles: { fillColor: C.navy, textColor: C.white, fontSize: 6.5 }, alternateRowStyles: { fillColor: C.bg }, margin: { left: 15, right: 15 } })
+    y = lastY + 8
   }
 
-  yPos = lastTableY + 10
-
-  // Comparáveis
-  if (p.comparaveis?.length > 0 && yPos < 220) {
-    doc.setFontSize(9)
-    doc.setFont('helvetica', 'bold')
-    doc.setTextColor(...NAVY)
-    doc.text(`Comparáveis (${p.comparaveis.length})`, 15, yPos)
-    yPos += 3
-
-    const compRows = p.comparaveis.slice(0, 8).map(c => [
-      (c.descricao || c.endereco || '—').substring(0, 50),
-      c.area_m2 ? `${c.area_m2}m²` : '—',
-      c.quartos || '—',
-      c.valor ? fmt(c.valor) : '—',
-      c.preco_m2 ? `R$ ${Math.round(c.preco_m2).toLocaleString('pt-BR')}` : '—',
-    ])
-
-    table({
-      startY: yPos,
-      head: [['Endereço', 'Área', 'Q', 'Preço', 'R$/m²']],
-      body: compRows,
-      theme: 'striped',
-      styles: { fontSize: 7, cellPadding: 2 },
-      headStyles: { fillColor: NAVY, textColor: WHITE, fontSize: 7 },
-      margin: { left: 15, right: 15 },
-    })
+  if (aluguel > 0 && y < 245) {
+    y = subH(doc, y, 'Aluguel Estimado por Cenario')
+    tbl({ startY: y, head: [['Cenario', 'Aluguel', 'Yield']], body: [['Sem reforma', 0.90], ['Basica', 1.00], ['Media', 1.08], ['Completa', 1.20]].map(([lb, ft]) => { const al = Math.round(aluguel * ft); return [lb, `${fmt(al)}/mes`, lance > 0 ? `${((al * 12) / lance * 100).toFixed(1)}%` : '--'] }), theme: 'striped', styles: { fontSize: 7.5, cellPadding: 2 }, headStyles: { fillColor: C.navy, textColor: C.white, fontSize: 7 }, alternateRowStyles: { fillColor: C.bg }, margin: { left: 15, right: 105 }, tableWidth: 90 })
   }
+  rodape(doc, p, 5, totalPg)
 
-  // Aluguel por cenário
-  yPos = lastTableResult ? lastTableY + 10 : yPos + 5
-  if (aluguel > 0 && yPos < 250) {
-    doc.setFontSize(9)
-    doc.setFont('helvetica', 'bold')
-    doc.setTextColor(...NAVY)
-    doc.text('Aluguel Estimado por Cenário', 15, yPos)
-    yPos += 3
-
-    const alugCenarios = [
-      ['Sem reforma', 0.90], ['Básica', 1.00], ['Média', 1.08], ['Completa', 1.20]
-    ].map(([label, fator]) => {
-      const alug = Math.round(aluguel * fator)
-      const yieldB = lance > 0 ? ((alug * 12) / lance * 100).toFixed(1) : '—'
-      return [label, fmt(alug) + '/mês', `${yieldB}%`]
-    })
-
-    table({
-      startY: yPos,
-      head: [['Cenário', 'Aluguel', 'Yield']],
-      body: alugCenarios,
-      theme: 'striped',
-      styles: { fontSize: 7.5, cellPadding: 2 },
-      headStyles: { fillColor: NAVY, textColor: WHITE, fontSize: 7 },
-      margin: { left: 15, right: 105 },
-      tableWidth: 85,
-    })
-  }
-
-  drawRodape(doc, p, 5, totalPages)
-
-  // ══════════════════════════════════════════════════════════════
-  // PÁGINA 6 — GALERIA DE FOTOS
-  // ══════════════════════════════════════════════════════════════
+  // ============ PAGINA 6 — FOTOS ============
   onProgress('Galeria de fotos...')
   doc.addPage()
-  yPos = 15
-
-  doc.setFontSize(14)
-  doc.setFont('helvetica', 'bold')
-  doc.setTextColor(...NAVY)
-  doc.text('Galeria de Fotos', 15, yPos)
-  yPos += 8
+  y = 15
+  y = secHeader(doc, y, 'Galeria de Fotos')
 
   if (fotosB64.length > 0) {
-    const cols = 2
-    const imgW = 87
-    const imgH = 58
-    const gap = 6
+    const cols = 2, imgW = 87, imgH = 58, gap = 6
     fotosB64.slice(0, 8).forEach((img, i) => {
-      const col = i % cols
-      const row = Math.floor(i / cols)
-      const x = 15 + col * (imgW + gap)
-      const y = yPos + row * (imgH + gap)
-      if (y + imgH > 275) return // overflow protection
-      try {
-        doc.setFillColor(...LIGHT)
-        doc.roundedRect(x, y, imgW, imgH, 2, 2, 'F')
-        doc.addImage(img, 'JPEG', x + 1, y + 1, imgW - 2, imgH - 2)
-      } catch { /* foto falhou */ }
+      const col = i % cols, row = Math.floor(i / cols)
+      const fx = 15 + col * (imgW + gap), fy = y + row * (imgH + gap)
+      if (fy + imgH > 275) return
+      try { doc.setFillColor(...C.bg); doc.roundedRect(fx, fy, imgW, imgH, 2, 2, 'F'); doc.addImage(img, 'JPEG', fx + 1, fy + 1, imgW - 2, imgH - 2); doc.setDrawColor(...C.grayL); doc.setLineWidth(0.3); doc.roundedRect(fx, fy, imgW, imgH, 2, 2, 'S') } catch {}
     })
-  } else {
-    doc.setFontSize(10)
-    doc.setTextColor(...GRAY)
-    doc.text('Nenhuma foto disponível', 105, 150, { align: 'center' })
-  }
+  } else { doc.setFontSize(10); doc.setTextColor(...C.gray); doc.text('Nenhuma foto disponivel', 105, 150, { align: 'center' }) }
+  rodape(doc, p, 6, totalPg)
 
-  drawRodape(doc, p, 6, totalPages)
-
-  // ══════════════════════════════════════════════════════════════
-  // SALVAR
-  // ══════════════════════════════════════════════════════════════
   onProgress('Finalizando PDF...')
-  const filename = `AXIS_${p.codigo_axis || 'imovel'}_${new Date().toISOString().slice(0, 10)}.pdf`
-  doc.save(filename)
-  return filename
+  doc.save(`AXIS_${p.codigo_axis || 'imovel'}_${new Date().toISOString().slice(0, 10)}.pdf`)
 }
