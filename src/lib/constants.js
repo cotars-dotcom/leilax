@@ -311,3 +311,231 @@ export function calcularPreditorConcorrencia(lanceMinimo, valorMercado, custos, 
     }
   }).filter(n => n.viavel)
 }
+
+// ─── SPRINT 17: Fator de Homogeneização por Atributos (NBR 14653) ──────────
+
+/**
+ * Fatores de ajuste do valor de mercado com base nos atributos do imóvel.
+ * Referência: NBR 14653-2 (Avaliação de Imóveis Urbanos) — fatores de homogeneização.
+ */
+export const FATORES_ATRIBUTOS = {
+  elevador_presente:          { fator: 1.08,  label: 'Elevador',           descricao: 'Prédio com elevador' },
+  elevador_ausente_alto:      { fator: 0.87,  label: 'Sem elevador (>4and)', descricao: 'Sem elevador, prédio >4 andares' },
+  elevador_ausente_baixo:     { fator: 1.00,  label: 'Sem elevador (≤4and)', descricao: 'Sem elevador, prédio ≤4 andares (neutro)' },
+  piscina:                    { fator: 1.05,  label: 'Piscina',            descricao: 'Condomínio com piscina' },
+  area_lazer:                 { fator: 1.03,  label: 'Área de lazer',      descricao: 'Área de lazer completa' },
+  portaria_24h:               { fator: 1.04,  label: 'Portaria 24h',       descricao: 'Portaria 24 horas' },
+  andar_alto:                 { fator: 1.05,  label: 'Andar alto (>8)',     descricao: 'Unidade em andar acima do 8º' },
+  idade_alta:                 { fator: 0.95,  label: 'Idade >30 anos',     descricao: 'Edificação com mais de 30 anos sem reforma relevante' },
+  academia:                   { fator: 1.02,  label: 'Academia',           descricao: 'Condomínio com academia' },
+  churrasqueira:              { fator: 1.01,  label: 'Churrasqueira',      descricao: 'Área de churrasqueira' },
+}
+
+/**
+ * Calcula o fator de homogeneização composto e a lista de ajustes aplicados.
+ *
+ * @param {object} p - Imóvel com campos: elevador, piscina, academia, churrasqueira,
+ *                      area_lazer, portaria_24h, andar, total_andares, ano_construcao
+ * @returns {{ fator: number, ajustes: Array<{key, label, fator, impactoR$}>, impactoTotal: number }}
+ */
+export function calcularFatorHomogeneizacao(p, valorBase = 0) {
+  if (!p) return { fator: 1.0, ajustes: [], impactoTotal: 0 }
+
+  const ajustes = []
+  const andar = parseInt(p.andar) || 0
+  const totalAndares = parseInt(p.total_andares) || 0
+  const anoConst = parseInt(p.ano_construcao) || 0
+  const idadeEdif = anoConst > 0 ? (new Date().getFullYear() - anoConst) : 0
+
+  // Elevador — regra condicional por altura do prédio
+  if (p.elevador === true) {
+    ajustes.push({ key: 'elevador_presente', ...FATORES_ATRIBUTOS.elevador_presente })
+  } else if (p.elevador === false) {
+    if (totalAndares > 4 || (andar > 4 && !totalAndares)) {
+      ajustes.push({ key: 'elevador_ausente_alto', ...FATORES_ATRIBUTOS.elevador_ausente_alto })
+    } else {
+      ajustes.push({ key: 'elevador_ausente_baixo', ...FATORES_ATRIBUTOS.elevador_ausente_baixo })
+    }
+  }
+
+  // Amenidades booleanas
+  if (p.piscina === true)      ajustes.push({ key: 'piscina',       ...FATORES_ATRIBUTOS.piscina })
+  if (p.area_lazer === true)   ajustes.push({ key: 'area_lazer',    ...FATORES_ATRIBUTOS.area_lazer })
+  if (p.portaria_24h === true) ajustes.push({ key: 'portaria_24h',  ...FATORES_ATRIBUTOS.portaria_24h })
+  if (p.academia === true)     ajustes.push({ key: 'academia',      ...FATORES_ATRIBUTOS.academia })
+  if (p.churrasqueira === true) ajustes.push({ key: 'churrasqueira', ...FATORES_ATRIBUTOS.churrasqueira })
+
+  // Andar alto
+  if (andar > 8) ajustes.push({ key: 'andar_alto', ...FATORES_ATRIBUTOS.andar_alto })
+
+  // Idade alta sem reforma relevante
+  if (idadeEdif > 30) ajustes.push({ key: 'idade_alta', ...FATORES_ATRIBUTOS.idade_alta })
+
+  // Fator composto (multiplicativo)
+  const fator = ajustes.reduce((acc, a) => acc * a.fator, 1.0)
+  const fatorArredondado = Math.round(fator * 10000) / 10000
+
+  // Impacto em R$ se valor base fornecido
+  const valorAjustado = Math.round(valorBase * fatorArredondado)
+  const impactoTotal = valorAjustado - Math.round(valorBase)
+
+  // Enriquecer cada ajuste com impacto em R$
+  const ajustesComImpacto = ajustes.map(a => ({
+    ...a,
+    impactoR$: valorBase > 0 ? Math.round(valorBase * (a.fator - 1)) : 0,
+    impactoPct: Math.round((a.fator - 1) * 1000) / 10,
+  }))
+
+  return {
+    fator: fatorArredondado,
+    ajustes: ajustesComImpacto,
+    impactoTotal,
+    valorAjustado,
+    qtdAjustes: ajustes.length,
+  }
+}
+
+/**
+ * Score de atributos para compor o score_total (sub-dimensão de Mercado).
+ * Escala 0-10: penalizado por ausência de amenidades, bonificado pela presença.
+ * Neutro (sem dados) = 5.0
+ */
+export function calcularScoreAtributos7D(p) {
+  if (!p) return { score: 5.0, detalhes: [] }
+
+  const homo = calcularFatorHomogeneizacao(p)
+  if (homo.ajustes.length === 0) return { score: 5.0, detalhes: [], semDados: true }
+
+  // Mapear fator composto para escala 0-10
+  // fator 0.80 → score ~2, fator 1.00 → score 5, fator 1.30 → score 9.5
+  const raw = 5.0 + (homo.fator - 1.0) * 50  // cada 1% = 0.5pt
+  const score = Math.max(0, Math.min(10, Math.round(raw * 10) / 10))
+
+  return { score, fator: homo.fator, detalhes: homo.ajustes }
+}
+
+// ─── SPRINT 17: Matriz Unificada de Investimento ────────────────────────────
+
+/**
+ * Calcula a Matriz Unificada de Investimento: 4 cenários de reforma × métricas.
+ * FONTE ÚNICA para todos os painéis: PainelInvestimento, CenariosReforma,
+ * PainelRentabilidade, CalculadoraROI, PDF, HTML, SharedViewer.
+ *
+ * @param {object} p - Imóvel do Supabase
+ * @param {object} opts - { lance, eMercado, holdingMeses, reformaCustos }
+ * @returns {object} { cenarios: [...], melhor: { flip, locacao } }
+ */
+export function calcularMatrizInvestimento(p, opts = {}) {
+  if (!p) return null
+
+  const lance = opts.lance || parseFloat(p.preco_pedido || p.valor_minimo) || 0
+  const eMercado = opts.eMercado != null ? opts.eMercado : false
+  const mercado = parseFloat(p.valor_mercado_estimado) || 0
+  const aluguel = parseFloat(p.aluguel_mensal_estimado) || 0
+  const area = parseFloat(p.area_privativa_m2 || p.area_m2) || 0
+  const holdingMeses = opts.holdingMeses || HOLDING_MESES_PADRAO
+  const condoMensal = parseFloat(p.condominio_mensal || 0)
+  const iptuMensal = parseFloat(p.iptu_mensal || 0) || (condoMensal > 0 ? Math.round(condoMensal * IPTU_SOBRE_CONDO_RATIO) : 0)
+  const holdingMensal = condoMensal + iptuMensal
+  const holdingTotal = holdingMeses * holdingMensal
+
+  if (!lance || !mercado) return null
+
+  // Homogeneização
+  const homo = calcularFatorHomogeneizacao(p, mercado)
+  const mercadoAjustado = homo.valorAjustado || mercado
+
+  // Breakdown de aquisição
+  const bd = calcularBreakdownFinanceiro(lance, p, eMercado)
+  const custosAquisicao = bd.totalCustos
+
+  // Fatores de valorização e aluguel por cenário
+  const CENARIOS = [
+    { id: 'sem_reforma',  label: 'Sem Reforma',   fvPct: 0,   alugFator: 0.90, cor: '#8E8EA0' },
+    { id: 'basica',       label: 'Básica',         fvPct: 4,   alugFator: 1.00, cor: '#3B8BD4' },
+    { id: 'media',        label: 'Média',          fvPct: 12,  alugFator: 1.08, cor: '#D4A017' },
+    { id: 'completa',     label: 'Completa',       fvPct: 28,  alugFator: 1.20, cor: '#D05538' },
+  ]
+
+  // Custos de reforma — prioridade: opts > banco > SINAPI
+  const reformaCustos = opts.reformaCustos || {}
+  const getCustoReforma = (cenId) => {
+    if (cenId === 'sem_reforma') return 0
+    if (reformaCustos[cenId] > 0) return reformaCustos[cenId]
+    const chaveBanco = `custo_reforma_${cenId}`
+    if (parseFloat(p[chaveBanco]) > 0) return parseFloat(p[chaveBanco])
+    // Fallback SINAPI (importação circular evitada — cálculo inline)
+    const SINAPI_M2 = { basica: 375, media: 1070, completa: 2200 }  // classe B padrão
+    return Math.round(area * (SINAPI_M2[cenId] || 1070))
+  }
+
+  const cenarios = CENARIOS.map(cen => {
+    const custoReforma = getCustoReforma(cen.id)
+    const investTotal = lance + custosAquisicao + custoReforma + holdingTotal
+    const valorPos = Math.round(mercadoAjustado * (1 + cen.fvPct / 100))
+
+    // Flip
+    const lucroFlip = valorPos * 0.94 - investTotal  // 6% corretagem
+    const roiFlip = investTotal > 0 ? Math.round((lucroFlip / investTotal) * 1000) / 10 : 0
+
+    // Locação
+    const alugMensal = aluguel > 0 ? Math.round(aluguel * cen.alugFator) : 0
+    const yieldAnual = alugMensal > 0 && investTotal > 0 ? Math.round((alugMensal * 12 / investTotal) * 1000) / 10 : 0
+    const paybackAnos = alugMensal > 0 ? Math.round(investTotal / (alugMensal * 12) * 10) / 10 : 0
+
+    return {
+      ...cen,
+      custoReforma,
+      investTotal,
+      valorPos,
+      lucroFlip: Math.round(lucroFlip),
+      roiFlip,
+      alugMensal,
+      yieldAnual,
+      paybackAnos,
+    }
+  })
+
+  // Melhor cenário flip e locação
+  const melhorFlip = cenarios.reduce((best, c) => c.roiFlip > best.roiFlip ? c : best, cenarios[0])
+  const melhorLocacao = cenarios.reduce((best, c) => c.yieldAnual > best.yieldAnual ? c : best, cenarios[0])
+
+  return {
+    cenarios,
+    melhorFlip: { id: melhorFlip.id, label: melhorFlip.label, roiFlip: melhorFlip.roiFlip, lucro: melhorFlip.lucroFlip },
+    melhorLocacao: { id: melhorLocacao.id, label: melhorLocacao.label, yieldAnual: melhorLocacao.yieldAnual },
+    bd,
+    holdingTotal,
+    holdingMensal,
+    homo,
+    mercadoAjustado,
+  }
+}
+
+/**
+ * Calcula o lance máximo para um ROI alvo.
+ * @returns {number} Lance máximo em R$
+ */
+export function calcularLanceMaximoParaROI(roiAlvo, p, opts = {}) {
+  if (!p) return 0
+  const mercado = parseFloat(p.valor_mercado_estimado) || 0
+  const eMercado = opts.eMercado || false
+  const custos = eMercado ? CUSTOS_MERCADO : CUSTOS_LEILAO
+  const pctCustos = (custos.comissao_leiloeiro_pct + custos.itbi_pct + custos.advogado_pct + custos.documentacao_pct) / 100
+  const custoReforma = opts.custoReforma || parseFloat(p.custo_reforma_estimado || p.custo_reforma_calculado) || 0
+  const condoMensal = parseFloat(p.condominio_mensal || 0)
+  const iptuMensal = parseFloat(p.iptu_mensal || 0) || (condoMensal > 0 ? Math.round(condoMensal * IPTU_SOBRE_CONDO_RATIO) : 0)
+  const holdingMeses = opts.holdingMeses || HOLDING_MESES_PADRAO
+  const holdingTotal = holdingMeses * (condoMensal + iptuMensal)
+  const registroFixo = custos.registro_fixo || 1500
+
+  // valorVenda = mercado * 0.94 (- 6% corretagem)
+  // investTotal = lance * (1 + pctCustos) + registroFixo + custoReforma + holdingTotal
+  // ROI = (valorVenda - investTotal) / investTotal
+  // Resolvendo para lance:
+  const valorVenda = mercado * 0.94
+  const targetInvest = valorVenda / (1 + roiAlvo / 100)
+  const lanceMax = (targetInvest - registroFixo - custoReforma - holdingTotal) / (1 + pctCustos)
+
+  return Math.max(0, Math.round(lanceMax))
+}

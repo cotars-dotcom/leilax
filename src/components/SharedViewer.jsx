@@ -6,7 +6,7 @@
 import { useState, useEffect } from 'react'
 import { getImovelPorToken } from '../lib/supabase.js'
 import { isMercadoDireto } from '../lib/detectarFonte.js'
-import { calcularBreakdownFinanceiro, calcularROI, HOLDING_MESES_PADRAO, IPTU_SOBRE_CONDO_RATIO } from '../lib/constants.js'
+import { calcularBreakdownFinanceiro, calcularROI, HOLDING_MESES_PADRAO, IPTU_SOBRE_CONDO_RATIO, calcularFatorHomogeneizacao } from '../lib/constants.js'
 import { CUSTO_M2_SINAPI, FATOR_VALORIZACAO, detectarClasse, avaliarViabilidadeReforma } from '../lib/reformaUnificada.js'
 
 const fmt = v => v ? `R$ ${Math.round(v).toLocaleString('pt-BR')}` : '—'
@@ -97,6 +97,7 @@ export default function SharedViewer({ token }) {
     const fv = FATOR_VALORIZACAO[esc] || 1
     return { label: ['Básica','Média','Completa'][i], custo, custoM2, valorizacao: Math.round((fv-1)*100) }
   })
+  const homo = calcularFatorHomogeneizacao(p, mercado)
 
   const fotos = [...new Set([p.foto_principal,...(p.fotos||[])].filter(f => f && !f.includes('{action}')))]
   const respDebitos = p.responsabilidade_debitos === 'sub_rogado' ? '✅ Sub-rogados no preço' : p.responsabilidade_debitos === 'exonerado' ? '✅ Exonerado' : p.responsabilidade_debitos === 'arrematante' ? '⚠️ Arrematante arca' : p.responsabilidade_debitos
@@ -306,12 +307,32 @@ export default function SharedViewer({ token }) {
         {/* JUSTIFICATIVA */}
         {p.justificativa && <div style={card()}>{secTitle('Justificativa','💬')}<div style={{ fontSize:12,color:C.text,lineHeight:1.65,whiteSpace:'pre-wrap' }}>{p.justificativa}</div></div>}
 
-        {/* ATRIBUTOS */}
-        {(p.elevador!=null||p.piscina!=null||p.area_lazer!=null) && <div style={card()}>{secTitle('Atributos do Prédio','🏗️')}
-          <div style={{ display:'flex',flexWrap:'wrap',gap:6 }}>
-            {[p.elevador!=null&&[p.elevador?'✓ Elevador':'✗ Sem elevador',p.elevador],p.piscina!=null&&[p.piscina?'✓ Piscina':'✗ Sem piscina',p.piscina],p.area_lazer!=null&&[p.area_lazer?'✓ Área lazer':'✗ Sem área lazer',p.area_lazer],p.salao_festas!=null&&[p.salao_festas?'✓ Salão festas':'✗ Sem salão',p.salao_festas],p.portaria_24h&&['✓ Portaria 24h',true]].filter(Boolean).map(([t,v],i) =>
+        {/* ATRIBUTOS + HOMOGENEIZAÇÃO */}
+        {(p.elevador!=null||p.piscina!=null||p.area_lazer!=null||homo.ajustes.length>0) && <div style={card()}>{secTitle('Atributos do Prédio','🏗️')}
+          <div style={{ display:'flex',flexWrap:'wrap',gap:6,marginBottom:homo.ajustes.length>0?12:0 }}>
+            {[p.elevador!=null&&[p.elevador?'✓ Elevador':'✗ Sem elevador',p.elevador],p.piscina!=null&&[p.piscina?'✓ Piscina':'✗ Sem piscina',p.piscina],p.area_lazer!=null&&[p.area_lazer?'✓ Área lazer':'✗ Sem área lazer',p.area_lazer],p.academia!=null&&[p.academia?'✓ Academia':'✗ Sem academia',p.academia],p.churrasqueira!=null&&[p.churrasqueira?'✓ Churrasqueira':'✗ Sem churrasqueira',p.churrasqueira],p.portaria_24h&&['✓ Portaria 24h',true]].filter(Boolean).map(([t,v],i) =>
               <span key={i} style={{ fontSize:10,padding:'3px 8px',borderRadius:5,fontWeight:600,background:v?'#ECFDF5':'#FEF9C3',color:v?'#065F46':'#92400E' }}>{t}</span>)}
           </div>
+          {homo.ajustes.length > 0 && <>
+            <div style={{ fontSize:10,fontWeight:700,color:C.navy,marginBottom:6,textTransform:'uppercase',letterSpacing:'.3px' }}>Impacto no Valor (NBR 14653)</div>
+            {homo.ajustes.map((a,i) => {
+              const pos = a.fator >= 1
+              return <div key={i} style={{ display:'flex',justifyContent:'space-between',alignItems:'center',padding:'4px 8px',borderRadius:6,fontSize:11,marginBottom:2,background:pos?'#F0FDF4':'#FEF2F2' }}>
+                <span style={{ color:'#475569' }}>{a.label}</span>
+                <div style={{ display:'flex',gap:10 }}>
+                  <span style={{ fontWeight:700,color:pos?'#065F46':'#991B1B' }}>{a.impactoPct>0?'+':''}{a.impactoPct}%</span>
+                  {a['impactoR$']!==0 && <span style={{ fontWeight:600,color:pos?'#065F46':'#991B1B',fontSize:10,minWidth:70,textAlign:'right' }}>{a['impactoR$']>0?'+':''}{fmt(a['impactoR$'])}</span>}
+                </div>
+              </div>
+            })}
+            <div style={{ display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:6,padding:'6px 8px',borderRadius:6,background:homo.fator>=1?'#065F4610':'#991B1B10',border:`1px solid ${homo.fator>=1?'#065F4630':'#991B1B30'}` }}>
+              <span style={{ fontSize:11,fontWeight:700,color:C.navy }}>Ajuste composto</span>
+              <div style={{ display:'flex',gap:10 }}>
+                <span style={{ fontWeight:800,color:homo.fator>=1?'#065F46':'#991B1B',fontSize:12 }}>{homo.fator>=1?'+':''}{((homo.fator-1)*100).toFixed(1)}%</span>
+                {homo.impactoTotal!==0 && <span style={{ fontWeight:700,color:homo.fator>=1?'#065F46':'#991B1B',fontSize:11 }}>{homo.impactoTotal>0?'+':''}{fmt(homo.impactoTotal)}</span>}
+              </div>
+            </div>
+          </>}
         </div>}
 
         {/* FOOTER */}

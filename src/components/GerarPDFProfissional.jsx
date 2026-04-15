@@ -5,7 +5,7 @@
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { isMercadoDireto } from '../lib/detectarFonte.js'
-import { calcularBreakdownFinanceiro, calcularROI, HOLDING_MESES_PADRAO, IPTU_SOBRE_CONDO_RATIO } from '../lib/constants.js'
+import { calcularBreakdownFinanceiro, calcularROI, HOLDING_MESES_PADRAO, IPTU_SOBRE_CONDO_RATIO, calcularFatorHomogeneizacao } from '../lib/constants.js'
 import { CUSTO_M2_SINAPI, FATOR_VALORIZACAO, detectarClasse, avaliarViabilidadeReforma } from '../lib/reformaUnificada.js'
 
 const C = {
@@ -97,6 +97,7 @@ export async function gerarPDFProfissional(p, onProgress = () => {}) {
 
   const classe = detectarClasse(parseFloat(p.preco_m2_mercado) || 7000)
   const viab = avaliarViabilidadeReforma(mercado, lance, area, parseFloat(p.preco_m2_mercado) || 7000)
+  const homo = calcularFatorHomogeneizacao(p, mercado)
   const reformas = ['refresh_giro', 'leve_reforcada_1_molhado', 'pesada'].map((esc, i) => {
     const custoM2 = CUSTO_M2_SINAPI[esc]?.[classe] || 0
     const custo = parseFloat(p[['custo_reforma_basica', 'custo_reforma_media', 'custo_reforma_completa'][i]]) || Math.round(area * custoM2)
@@ -250,20 +251,20 @@ export async function gerarPDFProfissional(p, onProgress = () => {}) {
     holdingTotal > 0 && [`Holding (${HOLDING_MESES_PADRAO}m x ${fmt(holdingMensal)}/mes)`, fmt(holdingTotal)],
   ].filter(Boolean)
   bRows.push([{ content: 'INVESTIMENTO TOTAL', styles: { fontStyle: 'bold', textColor: C.navy } }, { content: fmt(bd.investimentoTotal + holdingTotal), styles: { fontStyle: 'bold', textColor: C.navy } }])
-  tbl({ startY: y, head: [], body: bRows, theme: 'striped', styles: { fontSize: 7.5, cellPadding: 2, textColor: C.text }, alternateRowStyles: { fillColor: C.bg }, columnStyles: { 0: { cellWidth: 85 }, 1: { cellWidth: 45, halign: 'right', fontStyle: 'bold' } }, margin: { left: 15, right: 65 }, tableWidth: 130 })
+  tbl({ startY: y, head: [], body: bRows, theme: 'striped', styles: { fontSize: 7.5, cellPadding: 2, textColor: C.text }, alternateRowStyles: { fillColor: C.bg }, columnStyles: { 0: { cellWidth: 75 }, 1: { cellWidth: 40, halign: 'right', fontStyle: 'bold' } }, margin: { left: 15, right: 80 }, tableWidth: 115 })
 
   const eY = y - 5
-  doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(...C.navy); doc.text('Cenarios de Saida', 150, eY)
+  doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(...C.navy); doc.text('Cenarios de Saida', 135, eY)
   tbl({ startY: eY + 3, head: [['Cenario', 'Valor', 'ROI']], body: [
     ['Otimista (+15%)', fmt(roi.cenarios?.otimista?.valor), `${roi.cenarios?.otimista?.roi > 0 ? '+' : ''}${roi.cenarios?.otimista?.roi}%`],
     ['Realista', fmt(roi.cenarios?.realista?.valor), `${roi.cenarios?.realista?.roi > 0 ? '+' : ''}${roi.cenarios?.realista?.roi}%`],
     ['Venda rapida', fmt(roi.cenarios?.vendaRapida?.valor), `${roi.cenarios?.vendaRapida?.roi > 0 ? '+' : ''}${roi.cenarios?.vendaRapida?.roi}%`],
-  ], theme: 'grid', styles: { fontSize: 6.5, cellPadding: 2 }, headStyles: { fillColor: C.navy, textColor: C.white, fontSize: 6 }, margin: { left: 150 }, tableWidth: 45 })
+  ], theme: 'grid', styles: { fontSize: 6.5, cellPadding: 2 }, headStyles: { fillColor: C.navy, textColor: C.white, fontSize: 6 }, margin: { left: 135 }, tableWidth: 60 })
 
   if (roi.locacao) {
-    const lY = lastY + 4; doc.setFillColor(...C.greenL); doc.roundedRect(150, lY, 45, 14, 1.5, 1.5, 'F')
-    doc.setFontSize(6.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(...C.green); doc.text('Locacao', 153, lY + 5)
-    doc.setFont('helvetica', 'normal'); doc.text(`${fmt(roi.locacao.aluguelMensal)}/mes`, 153, lY + 9); doc.text(`Yield ${roi.locacao.yieldAnual}% | ${Math.round(roi.locacao.paybackMeses / 12)}a`, 153, lY + 13)
+    const lY = lastY + 4; doc.setFillColor(...C.greenL); doc.roundedRect(135, lY, 60, 14, 1.5, 1.5, 'F')
+    doc.setFontSize(6.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(...C.green); doc.text('Locacao', 138, lY + 5)
+    doc.setFont('helvetica', 'normal'); doc.text(`${fmt(roi.locacao.aluguelMensal)}/mes`, 138, lY + 9); doc.text(`Yield ${roi.locacao.yieldAnual}% | ${Math.round(roi.locacao.paybackMeses / 12)}a`, 138, lY + 13)
   }
 
   // SIMULACAO 2a PRACA
@@ -345,18 +346,39 @@ export async function gerarPDFProfissional(p, onProgress = () => {}) {
     y += 16
   }
 
-  // Atributos do predio (se disponíveis)
+  // Atributos do predio com homogeneização (Sprint 17)
   const attrs = ['elevador', 'piscina', 'academia', 'churrasqueira', 'area_lazer', 'portaria_24h']
   const attrPresent = attrs.filter(a => p[a] != null)
-  if (attrPresent.length > 0) {
-    y = subH(doc, y, 'Atributos do Predio')
+  if (attrPresent.length > 0 || homo.ajustes.length > 0) {
+    y = subH(doc, y, 'Atributos do Predio e Homogeneizacao (NBR 14653)')
+
+    // Info row simples
     const attrLabels = { elevador: 'Elevador', piscina: 'Piscina', academia: 'Academia', churrasqueira: 'Churrasqueira', area_lazer: 'Area Lazer', portaria_24h: 'Portaria 24h' }
-    const attrRow = attrPresent.map(a => [attrLabels[a], p[a] ? 'Sim' : 'Nao'])
-    if (p.nome_condominio) attrRow.push(['Condominio', p.nome_condominio])
-    if (p.andar) attrRow.push(['Andar', String(p.andar)])
-    if (p.ano_construcao) attrRow.push(['Ano construcao', String(p.ano_construcao)])
-    if (p.distribuicao_pavimentos) attrRow.push(['Pavimentos', p.distribuicao_pavimentos.substring(0, 80)])
-    tbl({ startY: y, head: [], body: attrRow, theme: 'plain', styles: { fontSize: 7.5, cellPadding: 2, textColor: C.text }, columnStyles: { 0: { cellWidth: 35, fontStyle: 'bold', textColor: C.gray } }, margin: { left: 15, right: 105 }, tableWidth: 90 })
+    const infoRows = [
+      ...attrPresent.map(a => [attrLabels[a], p[a] ? 'Sim' : 'Nao']),
+      ...(p.nome_condominio ? [['Condominio', p.nome_condominio]] : []),
+      ...(p.andar ? [['Andar', String(p.andar)]] : []),
+      ...(p.ano_construcao ? [['Ano construcao', String(p.ano_construcao)]] : []),
+    ]
+    if (infoRows.length > 0) {
+      tbl({ startY: y, head: [], body: infoRows, theme: 'plain', styles: { fontSize: 7.5, cellPadding: 2, textColor: C.text }, columnStyles: { 0: { cellWidth: 35, fontStyle: 'bold', textColor: C.gray } }, margin: { left: 15, right: 105 }, tableWidth: 90 })
+      y = lastY + 4
+    }
+
+    // Tabela de homogeneização com impacto
+    if (homo.ajustes.length > 0 && y < 240) {
+      const homoRows = homo.ajustes.map(a => {
+        const pctStr = `${a.impactoPct > 0 ? '+' : ''}${a.impactoPct}%`
+        const valStr = a['impactoR$'] !== 0 ? `${a['impactoR$'] > 0 ? '+' : ''}R$ ${Math.abs(a['impactoR$']).toLocaleString('pt-BR')}` : '—'
+        return [a.label, pctStr, valStr]
+      })
+      // Linha total
+      const totalPct = `${(homo.fator - 1) >= 0 ? '+' : ''}${((homo.fator - 1) * 100).toFixed(1)}%`
+      const totalVal = homo.impactoTotal !== 0 ? `${homo.impactoTotal > 0 ? '+' : ''}R$ ${Math.abs(homo.impactoTotal).toLocaleString('pt-BR')}` : '—'
+      homoRows.push([{ content: 'FATOR COMPOSTO', styles: { fontStyle: 'bold', textColor: C.navy } }, { content: totalPct, styles: { fontStyle: 'bold', textColor: homo.fator >= 1 ? C.green : C.red } }, { content: totalVal, styles: { fontStyle: 'bold', textColor: homo.fator >= 1 ? C.green : C.red } }])
+
+      tbl({ startY: y, head: [['Atributo', 'Fator', 'Impacto R$']], body: homoRows, theme: 'striped', styles: { fontSize: 7, cellPadding: 2 }, headStyles: { fillColor: C.navy, textColor: C.white, fontSize: 6.5 }, alternateRowStyles: { fillColor: C.bg }, columnStyles: { 0: { cellWidth: 50 }, 1: { cellWidth: 20, halign: 'center' }, 2: { cellWidth: 35, halign: 'right' } }, margin: { left: 15, right: 90 }, tableWidth: 105 })
+    }
   }
   foot(doc, p, 4, totalPg)
 

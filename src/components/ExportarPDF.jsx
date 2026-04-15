@@ -5,7 +5,7 @@
 import { C } from '../appConstants.js'
 import { isMercadoDireto } from '../lib/detectarFonte.js'
 import { CUSTO_M2_SINAPI, FATOR_VALORIZACAO, detectarClasse, avaliarViabilidadeReforma } from '../lib/reformaUnificada.js'
-import { calcularBreakdownFinanceiro, HOLDING_MESES_PADRAO, IPTU_SOBRE_CONDO_RATIO } from '../lib/constants.js'
+import { calcularBreakdownFinanceiro, HOLDING_MESES_PADRAO, IPTU_SOBRE_CONDO_RATIO, calcularFatorHomogeneizacao } from '../lib/constants.js'
 
 const fmt = v => v ? `R$ ${Math.round(v).toLocaleString('pt-BR')}` : '—'
 const pct = v => v != null ? `${Number(v).toFixed(1)}%` : '—'
@@ -29,7 +29,8 @@ function gerarHTML(p) {
   const viab = avaliarViabilidadeReforma(valorMercado, precoCompra, area, parseFloat(p.preco_m2_mercado) || 7000)
   const reformas = ['refresh_giro', 'leve_reforcada_1_molhado', 'pesada'].map((esc, i) => {
     const custoM2 = CUSTO_M2_SINAPI[esc]?.[classe] || 0
-    const custo = Math.round(area * custoM2)
+    const chaveBanco = ['custo_reforma_basica', 'custo_reforma_media', 'custo_reforma_completa'][i]
+    const custo = parseFloat(p[chaveBanco]) || Math.round(area * custoM2)
     const fv = FATOR_VALORIZACAO[esc] || 1
     const cenario = ['basica', 'media', 'completa'][i]
     const label = esc === 'refresh_giro' ? 'Básica' : esc === 'leve_reforcada_1_molhado' ? 'Média' : 'Completa'
@@ -56,15 +57,17 @@ function gerarHTML(p) {
     { l: 'Mercado', v: p.score_mercado, w: 14 },
   ]
 
-  // Atributos
-  const attrs = [
-    p.elevador != null && ['Elevador', p.elevador, p.elevador ? '+' : '-15%'],
-    p.piscina != null && ['Piscina', p.piscina, p.piscina ? '+' : '-3%'],
-    p.area_lazer != null && ['Área lazer', p.area_lazer, p.area_lazer ? '+' : '-5%'],
-    p.salao_festas != null && ['Salão festas', p.salao_festas, p.salao_festas ? '+' : '-3%'],
-    p.condominio_mensal && ['Condomínio', true, `R$ ${Number(p.condominio_mensal).toLocaleString('pt-BR')}/mês`],
-    p.portaria_24h && ['Portaria 24h', true, '✓'],
-  ].filter(Boolean)
+  // Atributos com homogeneização real (Sprint 17)
+  const homo = calcularFatorHomogeneizacao(p, valorMercado)
+  const attrs = homo.ajustes.length > 0
+    ? homo.ajustes.map(a => [a.label, a.fator >= 1, `${a.impactoPct > 0 ? '+' : ''}${a.impactoPct}%`])
+    : [
+      p.elevador != null && ['Elevador', p.elevador, p.elevador ? '+8%' : '-13%'],
+      p.piscina != null && ['Piscina', p.piscina, p.piscina ? '+5%' : ''],
+      p.area_lazer != null && ['Área lazer', p.area_lazer, p.area_lazer ? '+3%' : ''],
+      p.portaria_24h && ['Portaria 24h', true, '+4%'],
+      p.condominio_mensal && ['Condomínio', true, `R$ ${Number(p.condominio_mensal).toLocaleString('pt-BR')}/mês`],
+    ].filter(Boolean)
 
   // Título padronizado
   const tituloCurto = (() => {
@@ -317,6 +320,8 @@ ${(p.fotos?.length > 1) ? `<div style="display:flex;gap:6px;overflow-x:auto;marg
     </div>
     ${p.fator_homogenizacao && p.fator_homogenizacao < 1 ? `
     <div style="margin-top:8px;font-size:10px;color:#92400E">📐 Fator homogeneização: <strong>${(p.fator_homogenizacao * 100).toFixed(0)}%</strong> (NBR 14653)</div>` : ''}
+    ${homo.ajustes.length > 0 ? `
+    <div style="margin-top:8px;font-size:10px;color:${homo.fator >= 1 ? '#065F46' : '#991B1B'}">📐 Fator composto: <strong>${(homo.fator * 100).toFixed(1)}%</strong> (${homo.impactoTotal > 0 ? '+' : ''}${fmt(homo.impactoTotal)}) — NBR 14653</div>` : ''}
   </div>` : ''}
 </div>
 
