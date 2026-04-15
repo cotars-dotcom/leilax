@@ -1494,8 +1494,13 @@ DADOS DE BAIRRO (parcial):
         const imageParts = []
         for (const fotoUrl of fotosParaAnalisar) {
           try {
-            const imgRes = await fetch(fotoUrl, { signal: AbortSignal.timeout(10000) })
-            if (!imgRes.ok) continue
+            // Usar wsrv.nl como proxy CORS para imagens de leiloeiros
+            const proxyUrl = `https://wsrv.nl/?url=${encodeURIComponent(fotoUrl)}&w=800&output=jpg&q=75`
+            const imgRes = await fetch(proxyUrl, { signal: AbortSignal.timeout(12000) })
+            if (!imgRes.ok) {
+              console.warn('[AXIS Vision] Proxy falhou para:', fotoUrl.substring(0, 60), imgRes.status)
+              continue
+            }
             const blob = await imgRes.blob()
             if (blob.size < 5000 || blob.size > 10_000_000) continue // Skip tiny/huge
             const base64 = await new Promise((resolve, reject) => {
@@ -1505,9 +1510,11 @@ DADOS DE BAIRRO (parcial):
               reader.readAsDataURL(blob)
             })
             imageParts.push({
-              inline_data: { mime_type: blob.type || 'image/jpeg', data: base64 }
+              inline_data: { mime_type: 'image/jpeg', data: base64 }
             })
-          } catch(imgErr) { /* skip failed images */ }
+          } catch(imgErr) {
+            console.warn('[AXIS Vision] Erro ao baixar foto:', fotoUrl.substring(0, 60), imgErr.message?.substring(0, 40))
+          }
         }
 
         if (imageParts.length > 0) {
@@ -1530,20 +1537,33 @@ Retorne APENAS JSON válido:
 }
 Regras: true = claramente visível. false = claramente ausente (ex: prédio baixo sem elevador). null = impossível determinar pela foto.`
 
-          const visionRes = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/${MODELOS_GEMINI[0]}:generateContent?key=${gemKeyVision}`,
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                contents: [{ parts: [...imageParts, { text: visionPrompt }] }],
-                generationConfig: { temperature: 0.1, maxOutputTokens: 1000 }
-              }),
-              signal: AbortSignal.timeout(30000)
+          // Sprint 18: Tentar proxy server-side para Vision também
+          let visionData = null
+          try {
+            const { aiProxy } = await import('./aiProxy.js')
+            visionData = await aiProxy('gemini', {
+              contents: [{ parts: [...imageParts, { text: visionPrompt }] }],
+              generationConfig: { temperature: 0.1, maxOutputTokens: 1000 }
+            }, { model: MODELOS_GEMINI[0], timeout: 30000 })
+          } catch (proxyErr) {
+            // Fallback: chamada direta com key do localStorage
+            if (gemKeyVision) {
+              const visionRes = await fetch(
+                `https://generativelanguage.googleapis.com/v1beta/models/${MODELOS_GEMINI[0]}:generateContent?key=${gemKeyVision}`,
+                {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    contents: [{ parts: [...imageParts, { text: visionPrompt }] }],
+                    generationConfig: { temperature: 0.1, maxOutputTokens: 1000 }
+                  }),
+                  signal: AbortSignal.timeout(30000)
+                }
+              )
+              if (visionRes.ok) visionData = await visionRes.json()
             }
-          )
-          if (visionRes.ok) {
-            const visionData = await visionRes.json()
+          }
+          if (visionData) {
             const visionTxt = visionData.candidates?.[0]?.content?.parts?.[0]?.text || ''
             const visionClean = visionTxt.replace(/```json|```/g, '').trim()
             const visionMatch = visionClean.match(/\{[\s\S]*\}/)
