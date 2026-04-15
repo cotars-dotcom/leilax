@@ -2,6 +2,7 @@ import { useState } from "react"
 import { C, RED, ESTRATEGIA_CONFIG } from "../appConstants.js"
 import { isMercadoDireto } from '../lib/detectarFonte.js'
 import { CUSTOS_LEILAO, CUSTOS_MERCADO, calcularFatorHomogeneizacao } from '../lib/constants.js'
+import { useReforma } from '../hooks/useReforma.jsx'
 
 export default function CalculadoraROI({ imovel }) {
   const [entrada, setEntrada] = useState(30)
@@ -9,10 +10,12 @@ export default function CalculadoraROI({ imovel }) {
   const [taxaJuros, setTaxaJuros] = useState(10.5)
   const [tabela, setTabela] = useState('price')
   const [estrategia, setEstrategia] = useState('flip')
+  const { lanceEstudo } = useReforma()
   const eMercado = isMercadoDireto(imovel.fonte_url, imovel.tipo_transacao)
-  const precoAquisicao = eMercado
+  // Sprint 18: usar lance do ConfigEstudo se disponível
+  const precoAquisicao = lanceEstudo || (eMercado
     ? (parseFloat(imovel.preco_pedido) || parseFloat(imovel.valor_minimo) || 0)
-    : (parseFloat(imovel.valor_minimo) || 0)
+    : (parseFloat(imovel.valor_minimo) || 0))
   if (precoAquisicao <= 0) {
     return <div style={{ ...card(), padding: 16 }}>
       <div style={{ fontWeight: 600, fontSize: 13, color: C.navy, marginBottom: 6 }}>💰 Calculadora de ROI</div>

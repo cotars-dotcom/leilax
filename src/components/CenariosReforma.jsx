@@ -12,16 +12,16 @@ import {
 } from '../lib/reformaUnificada.js'
 
 export default function CenariosReforma({ imovel, isAdmin }) {
-  const { escopoDetalhado: escopoSel, selecionarEscopo: setEscopoSel, area, preco_m2, classe } = useReforma()
+  const { escopoDetalhado: escopoSel, selecionarEscopo: setEscopoSel, area, preco_m2, classe, lanceEstudo } = useReforma()
   const [mostrarDetalhe, setMostrarDetalhe] = useState(false)
 
   const p = imovel || {}
   const eMercado = isMercadoDireto(p.fonte_url, p.tipo_transacao)
 
-  // Base de aquisição: preco_pedido para mercado direto, valor_minimo para leilão
-  const precoAquisicao = eMercado
+  // Sprint 18: usar lance do ConfigEstudo se disponível
+  const precoAquisicao = lanceEstudo || (eMercado
     ? (parseFloat(p.preco_pedido) || parseFloat(p.valor_minimo) || 0)
-    : (parseFloat(p.valor_minimo) || 0)
+    : (parseFloat(p.valor_minimo) || 0))
   const semDados = precoAquisicao === 0
   const avaliacao = parseFloat(p.valor_avaliacao) || precoAquisicao * 1.3
   const vmercadoRaw = parseFloat(p.valor_mercado_estimado) || avaliacao * 1.2

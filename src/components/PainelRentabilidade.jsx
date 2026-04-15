@@ -147,7 +147,7 @@ function CardLance({ titulo, lance, avaliacao, vmercado, flip, loc, prob, destaq
 
 // ─── Componente principal ─────────────────────────────────────────────────────
 export default function PainelRentabilidade({ imovel }) {
-  const { cenarioSimplificado: cenarioReforma, selecionarCenario: setCenarioReforma, reformas } = useReforma()
+  const { cenarioSimplificado: cenarioReforma, selecionarCenario: setCenarioReforma, reformas, lanceEstudo } = useReforma()
   const [mostrarAtributos, setMostrarAtributos] = useState(false)
 
   const {
@@ -161,7 +161,8 @@ export default function PainelRentabilidade({ imovel }) {
   const eMercado = isMercadoDireto(imovel.fonte_url, imovel.tipo_transacao)
   const area     = parseFloat(area_privativa_m2 || area_m2) || 97
   const avaliacao = parseFloat(valor_avaliacao) || parseFloat(valor_mercado_estimado) || parseFloat(valor_minimo) || 550000
-  const precoBase = parseFloat(preco_pedido || valor_minimo) || avaliacao * 0.675
+  // Sprint 18: usar lance do ConfigEstudo se disponível
+  const precoBase = lanceEstudo || parseFloat(preco_pedido || valor_minimo) || avaliacao * 0.675
   const lance1   = precoBase
 
   // Lances dos cenários
