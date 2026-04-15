@@ -139,9 +139,34 @@ export default function PainelInvestimento({ imovel }) {
                 )}
               </div>
             )}
-          </div>
 
-          {/* Coluna direita: Cenários */}
+            {/* Débitos registrados */}
+            {parseFloat(p.debitos_total_estimado) > 0 && (
+              <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 8,
+                background: p.responsabilidade_debitos === 'arrematante' ? '#FEF2F2' : '#F0F4FF',
+                border: `1px solid ${p.responsabilidade_debitos === 'arrematante' ? '#FECACA' : '#C7D4F8'}` }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: p.responsabilidade_debitos === 'arrematante' ? '#991B1B' : '#1D4ED8' }}>
+                    ⚖️ Débitos registrados
+                  </span>
+                  <span style={{ fontSize: 13, fontWeight: 800, color: p.responsabilidade_debitos === 'arrematante' ? '#991B1B' : '#1D4ED8' }}>
+                    {fmt(parseFloat(p.debitos_total_estimado))}
+                  </span>
+                </div>
+                <div style={{ fontSize: 9, color: '#64748B', marginTop: 3 }}>
+                  {p.responsabilidade_debitos === 'sub_rogado'
+                    ? '✅ Sub-rogados no preço (Art. 130 CTN) — não soma ao investimento'
+                    : p.responsabilidade_debitos === 'arrematante'
+                    ? '⚠️ Arrematante responsável — soma ao investimento total'
+                    : p.responsabilidade_debitos === 'exonerado'
+                    ? '✅ Arrematante exonerado'
+                    : `Responsabilidade: ${p.responsabilidade_debitos || 'verificar edital'}`}
+                </div>
+                {p.debitos_condominio && <div style={{ fontSize: 9, color: '#64748B', marginTop: 2 }}>Cond: {p.debitos_condominio.substring(0, 80)}</div>}
+                {p.debitos_iptu && <div style={{ fontSize: 9, color: '#64748B' }}>IPTU: {p.debitos_iptu.substring(0, 80)}</div>}
+              </div>
+            )}
+          </div>
           <div>
             <div style={{ fontSize: 11, fontWeight: 700, color: C.navy, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '.3px' }}>
               Cenários de Saída
