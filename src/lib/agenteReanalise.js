@@ -188,7 +188,7 @@ Retorne APENAS JSON com os campos atualizados:
       }
       data = await r.json()
       modeloUsado = modelo
-      console.log('[AXIS agenteReanalise] Sucesso com modelo:', modelo)
+      console.debug('[AXIS agenteReanalise] Sucesso com modelo:', modelo)
       break
     } catch(e) {
       console.warn('[AXIS agenteReanalise] Erro com', modelo, ':', e.message)

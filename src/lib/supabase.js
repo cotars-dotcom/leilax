@@ -676,7 +676,7 @@ export async function salvarDocumentoJuridico(doc) {
     if (!payload.imovel_id) throw new Error('salvarDocumentoJuridico: imovel_id obrigatório')
     if (!payload.tipo) throw new Error('salvarDocumentoJuridico: tipo obrigatório')
 
-    console.log('[AXIS] salvarDocumentoJuridico:', payload.imovel_id, payload.tipo, 'campos:', Object.keys(payload).length)
+    console.debug('[AXIS] salvarDocumentoJuridico:', payload.imovel_id, payload.tipo, 'campos:', Object.keys(payload).length)
 
     // 3. Verificar se já existe (para decidir entre INSERT e UPDATE)
     const { data: exist, error: existErr } = await supabase
@@ -698,7 +698,7 @@ export async function salvarDocumentoJuridico(doc) {
         .eq('id', exist.id)
         .select()
       )
-      console.log('[AXIS] UPDATE doc:', exist.id?.substring(0,8), '| error:', error?.message)
+      console.debug('[AXIS] UPDATE doc:', exist.id?.substring(0,8), '| error:', error?.message)
     } else {
       // INSERT — não existe
       ;({ data, error } = await supabase
@@ -706,7 +706,7 @@ export async function salvarDocumentoJuridico(doc) {
         .insert(payload)
         .select()
       )
-      console.log('[AXIS] INSERT doc:', data?.[0]?.id?.substring(0,8), '| error:', error?.message)
+      console.debug('[AXIS] INSERT doc:', data?.[0]?.id?.substring(0,8), '| error:', error?.message)
     }
 
     if (error) {
@@ -1030,7 +1030,7 @@ export async function seedMercadoRegional() {
     .from('mercado_regional')
     .upsert(entradas, { onConflict: 'regiao_id', ignoreDuplicates: false })
   if (error) console.error('[AXIS seed] mercado_regional:', error.message)
-  else console.log(`[AXIS seed] ${entradas.length} regiões inseridas em mercado_regional`)
+  else console.debug(`[AXIS seed] ${entradas.length} regiões inseridas em mercado_regional`)
 }
 
 export async function seedRiscosJuridicos() {
@@ -1052,7 +1052,7 @@ export async function seedRiscosJuridicos() {
     .from('riscos_juridicos')
     .upsert(entradas, { onConflict: 'risco_id', ignoreDuplicates: false })
   if (error) console.error('[AXIS seed] riscos_juridicos:', error.message)
-  else console.log(`[AXIS seed] ${entradas.length} riscos inseridos em riscos_juridicos`)
+  else console.debug(`[AXIS seed] ${entradas.length} riscos inseridos em riscos_juridicos`)
 }
 
 // ══════════════════════════════════════════════════════════════════════════

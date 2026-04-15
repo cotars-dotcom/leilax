@@ -1761,7 +1761,7 @@ export default function App() {
           } else { localStorage.setItem('axis-migracao-concluida','true') }
         }
         const data=await getImoveis()
-        console.log('[AXIS] Loaded', data?.length, 'imóveis')
+        console.debug('[AXIS] Loaded', data?.length, 'imóveis')
         if(data&&data.length>0){ setProps(data); stSave("axis-props",data) }
         else { const cache=JSON.parse(localStorage.getItem('axis-props')||'[]'); if(cache.length>0) setProps(cache) }
       } catch(e) { console.error('[AXIS] Load error:', e.message); const cache=JSON.parse(localStorage.getItem('axis-props')||'[]'); if(cache.length>0) setProps(cache) }
@@ -1843,7 +1843,7 @@ export default function App() {
     if(cfg.boardId&&cfg.key&&cfg.token){
       import('./lib/trelloService.js').then(({setupBoardAxis,AXIS_BOARDS:AB})=>{
         setupBoardAxis(AB.PIPELINE,cfg.key,cfg.token)
-          .then(()=>console.log('[AXIS] Board Trello configurado'))
+          .then(()=>console.debug('[AXIS] Board Trello configurado'))
           .catch(e=>console.warn('[AXIS] Setup Trello:',e.message))
       })
     }

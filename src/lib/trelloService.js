@@ -338,7 +338,7 @@ export async function criarOuAtualizarCardImovel(imovel, listId, boardId, key, t
         null, key, token
       )
       if (cardExistente && !cardExistente.closed) {
-        console.log(`[AXIS] Card Trello já existe para ${imovel.codigo_axis} — atualizando`)
+        console.debug(`[AXIS] Card Trello já existe para ${imovel.codigo_axis} — atualizando`)
         return await atualizarCardCompleto(imovel, cardExistente.id, listId, key, token)
       }
     } catch {

@@ -225,7 +225,11 @@ ATRIBUTOS DO PRÉDIO — REGRAS CONSERVADORAS (só marcar true quando EXPLICITAM
 - ATENÇÃO: Quando não há informação explícita, use null — NUNCA infira por associação (portaria ≠ piscina, alto padrão ≠ piscina, área de lazer ≠ piscina).
 - ATENÇÃO: Bairros populares/médios (Dona Clara, Pampulha, norte BH) raramente têm piscina — não assuma sem menção explícita.
 - score_liquidez: alta demanda→8.5, média→6.5, baixa→4.0
-- score_mercado: classe Luxo BH→8.5, Alto→7.0, Médio→5.5, Popular→4.0`
+- score_mercado: classe Luxo BH→8.5, Alto→7.0, Médio→5.5, Popular→4.0
+
+FÓRMULA OBRIGATÓRIA DO SCORE TOTAL (NÃO INVENTE UM VALOR — CALCULE):
+score_total = ROUND(score_localizacao×0.20 + score_desconto×0.18 + score_juridico×0.18 + score_ocupacao×0.15 + score_liquidez×0.15 + score_mercado×0.14, 2)
+O score_total retornado DEVE ser matematicamente consistente com os sub-scores acima.`
 }
 
 // ─── CHAMADA GEMINI FLASH-LITE ───────────────────────────────────────────────
@@ -487,7 +491,7 @@ export async function analisarComGemini(url, geminiKey, parametros, onProgress, 
     try {
       analiseGemini = await chamarGeminiComGrounding(url, geminiKey, camposBasicos, contextoMercado)
       _modeloGemini = analiseGemini._modelo_usado || MODELOS_GEMINI[0]
-      console.log('[AXIS] Grounding sucesso — dados encontrados via Google Search')
+      console.debug('[AXIS] Grounding sucesso — dados encontrados via Google Search')
     } catch(e) {
       erros.push(`Gemini Grounding falhou: ${e.message}`)
       console.warn('[AXIS] Grounding falhou:', e.message, '— tentando análise normal')

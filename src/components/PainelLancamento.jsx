@@ -141,9 +141,9 @@ export default function PainelLancamento({ imovel }) {
 
   const area = parseFloat(area_privativa_m2 || area_m2) || 0
   const avaliacao = parseFloat(valor_avaliacao) || 0
-  const lancePrin = parseFloat(valor_minimo) || 0
-  // Reforma unificada via context useReforma (sincronizado com PainelRentabilidade e CenariosReforma)
-  const { cenarioSimplificado: cenarioReforma, selecionarCenario: setCenarioReformaLocal, reformas: reformasCtx } = useReforma()
+  // Lance e reforma unificados via context useReforma (sincronizado com ConfigEstudo e todos os painéis)
+  const { cenarioSimplificado: cenarioReforma, selecionarCenario: setCenarioReformaLocal, reformas: reformasCtx, lanceEstudo } = useReforma()
+  const lancePrin = lanceEstudo > 0 ? lanceEstudo : parseFloat(valor_minimo) || 0
   const custo_reforma_basica = reformasCtx.basica
   const custo_reforma_media = reformasCtx.media
   const custo_reforma_completa = reformasCtx.completa

@@ -229,7 +229,7 @@ export async function pesquisarMercadoGPT(url, cidade, tipo, openaiKey, quartos 
     if (cached?.atualizado_em) {
       const horas = (Date.now() - new Date(cached.atualizado_em)) / 3_600_000
       if (horas < 72) {
-        console.log('[AXIS Cache] Mercado em cache para:', cacheKey)
+        console.debug('[AXIS Cache] Mercado em cache para:', cacheKey)
         return cached.dados
       }
     }
