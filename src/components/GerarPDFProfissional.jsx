@@ -268,8 +268,10 @@ export async function gerarPDFProfissional(p, onProgress = () => {}) {
     doc.setFont('helvetica', 'normal'); doc.text(`${fmt(roi.locacao.aluguelMensal)}/mes`, 138, lY + 9); doc.text(`Yield ${roi.locacao.yieldAnual}% | ${Math.round(roi.locacao.paybackMeses / 12)}a`, 138, lY + 13)
   }
 
-  // SIMULACAO 2a PRACA
-  if (!eMercado && lance2p > 0) {
+  // SIMULACAO 2a PRACA — só mostrar se leilão ainda não ocorreu
+  const leilaoPassou = p.data_leilao && new Date(p.data_leilao + 'T00:00:00') < new Date()
+  const jaProcessado = p.status_operacional === 'aguardando_resultado' || p.status_operacional === 'arrematado' || p.status_operacional === 'nao_arrematado'
+  if (!eMercado && lance2p > 0 && !leilaoPassou && !jaProcessado) {
     y = Math.max(lastY + 15, eY + 60)
     y = subH(doc, y, `Simulacao 2a Praca (50% avaliacao = ${fmt(lance2p)})`)
     const inv2 = bd2p.investimentoTotal
