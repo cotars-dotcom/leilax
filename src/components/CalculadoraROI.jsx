@@ -10,7 +10,7 @@ export default function CalculadoraROI({ imovel }) {
   const [taxaJuros, setTaxaJuros] = useState(10.5)
   const [tabela, setTabela] = useState('price')
   const [estrategia, setEstrategia] = useState('flip')
-  const { lanceEstudo } = useReforma()
+  const { lanceEstudo, custoReformaAtual } = useReforma()
   const eMercado = isMercadoDireto(imovel.fonte_url, imovel.tipo_transacao)
   // Sprint 18: usar lance do ConfigEstudo se disponível
   const precoAquisicao = lanceEstudo || (eMercado
@@ -26,11 +26,12 @@ export default function CalculadoraROI({ imovel }) {
   const comissao    = precoAquisicao * ((imovel.comissao_leiloeiro_pct ?? _tab.comissao_leiloeiro_pct) / 100)
   const itbi        = precoAquisicao * ((imovel.itbi_pct ?? _tab.itbi_pct) / 100)
   const doc         = precoAquisicao * (_tab.documentacao_pct / 100)
-  const reforma     = imovel.custo_reforma_calculado || imovel.custo_reforma_previsto || 0
+  const reforma     = custoReformaAtual || parseFloat(imovel.custo_reforma_calculado || imovel.custo_reforma_previsto || 0)
   const advogado    = precoAquisicao * (_tab.advogado_pct / 100)
-  const registro    = _tab.registro_fixo
-  const custoJuridico = imovel.custo_juridico_estimado || 0
-  const custoTotal    = precoAquisicao + comissao + itbi + doc + advogado + registro + reforma + custoJuridico
+  const registro    = _tab.registro_fixo ?? 0
+  const custoJuridico = parseFloat(imovel.custo_juridico_estimado || 0)
+  const debitosArr  = imovel.responsabilidade_debitos === 'arrematante' ? parseFloat(imovel.debitos_total_estimado || 0) : 0
+  const custoTotal    = precoAquisicao + comissao + itbi + doc + advogado + registro + reforma + custoJuridico + debitosArr
   const vmercadoRaw = imovel.valor_mercado_estimado || imovel.valor_pos_reforma_estimado
     || (imovel.preco_m2_mercado * (imovel.area_privativa_m2 || imovel.area_m2 || 0))
     || precoAquisicao * 1.4

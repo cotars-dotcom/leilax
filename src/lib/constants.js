@@ -229,8 +229,12 @@ export function calcularBreakdownFinanceiro(lance, imovel = {}, eMercado = false
   const holdingMeses = HOLDING_MESES_PADRAO
   const holdingMensal = condoMensal + iptuMensal
   const holding = holdingMeses * holdingMensal
+  // Débitos a cargo do arrematante (condomínio/IPTU propter rem — STJ)
+  const debitosArrematante = imovel.responsabilidade_debitos === 'arrematante'
+    ? parseFloat(imovel.debitos_total_estimado || 0)
+    : 0
   const totalCustos = comissao + itbi + doc + advogado
-  const investimentoTotal = lance + totalCustos + reforma + holding
+  const investimentoTotal = lance + totalCustos + reforma + holding + debitosArrematante
   
   return {
     lance,
@@ -242,6 +246,7 @@ export function calcularBreakdownFinanceiro(lance, imovel = {}, eMercado = false
     holding: Math.round(holding),
     holdingMensal: Math.round(holdingMensal),
     holdingMeses,
+    debitosArrematante: Math.round(debitosArrematante),
     totalCustos: Math.round(totalCustos),
     investimentoTotal: Math.round(investimentoTotal),
     pctCustosSobreLance: ((totalCustos / lance) * 100).toFixed(1),

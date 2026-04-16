@@ -25,22 +25,17 @@ const TX = {
   isencao_irpf: 440000,
 }
 
-function calcularCenario(lance, vmercado, reforma, juridico = 0) {
+function calcularCenario(lance, vmercado, reforma, juridico = 0, debitosArr = 0) {
   const taxas = lance * (TX.comissao + TX.itbi + TX.doc + TX.adv) + TX.reg
-  const custoTotal = lance + taxas + (reforma || 0) + (juridico || 0)
-  // IRPF: 15% sobre ganho de capital = (preço_venda_líquido - custo_aquisição)
+  const custoTotal = lance + taxas + (reforma || 0) + (juridico || 0) + debitosArr
   const corretagem = vmercado * TX.corretagem_venda
-  const precoVendaLiq = vmercado - corretagem  // valor recebido após corretagem
-  const ganho = Math.max(0, precoVendaLiq - custoTotal)  // ganho de capital real
+  const precoVendaLiq = vmercado - corretagem
+  const ganho = Math.max(0, precoVendaLiq - custoTotal)
   const irpf = vmercado <= TX.isencao_irpf ? 0 : ganho * TX.irpf_pct
   const lucro = precoVendaLiq - custoTotal - irpf
   const roi = custoTotal > 0 ? (lucro / custoTotal) * 100 : 0
-  // MAO = preço máximo que posso pagar para o lance ainda ser viável
-  const custosExtrasSemLance = taxas + (reforma || 0) + (juridico || 0)
-  // vmercado × margem = lance + taxas_proporcionais × lance + fixos + reforma
-  // vmercado × 0.80 = lance × (1 + tx_proporcionais) + fixos + reforma
   const txProporcional = TX.comissao + TX.itbi + TX.doc + TX.adv
-  const maoFlip = (vmercado * 0.80 - TX.reg - (reforma || 0) - (juridico || 0)) / (1 + txProporcional)
+  const maoFlip = (vmercado * 0.80 - TX.reg - (reforma || 0) - (juridico || 0) - debitosArr) / (1 + txProporcional)
   return {
     lance, custo_total: Math.round(custoTotal),
     irpf: Math.round(irpf), corretagem: Math.round(corretagem),
@@ -150,6 +145,8 @@ export default function PainelLancamento({ imovel }) {
   const reformaMap = { basica: custo_reforma_basica, media: custo_reforma_media, completa: custo_reforma_completa }
   const reforma = reformaMap[cenarioReforma]
   const juridico = parseFloat(custo_juridico_estimado) || 0
+  const debitosArr = imovel.responsabilidade_debitos === 'arrematante'
+    ? parseFloat(imovel.debitos_total_estimado || 0) : 0
   const aluguel = parseFloat(aluguel_mensal_estimado) || 0
 
   // Valor de mercado — preferir o do banco, senão calcular por m²
@@ -163,37 +160,32 @@ export default function PainelLancamento({ imovel }) {
   // Lance máximo viável para dado ROI alvo
   const txProporcional = TX.comissao + TX.itbi + TX.doc + TX.adv
   const lanceMaxViavel = useMemo(() => {
-    return (vmercado * 0.80 - TX.reg - reforma - juridico) / (1 + txProporcional)
-  }, [vmercado, reforma, juridico])
+    return (vmercado * 0.80 - TX.reg - reforma - juridico - debitosArr) / (1 + txProporcional)
+  }, [vmercado, reforma, juridico, debitosArr])
 
   const lanceMaxROIAlvo = useMemo(() => {
-    // roi_alvo = (vmercado - custo - irpf - corretagem) / custo
-    // Simplificado: lance_max = vmercado / (1 + roi_alvo/100) / (1 + tx_totais) - fixos
     const roiFator = 1 + roiAlvo / 100
     const custoMax = vmercado / roiFator
-    return (custoMax - TX.reg - reforma - juridico - vmercado * TX.corretagem_venda) / (1 + txProporcional)
-  }, [vmercado, roiAlvo, reforma, juridico])
+    return (custoMax - TX.reg - reforma - juridico - debitosArr - vmercado * TX.corretagem_venda) / (1 + txProporcional)
+  }, [vmercado, roiAlvo, reforma, juridico, debitosArr])
 
   const lanceMaxMargem = useMemo(() => {
-    // com margem de segurança sobre o MAO
     return lanceMaxViavel * (1 - margemSeg / 100)
   }, [lanceMaxViavel, margemSeg])
 
   // Cenário 1º leilão
-  const c1 = useMemo(() => calcularCenario(lancePrin, vmercado, reforma, juridico), [lancePrin, vmercado, reforma, juridico])
-  const cMax = useMemo(() => calcularCenario(Math.round(lanceMaxViavel), vmercado, reforma, juridico), [lanceMaxViavel, vmercado, reforma, juridico])
-  const cAlvo = useMemo(() => calcularCenario(Math.round(lanceMaxROIAlvo), vmercado, reforma, juridico), [lanceMaxROIAlvo, vmercado, reforma, juridico])
+  const c1 = useMemo(() => calcularCenario(lancePrin, vmercado, reforma, juridico, debitosArr), [lancePrin, vmercado, reforma, juridico, debitosArr])
+  const cMax = useMemo(() => calcularCenario(Math.round(lanceMaxViavel), vmercado, reforma, juridico, debitosArr), [lanceMaxViavel, vmercado, reforma, juridico, debitosArr])
+  const cAlvo = useMemo(() => calcularCenario(Math.round(lanceMaxROIAlvo), vmercado, reforma, juridico, debitosArr), [lanceMaxROIAlvo, vmercado, reforma, juridico, debitosArr])
 
-  // Projeções de lance — adapta para o leilão atual
+  // Projeções de lance
   const isSegundoLeilao = (num_leilao || 1) >= 2
-  // 2º leilão: piso legal 35% (art.891 CPC), esperado ~50% (TRT-3), competitivo ~65%
-  // Projeção 2º (quando no 1º): mesmos percentuais — 35%/50%/65%
   const lance2p = avaliacao ? Math.round(avaliacao * 0.35) : 0
   const lance2e = avaliacao ? Math.round(avaliacao * 0.50) : 0
   const lance2c = avaliacao ? Math.round(avaliacao * 0.65) : 0
-  const c2p = useMemo(() => calcularCenario(lance2p, vmercado, reforma, juridico), [lance2p, vmercado, reforma, juridico])
-  const c2e = useMemo(() => calcularCenario(lance2e, vmercado, reforma, juridico), [lance2e, vmercado, reforma, juridico])
-  const c2c = useMemo(() => calcularCenario(lance2c, vmercado, reforma, juridico), [lance2c, vmercado, reforma, juridico])
+  const c2p = useMemo(() => calcularCenario(lance2p, vmercado, reforma, juridico, debitosArr), [lance2p, vmercado, reforma, juridico, debitosArr])
+  const c2e = useMemo(() => calcularCenario(lance2e, vmercado, reforma, juridico, debitosArr), [lance2e, vmercado, reforma, juridico, debitosArr])
+  const c2c = useMemo(() => calcularCenario(lance2c, vmercado, reforma, juridico, debitosArr), [lance2c, vmercado, reforma, juridico, debitosArr])
 
   // Recomendação estratégica
   const estrategia = useMemo(() => {
@@ -331,7 +323,7 @@ export default function PainelLancamento({ imovel }) {
       <CardCenario
         label="Lance máximo viável"
         sublabel={`ROI ≥ ${roiAlvo}% com margem ${margemSeg}%`}
-        lance={Math.round(lanceMaxMargem)} cenario={calcularCenario(Math.round(lanceMaxMargem), vmercado, reforma, juridico)}
+        lance={Math.round(lanceMaxMargem)} cenario={calcularCenario(Math.round(lanceMaxMargem), vmercado, reforma, juridico, debitosArr)}
         avaliacao={avaliacao} isDestaque={false}
       />
 

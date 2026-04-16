@@ -40,11 +40,13 @@ export default function CenariosReforma({ imovel, isAdmin }) {
   const doc = precoAquisicao * (_tab.documentacao_pct / 100)
   const adv = precoAquisicao * (_tab.advogado_pct / 100)
   const reg = _tab.registro_fixo
+  const debitosArrematante = p.responsabilidade_debitos === 'arrematante'
+    ? parseFloat(p.debitos_total_estimado || 0) : 0
 
   const cenarios = useMemo(() => {
     return ESCOPOS.map(esc => {
       const custoReforma = (CUSTO_M2_SINAPI[esc.id]?.[classe] || 0) * area
-      const custoTotal = precoAquisicao + comissao + itbi + doc + adv + reg + custoReforma
+      const custoTotal = precoAquisicao + comissao + itbi + doc + adv + reg + custoReforma + debitosArrematante
       const prazo = prazoLib + (PRAZO_OBRA_MESES[esc.id] || 0)
 
       // Valor pós-reforma = mercado × fator_valorizacao

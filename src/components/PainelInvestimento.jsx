@@ -44,12 +44,10 @@ export default function PainelInvestimento({ imovel }) {
     mesesHolding,
     p.iptu_mensal ? parseFloat(p.iptu_mensal) : null
   )
-  // Débitos a cargo do arrematante entram como custo obrigatório
-  const debitosArrematante = (p.responsabilidade_debitos === 'arrematante' && parseFloat(p.debitos_total_estimado) > 0)
-    ? parseFloat(p.debitos_total_estimado)
-    : 0
-  const investimentoComHolding = bd.investimentoTotal + holding.total + debitosArrematante
-  const roi = calcularROI(bd.investimentoTotal + debitosArrematante, mercado, parseFloat(p.aluguel_mensal_estimado) || 0)
+  // Débitos já incluídos no bd.investimentoTotal via calcularBreakdownFinanceiro
+  const debitosArrematante = bd.debitosArrematante || 0
+  const investimentoComHolding = bd.investimentoTotal + holding.total
+  const roi = calcularROI(bd.investimentoTotal, mercado, parseFloat(p.aluguel_mensal_estimado) || 0)
   const roiComHolding = calcularROI(investimentoComHolding, mercado, parseFloat(p.aluguel_mensal_estimado) || 0)
   const preditor = !eMercado ? calcularPreditorConcorrencia(
     parseFloat(p.valor_minimo) || lance,

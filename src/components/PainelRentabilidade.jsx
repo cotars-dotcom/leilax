@@ -35,18 +35,16 @@ function custoArrematacao(lance, eMercado = false, overrides = {}) {
 }
 
 // Calcular cenário FLIP
-function calcFlip(lance, vmercado, reforma, juridico = 0, eMercado = false, overrides = {}) {
+function calcFlip(lance, vmercado, reforma, juridico = 0, eMercado = false, overrides = {}, debitosArr = 0) {
   const c = custoArrematacao(lance, eMercado, overrides)
-  const custoTotal = lance + c.total + reforma + juridico
+  const custoTotal = lance + c.total + reforma + juridico + debitosArr
   const corretagem = vmercado * 0.06
-  const precoVendaLiq = vmercado - corretagem  // valor líquido de venda
-  // IRPF: 15% sobre ganho de capital = precoVendaLiq - custoAquisição
+  const precoVendaLiq = vmercado - corretagem
   const ganhoCapital = Math.max(0, precoVendaLiq - custoTotal)
   const irpf = vmercado <= 440000 ? 0 : ganhoCapital * 0.15
   const lucro = precoVendaLiq - custoTotal - irpf
   const roi   = custoTotal > 0 ? (lucro / custoTotal * 100) : 0
-  // MAO: preço máximo para ROI ≥ 20% | vm*0.80 = MAO * (1+tx) + fixos + reforma
-  const mao = (vmercado * 0.80 - 1500 - reforma - juridico) / (1 + 0.095)
+  const mao = (vmercado * 0.80 - reforma - juridico - debitosArr) / (1 + c.total / Math.max(lance, 1))
   return { custoTotal, corretagem, irpf, lucro, roi, mao, viavel: roi >= 20 }
 }
 
@@ -164,6 +162,8 @@ export default function PainelRentabilidade({ imovel }) {
   // Sprint 18: usar lance do ConfigEstudo se disponível
   const precoBase = lanceEstudo || parseFloat(preco_pedido || valor_minimo) || avaliacao * 0.675
   const lance1   = precoBase
+  const debitosArr = imovel.responsabilidade_debitos === 'arrematante'
+    ? parseFloat(imovel.debitos_total_estimado || 0) : 0
 
   // Lances dos cenários
   const lance2piso  = Math.round(avaliacao * 0.35)
@@ -247,7 +247,7 @@ export default function PainelRentabilidade({ imovel }) {
   const melhoresCenarios = cenarios.map(c => {
     const desc = ((avaliacao - c.lance) / avaliacao * 100)
     const _overrides = { comissao_leiloeiro_pct: imovel.comissao_leiloeiro_pct }
-    const f = calcFlip(c.lance, vmercado, reformaValor, 0, eMercado, _overrides)
+    const f = calcFlip(c.lance, vmercado, reformaValor, 0, eMercado, _overrides, debitosArr)
     // Injetar vmercadoLiq diretamente no flip para evitar stale prop no CardLance
     f.vmercadoLiq = Math.round(vmercado * 0.94)
     const l = calcLocacao(c.lance, aluguelAtual, reformaValor, vmercado, 120, eMercado, _overrides)
