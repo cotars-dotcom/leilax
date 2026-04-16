@@ -81,8 +81,10 @@ export default function AtributosPredio({ p }) {
       <div style={{display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12}}>
         {AMENIDADES.map(a => {
           const val = p[a.key]
-          if (val == null) return null
-          return <span key={a.key} style={tagStyle(val)}>{a.icon} {a.label}</span>
+          if (val === true) return <span key={a.key} style={tagStyle(true)}>{a.icon} {a.label}</span>
+          if (val === false) return <span key={a.key} style={tagStyle(false)}>{a.icon} {a.label}</span>
+          // null = não determinado
+          return <span key={a.key} style={tagStyle(null)}>❓ {a.label}</span>
         })}
       </div>
 

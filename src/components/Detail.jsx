@@ -118,7 +118,7 @@ function ScoreRing({score,size=80}) {
         strokeDasharray={`${dash} ${circ}`} strokeLinecap="round"/>
     </svg>
     <div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",textAlign:"center"}}>
-      <div style={{fontSize:size>70?"18px":"13px",fontWeight:"800",color:c,lineHeight:1}}>{displayed.toFixed(1)}</div>
+      <div style={{fontSize:size>70?"18px":"13px",fontWeight:"800",color:c,lineHeight:1}}>{maxVal===10?displayed.toFixed(2):displayed.toFixed(1)}</div>
       <div style={{fontSize:"8px",color:C.hint,textTransform:"uppercase",letterSpacing:".5px"}}>{scoreLabel(displayed)}</div>
     </div>
   </div>
@@ -1402,8 +1402,11 @@ for (const s of SCORES) {
                 <div style={{flex:1,height:"6px",background:K.bd,borderRadius:"3px",overflow:"hidden"}}>
                   <div style={{width:`${(v||0)*10}%`,height:"100%",background:scoreColor(v||0),borderRadius:"3px"}}/>
                 </div>
-                <span style={{fontSize:"13px",fontWeight:"700",color:scoreColor(v||0),minWidth:"28px",textAlign:"right"}}>{(v||0).toFixed(1)}</span>
+                <span style={{fontSize:"13px",fontWeight:"700",color:scoreColor(v||0),minWidth:"36px",textAlign:"right"}}>{(v||0).toFixed(2)}</span>
               </div>
+              {l==="Jurídico"&&(v||0)>=7&&(!p.num_documentos||p.num_documentos===0)&&(
+                <div style={{fontSize:9,color:'#D97706',fontWeight:600,marginTop:4}}>⚠️ Score estimado — 0 documentos analisados</div>
+              )}
             </div>
           ))}
         </div>

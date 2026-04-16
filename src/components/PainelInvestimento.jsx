@@ -212,8 +212,9 @@ export default function PainelInvestimento({ imovel }) {
                     <div style={{ fontSize: 12, fontWeight: 700, color: '#065F46' }}>{fmt(roi.locacao.aluguelMensal)}/mês</div>
                   </div>
                   <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: 9, color: C.muted }}>Yield</div>
+                    <div style={{ fontSize: 9, color: C.muted }}>Yield s/ invest.</div>
                     <div style={{ fontSize: 12, fontWeight: 700, color: '#065F46' }}>{roi.locacao.yieldAnual}% a.a.</div>
+                    <div style={{ fontSize: 8, color: '#64748B' }}>Mercado: {p.yield_bruto_pct || '—'}%</div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <div style={{ fontSize: 9, color: C.muted }}>Payback</div>
