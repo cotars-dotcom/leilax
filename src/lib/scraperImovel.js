@@ -4,6 +4,8 @@
  * Depois regex extrai campos estruturados sem gastar API
  */
 
+import { MODELOS_GEMINI } from './constants.js'
+
 // ─── EXTRAÇÃO VIA JINA.AI (FREE) ─────────────────────────────────────────────
 
 // Indicadores de que o scrape retornou uma página de erro/SPA vazia
@@ -523,7 +525,7 @@ Retorne APENAS JSON válido:
 }`
 
       const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/${MODELOS_GEMINI[0]}:generateContent?key=${geminiKey}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

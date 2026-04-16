@@ -15,6 +15,7 @@
  */
 
 import { supabase } from './supabase.js'
+import { MODELOS_GEMINI } from './constants.js'
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || ''
 const AI_PROXY_URL = `${SUPABASE_URL}/functions/v1/ai-proxy`
@@ -71,7 +72,7 @@ export async function aiProxy(provider, payload, opts = {}) {
  * @param {string} model — default gemini-2.5-flash
  * @param {object} opts — { temperature, maxOutputTokens, timeout }
  */
-export async function geminiViaProxy(prompt, model = 'gemini-2.5-flash', opts = {}) {
+export async function geminiViaProxy(prompt, model = MODELOS_GEMINI[0], opts = {}) {
   const { temperature = 0.1, maxOutputTokens = 8192, timeout = 60000 } = opts
   const data = await aiProxy('gemini', {
     contents: [{ parts: [{ text: prompt }] }],
@@ -120,7 +121,7 @@ export async function testarProxy(provider = 'gemini') {
   const t0 = Date.now()
   try {
     if (provider === 'gemini') {
-      await geminiViaProxy('Respond with just "ok"', 'gemini-2.5-flash-lite', { maxOutputTokens: 5, timeout: 10000 })
+      await geminiViaProxy('Respond with just "ok"', MODELOS_GEMINI[1], { maxOutputTokens: 5, timeout: 10000 })
     } else if (provider === 'deepseek') {
       await deepseekViaProxy([{ role: 'user', content: 'ok' }], { maxTokens: 3, timeout: 10000 })
     }
