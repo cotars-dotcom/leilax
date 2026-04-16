@@ -21,7 +21,7 @@ function ScoreRing({score,size=80}) {
         strokeDasharray={`${dash} ${circ}`} strokeLinecap="round"/>
     </svg>
     <div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",textAlign:"center"}}>
-      <div style={{fontSize:size>70?"18px":"13px",fontWeight:"800",color:c,lineHeight:1}}>{(score||0).toFixed(1)}</div>
+      <div style={{fontSize:size>70?"18px":"13px",fontWeight:"800",color:c,lineHeight:1}}>{(score||0).toFixed(2)}</div>
       <div style={{fontSize:"8px",color:C.hint,textTransform:"uppercase",letterSpacing:".5px"}}>{scoreLabel(score||0)}</div>
     </div>
   </div>
@@ -296,7 +296,7 @@ function AxisHeader({profile:prof, imoveis=[], onNav, isPhone=false, isMobile=fa
 export default function Dashboard({props,onNav,profile:prof,isMobile,isPhone}) {
   const total=props.length, comprar=props.filter(p=>p.recomendacao==="COMPRAR").length
   const forte=props.filter(p=>(p.score_total||0)>=7.5).length
-  const avg=total?(props.reduce((s,p)=>s+(p.score_total||0),0)/total).toFixed(1):"0"
+  const avg=total?(props.reduce((s,p)=>s+(p.score_total||0),0)/total).toFixed(2):"0"
   const avgPct=total?Math.round((props.reduce((s,p)=>s+(p.score_total||0),0)/total)*10):0
   const recentes=[...props].sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt)).slice(0,4)
   const topAlerta=[...props].filter(p=>p.recomendacao!=="EVITAR").sort((a,b)=>(b.score_total||0)-(a.score_total||0))[0]

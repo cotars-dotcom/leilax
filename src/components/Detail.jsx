@@ -1061,8 +1061,9 @@ for (const s of SCORES) {
               const result = await criarLinkPublico(p.id, session?.user?.id)
               const url = `${window.location.origin}/#/share/${result.token}`
               await navigator.clipboard.writeText(url)
-              alert(`✅ Link copiado!\n\n${url}\n\nVálido por 30 dias.`)
-            } catch(e){ alert('Erro: '+e.message) }
+              setShareStatus(`🔗 Link copiado! Válido por 30 dias.`)
+              setTimeout(() => setShareStatus(null), 5000)
+            } catch(e){ setShareStatus(`❌ Erro: ${e.message}`); setTimeout(() => setShareStatus(null), 5000) }
           }}>🔗 Compartilhar</button>}
         {isAdmin&&<button style={{...btn("d"),padding:"5px 12px",fontSize:"12px"}} onClick={()=>{if(confirm("Excluir?"))onDelete(p.id)}}>🗑</button>}
       </>}/>
