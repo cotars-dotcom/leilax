@@ -44,8 +44,12 @@ export default function PainelInvestimento({ imovel }) {
     mesesHolding,
     p.iptu_mensal ? parseFloat(p.iptu_mensal) : null
   )
-  const investimentoComHolding = bd.investimentoTotal + holding.total
-  const roi = calcularROI(bd.investimentoTotal, mercado, parseFloat(p.aluguel_mensal_estimado) || 0)
+  // Débitos a cargo do arrematante entram como custo obrigatório
+  const debitosArrematante = (p.responsabilidade_debitos === 'arrematante' && parseFloat(p.debitos_total_estimado) > 0)
+    ? parseFloat(p.debitos_total_estimado)
+    : 0
+  const investimentoComHolding = bd.investimentoTotal + holding.total + debitosArrematante
+  const roi = calcularROI(bd.investimentoTotal + debitosArrematante, mercado, parseFloat(p.aluguel_mensal_estimado) || 0)
   const roiComHolding = calcularROI(investimentoComHolding, mercado, parseFloat(p.aluguel_mensal_estimado) || 0)
   const preditor = !eMercado ? calcularPreditorConcorrencia(
     parseFloat(p.valor_minimo) || lance,
@@ -103,13 +107,16 @@ export default function PainelInvestimento({ imovel }) {
             {bd.holding > 0 && (
               <BarraVisual label={`Holding (${bd.holdingMeses}m × ${fmt(bd.holdingMensal)}/mês)`} valor={bd.holding} total={mercado} cor="#EA580C" />
             )}
+            {debitosArrematante > 0 && (
+              <BarraVisual label="Débitos (a cargo do arrematante)" valor={debitosArrematante} total={mercado} cor="#991B1B" />
+            )}
             <div style={{ borderTop: `1px solid ${C.borderW}`, paddingTop: 6, marginTop: 4 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 700 }}>
                 <span style={{ color: C.navy }}>Investimento Total</span>
-                <span style={{ color: C.navy }}>{fmt(bd.investimentoTotal)}</span>
+                <span style={{ color: C.navy }}>{fmt(bd.investimentoTotal + debitosArrematante)}</span>
               </div>
               <div style={{ fontSize: 9, color: C.muted, marginTop: 2 }}>
-                Custos = {bd.pctCustosSobreLance}% sobre o lance
+                Custos = {bd.pctCustosSobreLance}% sobre o lance{debitosArrematante > 0 ? ` + ${fmt(debitosArrematante)} débitos` : ''}
               </div>
             </div>
 
@@ -157,12 +164,12 @@ export default function PainelInvestimento({ imovel }) {
                 </div>
                 <div style={{ fontSize: 9, color: '#64748B', marginTop: 3 }}>
                   {p.responsabilidade_debitos === 'sub_rogado'
-                    ? '✅ Sub-rogados no preço (Art. 130 CTN) — não soma ao investimento'
+                    ? 'Sub-rogados no preço (Art. 130 CTN) — pagos com produto da arrematação. Verificar edital.'
                     : p.responsabilidade_debitos === 'arrematante'
-                    ? '⚠️ Arrematante responsável — soma ao investimento total'
+                    ? `🔴 A cargo do arrematante — INCLUÍDO no investimento total (+${fmt(parseFloat(p.debitos_total_estimado))})`
                     : p.responsabilidade_debitos === 'exonerado'
-                    ? '✅ Arrematante exonerado'
-                    : `Responsabilidade: ${p.responsabilidade_debitos || 'verificar edital'}`}
+                    ? '✅ Arrematante exonerado — não impacta investimento'
+                    : `⚠️ Responsabilidade não determinada: ${p.responsabilidade_debitos || 'verificar edital'}`}
                 </div>
                 {p.debitos_condominio && <div style={{ fontSize: 9, color: '#64748B', marginTop: 2 }}>Cond: {p.debitos_condominio.substring(0, 80)}</div>}
                 {p.debitos_iptu && <div style={{ fontSize: 9, color: '#64748B' }}>IPTU: {p.debitos_iptu.substring(0, 80)}</div>}
