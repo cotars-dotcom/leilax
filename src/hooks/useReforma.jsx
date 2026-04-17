@@ -28,7 +28,7 @@ const ReformaContext = createContext(null)
 
 // Mapeamento inverso: escopo detalhado → cenário simplificado
 const ESCOPO_PARA_CENARIO = {
-  sem_reforma:              'sem_reforma',
+  sem_reforma:              'basica',
   refresh_giro:             'basica',
   leve_funcional:           'basica',
   leve_reforcada_1_molhado: 'media',
@@ -38,10 +38,9 @@ const ESCOPO_PARA_CENARIO = {
 
 // Mapeamento: cenário simplificado → escopo detalhado padrão
 const CENARIO_PARA_ESCOPO = {
-  sem_reforma: 'sem_reforma',
-  basica:      'refresh_giro',
-  media:       'leve_reforcada_1_molhado',
-  completa:    'pesada',
+  basica:   'refresh_giro',
+  media:    'leve_reforcada_1_molhado',
+  completa: 'pesada',
 }
 
 export function ReformaProvider({ imovel, children }) {
@@ -75,7 +74,7 @@ export function ReformaProvider({ imovel, children }) {
   )
 
   // Custo atual baseado no cenário simplificado selecionado
-  const custoReformaAtual = cenarioSimplificado === 'sem_reforma' ? 0 : (reformas[cenarioSimplificado] ?? 0)
+  const custoReformaAtual = reformas[cenarioSimplificado]
 
   // Custo detalhado (para CenariosReforma): direto do SINAPI por escopo
   const custoEscopoDetalhado = useMemo(() => {
@@ -138,7 +137,7 @@ export function useReforma() {
       selecionarCenario: () => {},
       selecionarEscopo: () => {},
       setLanceEstudo: () => {},
-      reformas: { sem_reforma: 0, basica: 0, media: 0, completa: 0 },
+      reformas: { basica: 0, media: 0, completa: 0 },
       custoReformaAtual: 0,
       custoEscopoDetalhado: 0,
       fatorValor: 1.12,
