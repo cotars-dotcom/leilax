@@ -46,7 +46,7 @@ export default function PainelInvestimento({ imovel }) {
   )
   // Débitos já incluídos no bd.investimentoTotal via calcularBreakdownFinanceiro
   const debitosArrematante = bd.debitosArrematante || 0
-  const investimentoComHolding = bd.investimentoTotal + holding.total
+  const investimentoComHolding = bd.investimentoTotal
   const roi = calcularROI(bd.investimentoTotal, mercado, parseFloat(p.aluguel_mensal_estimado) || 0)
   const roiComHolding = calcularROI(investimentoComHolding, mercado, parseFloat(p.aluguel_mensal_estimado) || 0)
   const preditor = !eMercado ? calcularPreditorConcorrencia(
@@ -111,7 +111,7 @@ export default function PainelInvestimento({ imovel }) {
             <div style={{ borderTop: `1px solid ${C.borderW}`, paddingTop: 6, marginTop: 4 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 700 }}>
                 <span style={{ color: C.navy }}>Investimento Total</span>
-                <span style={{ color: C.navy }}>{fmt(bd.investimentoTotal + debitosArrematante)}</span>
+                <span style={{ color: C.navy }}>{fmt(bd.investimentoTotal)}</span>
               </div>
               <div style={{ fontSize: 9, color: C.muted, marginTop: 2 }}>
                 Custos = {bd.pctCustosSobreLance}% sobre o lance{debitosArrematante > 0 ? ` + ${fmt(debitosArrematante)} débitos` : ''}

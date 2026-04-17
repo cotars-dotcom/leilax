@@ -77,7 +77,7 @@ export default function MapaLocaisProximos({ lat, lng, titulo }) {
     ensureLeaflet().then(() => {
       if (!isMounted || !mapRef.current || mapInstRef.current) return
       const L = window.L
-      const map = L.map(mapRef.current, { zoomControl: true, attributionControl: false }).setView([lat, lng], 15)
+      const map = L.map(mapRef.current, { zoomControl: true, attributionControl: false, scrollWheelZoom: false }).setView([lat, lng], 15)
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map)
       // Marcador do imóvel
       L.marker([lat, lng], {

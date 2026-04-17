@@ -94,6 +94,7 @@ export default function ConfigEstudo({ imovel }) {
   const acimaMAO = lanceEstudo > 0 && mao > 0 && lanceEstudo > mao
 
   const cenarios = [
+    { id: 'sem_reforma', label: 'Sem Reforma', custo: 0, cor: '#64748B' },
     { id: 'basica', label: 'Básica', custo: reformas.basica, cor: '#3B8BD4' },
     { id: 'media', label: 'Média', custo: reformas.media, cor: '#D4A017' },
     { id: 'completa', label: 'Completa', custo: reformas.completa, cor: '#D05538' },

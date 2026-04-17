@@ -142,8 +142,8 @@ export default function PainelLancamento({ imovel }) {
   const custo_reforma_basica = reformasCtx.basica
   const custo_reforma_media = reformasCtx.media
   const custo_reforma_completa = reformasCtx.completa
-  const reformaMap = { basica: custo_reforma_basica, media: custo_reforma_media, completa: custo_reforma_completa }
-  const reforma = reformaMap[cenarioReforma]
+  const reformaMap = { basica: custo_reforma_basica, media: custo_reforma_media, completa: custo_reforma_completa, sem_reforma: 0 }
+  const reforma = reformaMap[cenarioReforma] ?? 0
   const juridico = parseFloat(custo_juridico_estimado) || 0
   const debitosArr = imovel.responsabilidade_debitos === 'arrematante'
     ? parseFloat(imovel.debitos_total_estimado || 0) : 0
@@ -202,6 +202,12 @@ export default function PainelLancamento({ imovel }) {
 
   const rendaYield = vmercado > 0 && aluguel > 0
     ? ((aluguel * 12 / vmercado) * 100).toFixed(1) : null
+
+  const leilaoPassou = imovel.data_leilao && (() => {
+    const [y, m, d] = imovel.data_leilao.split('-').map(Number)
+    const dl = new Date(y, m - 1, d); dl.setHours(23, 59, 59, 0)
+    return dl < new Date()
+  })()
 
   return (
     <div style={{ ...card(), marginBottom: 14 }}>
@@ -308,6 +314,13 @@ export default function PainelLancamento({ imovel }) {
         ))}
       </div>
 
+      {leilaoPassou && (
+        <div style={{ padding: '10px 12px', borderRadius: 8, marginBottom: 10,
+          background: '#FEF2F2', border: '1px solid #FECACA', fontSize: 11, color: '#991B1B', fontWeight: 600 }}>
+          ⏰ Leilão já realizado — cenários de lance para referência histórica apenas.
+        </div>
+      )}
+
       {/* Cenários 1º leilão */}
       <div style={{ fontSize: 10.5, fontWeight: 700, color: C.navy,
         textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
@@ -316,8 +329,8 @@ export default function PainelLancamento({ imovel }) {
 
       <CardCenario
         label={isSegundoLeilao ? `Lance mínimo — ${num_leilao}º Leilão (35% av.)` : `Lance mínimo — ${num_leilao || 1}º Leilão`}
-        sublabel={avaliacao > 0 ? `${((lancePrin/avaliacao)*100).toFixed(0)}% da avaliação` : ''}
-        lance={lancePrin} cenario={c1} avaliacao={avaliacao}
+        sublabel={avaliacao > 0 ? (isSegundoLeilao ? `${((lancePrin/avaliacao)*100).toFixed(0)}% da avaliação` : '100% da avaliação') : ''}
+        lance={lancePrin} cenario={c1} avaliacao={isSegundoLeilao ? avaliacao : undefined}
         isDestaque={c1.viavel && c1.roi >= 20}
       />
       <CardCenario
@@ -412,7 +425,7 @@ export default function PainelLancamento({ imovel }) {
 
       {/* Nota de custos */}
       <div style={{ marginTop: 10, fontSize: 9.5, color: C.hint, lineHeight: 1.5 }}>
-        Premissas: comissão 5% · ITBI 3% · doc 0,5% · honorário adv 2% · registro R$1.500 · IRPF 15% (isenção ≤ R$440k) · corretagem venda 6%
+        Premissas: comissão 5% · ITBI 3% · doc 2,5% · honorário adv 5% · registro R$0 · IRPF 15% (isenção ≤ R$440k) · corretagem venda 6%
       </div>
     </div>
   )

@@ -31,6 +31,7 @@ export default function Tarefas() {
   const [form, setForm] = useState({ titulo: '', descricao: '', atribuido_para: '', prioridade: 'normal', prazo: '', status: 'pendente', imovel_id: '' })
   const [saving, setSaving] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(null)
+  const [toast, setToast] = useState(null)
 
   // Drag state
   const [dragId, setDragId] = useState(null)
@@ -77,21 +78,32 @@ export default function Tarefas() {
     try {
       const payload = { ...form, criado_por: profile?.id }
       if (!payload.imovel_id) delete payload.imovel_id
+      if (!payload.atribuido_para) delete payload.atribuido_para
       if (!payload.prazo) delete payload.prazo
       if (editando) payload.id = editando
       await saveTarefa(payload)
       setShowModal(false)
+      setToast({ type: 'success', msg: editando ? 'Tarefa atualizada!' : 'Tarefa criada!' })
+      setTimeout(() => setToast(null), 3000)
       await load()
-    } catch (er) { console.error('[Tarefas] save:', er) }
+    } catch (er) {
+      console.error('[Tarefas] save:', er)
+      setToast({ type: 'error', msg: 'Erro ao salvar tarefa. Tente novamente.' })
+      setTimeout(() => setToast(null), 4000)
+    }
     setSaving(false)
   }
 
   async function handleDelete(id) {
+    setConfirmDelete(null)
     try {
       await deleteTarefa(id)
       setTarefas(prev => prev.filter(t => t.id !== id))
-      setConfirmDelete(null)
-    } catch (e) { console.error('[Tarefas] delete:', e) }
+    } catch (e) {
+      console.error('[Tarefas] delete:', e)
+      setToast({ type: 'error', msg: 'Erro ao excluir tarefa.' })
+      setTimeout(() => setToast(null), 4000)
+    }
   }
 
   const moverTarefa = useCallback(async (id, novoStatus) => {
@@ -132,10 +144,12 @@ export default function Tarefas() {
     const dx = Math.abs(touch.clientX - touchRef.current.startX)
     const dy = Math.abs(touch.clientY - touchRef.current.startY)
     if (dx > 15 || dy > 15) touchRef.current.moved = true
+    if (!touchRef.current.moved) return
     // Highlight column under finger
     const el = document.elementFromPoint(touch.clientX, touch.clientY)
     const colEl = el?.closest('[data-col-id]')
-    setDragOverCol(colEl?.dataset.colId || null)
+    const novaCol = colEl?.dataset.colId || null
+    setDragOverCol(prev => prev === novaCol ? prev : novaCol)
   }
   function onTouchEnd() {
     const { id, moved } = touchRef.current
@@ -327,6 +341,16 @@ export default function Tarefas() {
                   padding: '8px 20px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>Excluir</button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Toast feedback */}
+      {toast && (
+        <div style={{ position: 'fixed', bottom: 24, right: 24, zIndex: 2000,
+          background: toast.type === 'error' ? '#E5484D' : C.emerald,
+          color: '#fff', padding: '10px 18px', borderRadius: 8, fontSize: 13,
+          fontWeight: 600, boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}>
+          {toast.msg}
         </div>
       )}
 
