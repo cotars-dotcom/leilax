@@ -17,7 +17,7 @@ import ConfigEstudo from './ConfigEstudo.jsx'
 import TimelineMatricula from './TimelineMatricula.jsx'
 import PainelRentabilidade from './PainelRentabilidade.jsx'
 import { isMercadoDireto } from '../lib/detectarFonte.js'
-import { calcularCustosAquisicao } from '../lib/constants.js'
+import { calcularCustosAquisicao, MULT_CUSTO_RAPIDO } from '../lib/constants.js'
 import CenariosReforma from './CenariosReforma.jsx'
 import { ReformaProvider } from '../hooks/useReforma.jsx'
 import CustosReaisEditor from './CustosReaisEditor.jsx'
@@ -501,7 +501,7 @@ function ModoAoVivo({ imovel, onClose }) {
           ['⚖️ Jurídico', `${s.score_juridico?.toFixed(1) || '—'}/10`],
           ['🏠 Ocupação', s.ocupacao || 'Verificar'],
           ['📍 Localização', `${s.score_localizacao?.toFixed(1) || '—'}/10`],
-          ['💡 Custo total', (()=>{const pr=parseFloat(isMercadoDireto(s.fonte_url,s.tipo_transacao)?(s.preco_pedido||s.valor_minimo):s.valor_minimo)||0;const mult=isMercadoDireto(s.fonte_url,s.tipo_transacao)?1.035:1.075;return pr?`R$ ${Math.round(pr*mult/1000)}k est.`:'—'})()],
+          ['💡 Custo total', (()=>{const pr=parseFloat(isMercadoDireto(s.fonte_url,s.tipo_transacao)?(s.preco_pedido||s.valor_minimo):s.valor_minimo)||0;const mult=1+(isMercadoDireto(s.fonte_url,s.tipo_transacao)?MULT_CUSTO_RAPIDO.mercado:MULT_CUSTO_RAPIDO.leilao);return pr?`R$ ${Math.round(pr*mult/1000)}k est.`:'—'})()],
         ].map(([label, val]) => (
           <div key={label} style={{ background:'rgba(255,255,255,0.08)',
             borderRadius:10, padding:'12px 14px' }}>

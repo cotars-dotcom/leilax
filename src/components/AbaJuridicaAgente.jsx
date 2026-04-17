@@ -305,7 +305,7 @@ export default function AbaJuridicaAgente({ imovel, isAdmin, onReclassificado })
           if (keys.claudeKey) { cKey = keys.claudeKey; localStorage.setItem('axis-api-key', cKey) }
           if (keys.openaiKey) { oKey = keys.openaiKey; localStorage.setItem('axis-openai-key', oKey) }
         }
-      } catch(e) {}
+      } catch(e) { console.warn('[Juridico] Erro ao processar campo:', e) }
     }
     return { gKey, cKey, oKey }
   }
@@ -434,7 +434,7 @@ export default function AbaJuridicaAgente({ imovel, isAdmin, onReclassificado })
                 if (textoExtraido.length > 100) {
                           analise = await analisarTextoJuridicoGemini(textoExtraido, file.name, imovel, cKey)
                 }
-              } catch(e2) {}
+              } catch(e2) { console.warn('[Juridico] Fallback extração falhou:', e2) }
             }
           }
         } else if (tipo === 'imagem') {
@@ -444,7 +444,7 @@ export default function AbaJuridicaAgente({ imovel, isAdmin, onReclassificado })
           })
           try {
               analise = await analisarImagemJuridicaGPT(base64, file.type, file.name, imovel, oKey)
-          } catch(e) {}
+          } catch(e) { console.warn('[Juridico] Erro processamento doc:', e) }
         }
         if (analise) await processarResultados([{ nome: file.name, tipo, analise }])
         else setProgresso(`⚠️ Análise de ${file.name} não retornou resultado`)
