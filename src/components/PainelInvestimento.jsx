@@ -38,7 +38,8 @@ export default function PainelInvestimento({ imovel }) {
 
   if (!lance || !mercado) return null
 
-  const bd = calcularBreakdownFinanceiro(lance, p, eMercado)
+  // Sprint 22: override custo_reforma_estimado com o cenário selecionado no ConfigEstudo
+  const bd = calcularBreakdownFinanceiro(lance, { ...p, custo_reforma_estimado: custoReformaAtual }, eMercado)
   const holding = calcularCustoHolding(
     parseFloat(p.condominio_mensal) || 0,
     mesesHolding,

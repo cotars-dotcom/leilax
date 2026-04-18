@@ -564,7 +564,8 @@ export function calcularMatrizInvestimento(p, opts = {}) {
  */
 export function calcularLanceMaximoParaROI(roiAlvo, p, opts = {}) {
   if (!p) return 0
-  const mercado = parseFloat(p.valor_mercado_estimado) || 0
+  // Usar mercado bruto passado explicitamente, ou valor_mercado_estimado do banco
+  const mercado = opts.mercadoBruto || parseFloat(p.valor_mercado_estimado) || 0
   const eMercado = opts.eMercado || false
   const custos = eMercado ? CUSTOS_MERCADO : CUSTOS_LEILAO
   const pctCustos = (custos.comissao_leiloeiro_pct + custos.itbi_pct + custos.advogado_pct + custos.documentacao_pct) / 100
@@ -574,14 +575,16 @@ export function calcularLanceMaximoParaROI(roiAlvo, p, opts = {}) {
   const holdingMeses = opts.holdingMeses || HOLDING_MESES_PADRAO
   const holdingTotal = holdingMeses * (condoMensal + iptuMensal)
   const registroFixo = custos.registro_fixo ?? 0
+  // Débitos a cargo do arrematante entram como custo fixo no MAO
+  const debitosArrematante = p.responsabilidade_debitos === 'arrematante'
+    ? parseFloat(p.debitos_total_estimado || 0) : 0
 
-  // valorVenda = mercado * 0.94 (- 6% corretagem)
-  // investTotal = lance * (1 + pctCustos) + registroFixo + custoReforma + holdingTotal
-  // ROI = (valorVenda - investTotal) / investTotal
-  // Resolvendo para lance:
-  const valorVenda = mercado * 0.94
+  // MAO = (valorVenda / (1 + ROI%) - custos_fixos) / (1 + pctCustos%)
+  // custos_fixos = registro + reforma + holding + débitos
+  const valorVenda = mercado * 0.94  // 6% corretagem de venda
   const targetInvest = valorVenda / (1 + roiAlvo / 100)
-  const lanceMax = (targetInvest - registroFixo - custoReforma - holdingTotal) / (1 + pctCustos)
+  const custosFixos = registroFixo + custoReforma + holdingTotal + debitosArrematante
+  const lanceMax = (targetInvest - custosFixos) / (1 + pctCustos)
 
   return Math.max(0, Math.round(lanceMax))
 }

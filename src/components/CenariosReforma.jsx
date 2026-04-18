@@ -12,8 +12,30 @@ import {
 } from '../lib/reformaUnificada.js'
 import { supabase } from '../lib/supabase.js'
 
+// Mapeamento: 4 nomes canônicos → SINAPI escopo para cálculo detalhado
+const CENARIO_ESCOPO = {
+  sem_reforma: 'sem_reforma',
+  basica:      'refresh_giro',
+  media:       'leve_reforcada_1_molhado',
+  completa:    'pesada',
+}
+
+// 4 cenários padronizados com dados do ESCOPOS como referência
+const CENARIOS_4 = [
+  { id: 'sem_reforma', label: 'Sem Reforma', cor: '#8E8EA0' },
+  { id: 'basica',     label: 'Básica',       cor: '#3B8BD4' },
+  { id: 'media',      label: 'Média',         cor: '#D4A017' },
+  { id: 'completa',   label: 'Completa',      cor: '#D05538' },
+]
+
 export default function CenariosReforma({ imovel, isAdmin }) {
-  const { escopoDetalhado: escopoSel, selecionarEscopo: setEscopoSel, area, preco_m2, classe, lanceEstudo } = useReforma()
+  const {
+    cenarioSimplificado: cenarioSel,
+    selecionarCenario: setCenarioSel,
+    escopoDetalhado: escopoSel,
+    selecionarEscopo: setEscopoSel,
+    area, preco_m2, classe, lanceEstudo,
+  } = useReforma()
   const [mostrarDetalhe, setMostrarDetalhe] = useState(false)
   const [itensDB, setItensDB] = useState(null)
   const [abertos, setAbertos] = useState(new Set())
@@ -179,7 +201,9 @@ export default function CenariosReforma({ imovel, isAdmin }) {
     return next
   })
 
-  const sel = cenarios.find(c => c.id === escopoSel) || cenarios[0]
+  // Mapear cenário canônico → SINAPI escopo para exibir métricas detalhadas
+  const escopoIdSel = CENARIO_ESCOPO[cenarioSel] || escopoSel
+  const sel = cenarios.find(c => c.id === escopoIdSel) || cenarios[0]
   const semReforma = cenarios[0]
   const gainVsSemReforma = sel.lucro - semReforma.lucro
 
@@ -215,16 +239,16 @@ export default function CenariosReforma({ imovel, isAdmin }) {
             : '⚠️ Lance mínimo não disponível — reanalize o imóvel para calcular os cenários corretamente.'}
         </div>
       )}
-      {/* Seletor de escopos */}
+      {/* Seletor — 4 nomes padronizados (sincroniza com ConfigEstudo) */}
       <div style={{display:'flex', gap:6, marginBottom:14, overflowX:'auto', paddingBottom:4}}>
-        {ESCOPOS.map(esc => (
-          <button key={esc.id} onClick={() => setEscopoSel(esc.id)} style={{
-            flexShrink:0, padding:'6px 12px', borderRadius:8, fontSize:11, cursor:'pointer',
-            fontWeight: escopoSel === esc.id ? 600 : 400,
-            border: `1.5px solid ${escopoSel === esc.id ? esc.cor : C.borderW}`,
-            background: escopoSel === esc.id ? `${esc.cor}15` : C.white,
-            color: escopoSel === esc.id ? esc.cor : C.muted
-          }}>{esc.label}</button>
+        {CENARIOS_4.map(c => (
+          <button key={c.id} onClick={() => setCenarioSel(c.id)} style={{
+            flex:1, padding:'6px 10px', borderRadius:8, fontSize:11, cursor:'pointer',
+            fontWeight: cenarioSel === c.id ? 700 : 400,
+            border: `1.5px solid ${cenarioSel === c.id ? c.cor : C.borderW}`,
+            background: cenarioSel === c.id ? `${c.cor}15` : C.white,
+            color: cenarioSel === c.id ? c.cor : C.muted
+          }}>{c.label}</button>
         ))}
       </div>
 
@@ -363,14 +387,18 @@ export default function CenariosReforma({ imovel, isAdmin }) {
               </tr>
             </thead>
             <tbody>
-              {cenarios.map((c, i) => (
-                <tr key={c.id} onClick={() => setEscopoSel(c.id)} style={{
+              {CENARIOS_4.map((can, i) => {
+                const escopoId = CENARIO_ESCOPO[can.id] || can.id
+                const c = cenarios.find(x => x.id === escopoId) || cenarios[0]
+                const selecionado = cenarioSel === can.id
+                return (
+                <tr key={can.id} onClick={() => setCenarioSel(can.id)} style={{
                   cursor:'pointer',
-                  background: c.id === escopoSel ? `${c.cor}08` : i % 2 === 0 ? 'transparent' : `${C.surface}80`,
-                  borderLeft: c.id === escopoSel ? `3px solid ${c.cor}` : '3px solid transparent'
+                  background: selecionado ? `${can.cor}08` : i % 2 === 0 ? 'transparent' : `${C.surface}80`,
+                  borderLeft: selecionado ? `3px solid ${can.cor}` : '3px solid transparent'
                 }}>
-                  <td style={{padding:'7px 10px', color:c.id === escopoSel ? c.cor : C.text, fontWeight: c.id === escopoSel ? 600 : 400}}>
-                    {c.label}
+                  <td style={{padding:'7px 10px', color:selecionado ? can.cor : C.text, fontWeight: selecionado ? 600 : 400}}>
+                    {can.label}
                   </td>
                   <td style={{padding:'7px 10px', textAlign:'right', color:C.muted}}>{fmt(c.custoReforma)}</td>
                   <td style={{padding:'7px 10px', textAlign:'right', color:C.text}}>{fmt(c.custoTotal)}</td>
@@ -382,7 +410,8 @@ export default function CenariosReforma({ imovel, isAdmin }) {
                   </td>
                   <td style={{padding:'7px 10px', textAlign:'right', color:c.yieldBruto >= 6 ? C.emerald : C.muted}}>{pct(c.yieldBruto)}</td>
                 </tr>
-              ))}
+                )
+              })}
             </tbody>
           </table>
           <div style={{fontSize:9, color:C.hint, marginTop:4, padding:'0 10px'}}>

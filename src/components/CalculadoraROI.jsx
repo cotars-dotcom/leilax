@@ -1,7 +1,10 @@
 import { useState } from "react"
 import { C, RED, ESTRATEGIA_CONFIG } from "../appConstants.js"
 import { isMercadoDireto } from '../lib/detectarFonte.js'
-import { CUSTOS_LEILAO, CUSTOS_MERCADO, calcularFatorHomogeneizacao } from '../lib/constants.js'
+import {
+  CUSTOS_LEILAO, CUSTOS_MERCADO, calcularFatorHomogeneizacao,
+  IPTU_SOBRE_CONDO_RATIO, HOLDING_MESES_PADRAO, calcularLanceMaximoParaROI,
+} from '../lib/constants.js'
 import { useReforma } from '../hooks/useReforma.jsx'
 
 export default function CalculadoraROI({ imovel }) {
@@ -10,14 +13,14 @@ export default function CalculadoraROI({ imovel }) {
   const [taxaJuros, setTaxaJuros] = useState(10.5)
   const [tabela, setTabela] = useState('price')
   const [estrategia, setEstrategia] = useState('flip')
+  const [usarHomogeneizado, setUsarHomogeneizado] = useState(false)
   const { lanceEstudo, custoReformaAtual } = useReforma()
   const eMercado = isMercadoDireto(imovel.fonte_url, imovel.tipo_transacao)
-  // Sprint 18: usar lance do ConfigEstudo se disponível
   const precoAquisicao = lanceEstudo || (eMercado
     ? (parseFloat(imovel.preco_pedido) || parseFloat(imovel.valor_minimo) || 0)
     : (parseFloat(imovel.valor_minimo) || 0))
   if (precoAquisicao <= 0) {
-    return <div style={{ ...card(), padding: 16 }}>
+    return <div style={{ padding: 16 }}>
       <div style={{ fontWeight: 600, fontSize: 13, color: C.navy, marginBottom: 6 }}>💰 Calculadora de ROI</div>
       <div style={{ fontSize: 12, color: C.muted }}>Preço de aquisição não disponível — informe o valor para calcular.</div>
     </div>
@@ -30,15 +33,28 @@ export default function CalculadoraROI({ imovel }) {
   const advogado    = precoAquisicao * (_tab.advogado_pct / 100)
   const registro    = _tab.registro_fixo ?? 0
   const custoJuridico = parseFloat(imovel.custo_juridico_estimado || 0)
-  const debitosArr  = imovel.responsabilidade_debitos === 'arrematante' ? parseFloat(imovel.debitos_total_estimado || 0) : 0
-  const custoTotal    = precoAquisicao + comissao + itbi + doc + advogado + registro + reforma + custoJuridico + debitosArr
-  const vmercadoRaw = imovel.valor_mercado_estimado || imovel.valor_pos_reforma_estimado
-    || (imovel.preco_m2_mercado * (imovel.area_privativa_m2 || imovel.area_m2 || 0))
+  const debitosArr  = imovel.responsabilidade_debitos === 'arrematante'
+    ? parseFloat(imovel.debitos_total_estimado || 0) : 0
+  // Holding: condomínio + IPTU estimado × meses padrão
+  const condoMensal  = parseFloat(imovel.condominio_mensal || 0)
+  const iptuMensal   = parseFloat(imovel.iptu_mensal || 0) || (condoMensal > 0 ? Math.round(condoMensal * IPTU_SOBRE_CONDO_RATIO) : 0)
+  const holding      = HOLDING_MESES_PADRAO * (condoMensal + iptuMensal)
+  const custoTotal   = precoAquisicao + comissao + itbi + doc + advogado + registro + reforma + custoJuridico + debitosArr + holding
+
+  // Valor de mercado: bruto por padrão (sem double-counting da homogeneização)
+  const vmercadoBruto = parseFloat(imovel.valor_mercado_estimado) || parseFloat(imovel.valor_pos_reforma_estimado)
+    || (parseFloat(imovel.preco_m2_mercado) * (parseFloat(imovel.area_privativa_m2 || imovel.area_m2) || 0))
     || precoAquisicao * 1.4
-  // Ajustar por atributos (Sprint 17 — homogeneização NBR 14653)
-  const homo = calcularFatorHomogeneizacao(imovel, vmercadoRaw)
-  const vmercado = homo.valorAjustado || vmercadoRaw
-  // IRPF: isento até R$440k (imóvel único PF - Lei 11.196/2005); 15% acima
+  const homo = calcularFatorHomogeneizacao(imovel, vmercadoBruto)
+  const vmercadoAjustado = homo.valorAjustado || vmercadoBruto
+  const vmercado = usarHomogeneizado ? vmercadoAjustado : vmercadoBruto
+
+  // Badge: valor ajustado acima da média do bairro
+  const areaImovel = parseFloat(imovel.area_privativa_m2 || imovel.area_m2) || 1
+  const precoM2Mercado = parseFloat(imovel.preco_m2_mercado) || 0
+  const ajustadoAcimaDaMed = precoM2Mercado > 0 && (vmercadoAjustado / areaImovel) > precoM2Mercado * 1.10
+
+  // IRPF: isento até R$440k (imóvel único PF)
   const ganhoCapital = Math.max(0, vmercado - custoTotal)
   const irpfGanho = vmercado <= 440000 ? 0 : ganhoCapital * 0.15
   const corretagemVenda = vmercado * 0.06
@@ -62,16 +78,17 @@ export default function CalculadoraROI({ imovel }) {
     : valorFinanciado - parcela * prazoVenda
   const lucroFinanciado = vmercado - saldoDevedor - entradaValor - reforma - comissao - itbi - doc - advogado - registro - custoJuridico - irpfGanho - corretagemVenda
   const fmt = n => n ? `R$ ${Math.round(n).toLocaleString('pt-BR')}` : '—'
-  const pct = n => n ? `${n.toFixed(1)}%` : '—'
-  // MAO — Lance Máximo para margem mínima de 20%
-  const custosFixos = comissao + itbi + doc + reforma
-  const capRatePct  = imovel.classe_ipead === 'Classe 4 - Luxo' ? 4.0
-                    : imovel.classe_ipead === 'Classe 3 - Alto' ? 5.0 : 6.0
-  const maoFlip     = vmercado > 0 ? vmercado * 0.80 - custosFixos : 0
-  const maoLocacao  = aluguelMensal > 0
-                    ? (aluguelMensal * 12) / (capRatePct / 100) - custosFixos
-                    : 0
+  const pct = n => n != null ? `${Number(n).toFixed(1)}%` : '—'
+
+  // MAO: usa fórmula correta com débitos como custo fixo
+  const maoFlip = calcularLanceMaximoParaROI(20, imovel, { eMercado, custoReforma: reforma, mercadoBruto: vmercadoBruto })
+  const maoLocacao = (() => {
+    const capRatePct = imovel.classe_ipead === 'Classe 4 - Luxo' ? 4.0 : imovel.classe_ipead === 'Classe 3 - Alto' ? 5.0 : 6.0
+    const custosFixos = reforma + debitosArr + holding + doc + advogado + registro + custoJuridico
+    return aluguelMensal > 0 ? (aluguelMensal * 12) / (capRatePct / 100) - custosFixos : 0
+  })()
   const lanceViavel = precoAquisicao <= maoFlip
+
   return (
     <div style={{ marginTop: 20 }}>
       <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
@@ -80,6 +97,26 @@ export default function CalculadoraROI({ imovel }) {
           {eMercado ? 'Calculadora de Retorno — Compra Direta' : 'Calculadora de Retorno'}
         </h4>
       </div>
+
+      {/* Toggle Mercado Bruto vs Ajustado */}
+      <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10, padding:'8px 12px',
+        borderRadius:8, background:usarHomogeneizado ? '#EFF6FF' : '#F0FDF4',
+        border:`1px solid ${usarHomogeneizado ? '#BFDBFE' : '#BBF7D0'}` }}>
+        <button onClick={() => setUsarHomogeneizado(false)} style={{
+          padding:'4px 10px', borderRadius:6, fontSize:11, fontWeight:600, cursor:'pointer',
+          border:'1px solid #BBF7D0', background: !usarHomogeneizado ? '#065F46' : '#fff',
+          color: !usarHomogeneizado ? '#fff' : '#64748B',
+        }}>● Mercado bruto {fmt(vmercadoBruto)}</button>
+        <button onClick={() => setUsarHomogeneizado(true)} style={{
+          padding:'4px 10px', borderRadius:6, fontSize:11, fontWeight:500, cursor:'pointer',
+          border:'1px solid #BFDBFE', background: usarHomogeneizado ? '#1D4ED8' : '#fff',
+          color: usarHomogeneizado ? '#fff' : '#64748B',
+        }}>Ajustado NBR {fmt(vmercadoAjustado)}</button>
+        {ajustadoAcimaDaMed && usarHomogeneizado && (
+          <span style={{ fontSize:10, color:'#D97706', fontWeight:600 }}>⚠️ Acima da média do bairro</span>
+        )}
+      </div>
+
       <div style={{ background:C.surface, borderRadius:10, padding:'12px 14px', marginBottom:12 }}>
         <p style={{ margin:'0 0 8px', fontSize:11, fontWeight:600, color:C.muted,
           textTransform:'uppercase', letterSpacing:'0.5px' }}>Custo Total de Aquisição</p>
@@ -89,9 +126,11 @@ export default function CalculadoraROI({ imovel }) {
           [`ITBI (${imovel.itbi_pct ?? _tab.itbi_pct}%)`, fmt(itbi)],
           [`Documentação (${String(_tab.documentacao_pct).replace('.', ',')}%)`, fmt(doc)],
           ...(eMercado ? [] : [[`Honorários advocacia (${_tab.advogado_pct}%)`, fmt(advogado)]]),
-          ['Registro cartório', fmt(registro)],
+          registro > 0 ? ['Registro cartório', fmt(registro)] : null,
           custoJuridico > 0 ? ['Custo jurídico estimado', fmt(custoJuridico)] : null,
+          debitosArr > 0 ? ['Débitos (arrematante)', fmt(debitosArr)] : null,
           reforma > 0 ? ['Reforma estimada', fmt(reforma)] : null,
+          holding > 0 ? [`Holding ${HOLDING_MESES_PADRAO}m (cond.+IPTU)`, fmt(holding)] : null,
         ].filter(Boolean).map(([k,v]) => (
           <div key={k} style={{ display:'flex', justifyContent:'space-between',
             padding:'4px 0', borderBottom:`1px solid ${C.borderW}`, fontSize:12 }}>
@@ -105,6 +144,7 @@ export default function CalculadoraROI({ imovel }) {
           <span style={{ fontWeight:800, color:C.navy }}>{fmt(custoTotal)}</span>
         </div>
       </div>
+
       <div style={{ display:'flex', gap:4, marginBottom:12 }}>
         {[['flip','🔄 Flip'],['locacao','🏠 Locação'],['financiado','🏦 Financiado']].map(([k,l]) => (
           <button key={k} onClick={() => setEstrategia(k)} style={{
@@ -115,6 +155,7 @@ export default function CalculadoraROI({ imovel }) {
           }}>{l}</button>
         ))}
       </div>
+
       {estrategia === 'flip' && (
         <div style={{ background:roiFlip > 20 ? C.emeraldL : C.surface,
           borderRadius:10, padding:'14px 16px' }}>
@@ -129,9 +170,23 @@ export default function CalculadoraROI({ imovel }) {
                 color: lucroFlip > 0 ? C.emerald : RED }}>{fmt(lucroFlip)}</p>
             </div>
           </div>
-          <div style={{ background:C.white, borderRadius:8, padding:'8px 12px',
+          {/* Detalhamento deduções */}
+          {[
+            ['Corretagem de venda (6%)', fmt(corretagemVenda)],
+            vmercado > 440000 && irpfGanho > 0 ? ['IRPF 15% g.c.', fmt(irpfGanho)] : null,
+          ].filter(Boolean).map(([k,v]) => (
+            <div key={k} style={{ display:'flex', justifyContent:'space-between',
+              padding:'3px 0', borderBottom:`1px solid ${C.borderW}`, fontSize:11 }}>
+              <span style={{ color:C.muted }}>{k}</span>
+              <span style={{ color:'#92400E' }}>−{v}</span>
+            </div>
+          ))}
+          <div style={{ background:C.white, borderRadius:8, padding:'8px 12px', marginTop:8,
             display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-            <span style={{ fontSize:12, color:C.muted }}>ROI estimado</span>
+            <div>
+              <span style={{ fontSize:12, color:C.muted }}>ROI estimado</span>
+              <div style={{ fontSize:9, color:C.hint, marginTop:1 }}>Líquido — inclui corretagem 6%</div>
+            </div>
             <span style={{ fontSize:18, fontWeight:800,
               color: roiFlip > 30 ? C.emerald : roiFlip > 15 ? C.mustard : RED }}>
               {pct(roiFlip)}
@@ -141,7 +196,7 @@ export default function CalculadoraROI({ imovel }) {
             <div style={{background:C.surface, borderRadius:8, padding:'8px 12px',
               marginTop:8, border:`1px solid ${lanceViavel ? C.emerald+'40' : RED+'40'}`}}>
               <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-                <span style={{fontSize:11, color:C.muted}}>{eMercado ? 'Preço máximo (margem 20%)' : 'Lance máximo (margem 20%)'}</span>
+                <span style={{fontSize:11, color:C.muted}}>{eMercado ? 'Preço máximo (ROI 20%)' : 'Lance máximo (ROI 20%)'}</span>
                 <span style={{fontSize:14, fontWeight:800,
                   color: lanceViavel ? C.emerald : RED}}>{fmt(maoFlip)}</span>
               </div>
@@ -151,16 +206,18 @@ export default function CalculadoraROI({ imovel }) {
                   ? (eMercado ? '✓ Preço pedido dentro da margem' : '✓ Lance atual está dentro do MAO')
                   : (eMercado ? '✗ Preço pedido supera a margem' : '✗ Lance atual supera o MAO')}
               </p>
+              <div style={{fontSize:9, color:C.hint, marginTop:3}}>Inclui débitos, holding e reforma no cálculo</div>
             </div>
           )}
         </div>
       )}
+
       {estrategia === 'locacao' && (
         <div style={{ background:C.surface, borderRadius:10, padding:'14px 16px' }}>
           {[
             ['Aluguel mensal estimado', fmt(aluguelMensal)],
             ['Renda bruta anual', fmt(rendaAnual)],
-            ['Yield bruto a.a.', pct(yieldLiquido)],
+            ['Yield s/ investimento', pct(yieldLiquido)],
           ].map(([k,v]) => (
             <div key={k} style={{ display:'flex', justifyContent:'space-between',
               padding:'5px 0', borderBottom:`1px solid ${C.borderW}`, fontSize:12 }}>
@@ -170,7 +227,7 @@ export default function CalculadoraROI({ imovel }) {
           ))}
           {maoLocacao > 0 && (
             <div style={{background:C.surface, borderRadius:8, padding:'8px 12px', marginTop:8}}>
-              <span style={{fontSize:11, color:C.muted}}>{eMercado ? 'Preço máximo' : 'Lance máximo'} (yield {capRatePct}% a.a.)</span>
+              <span style={{fontSize:11, color:C.muted}}>{eMercado ? 'Preço máximo' : 'Lance máximo'} (yield 6% a.a.)</span>
               <span style={{fontSize:14, fontWeight:800, color:C.navy, marginLeft:8}}>
                 {fmt(maoLocacao)}
               </span>
@@ -178,6 +235,7 @@ export default function CalculadoraROI({ imovel }) {
           )}
         </div>
       )}
+
       {estrategia === 'financiado' && (
         <div style={{ background:C.surface, borderRadius:10, padding:'14px 16px' }}>
           <div style={{ display:'flex', gap:8, marginBottom:10 }}>

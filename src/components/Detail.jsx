@@ -19,7 +19,7 @@ import PainelRentabilidade from './PainelRentabilidade.jsx'
 import { isMercadoDireto } from '../lib/detectarFonte.js'
 import { calcularCustosAquisicao, MULT_CUSTO_RAPIDO } from '../lib/constants.js'
 import CenariosReforma from './CenariosReforma.jsx'
-import { ReformaProvider } from '../hooks/useReforma.jsx'
+import { ReformaProvider, useReforma } from '../hooks/useReforma.jsx'
 import CustosReaisEditor from './CustosReaisEditor.jsx'
 import ComparaveisComFiltros from './ComparaveisComFiltros.jsx'
 const LazyMapaLocais = lazy(() => import('./MapaLocaisProximos.jsx'))
@@ -635,6 +635,54 @@ function AbaArremates({ imovel }) {
           )}
         </>
       )}
+    </div>
+  )
+}
+
+// Sprint 22: ROI dinâmico sincronizado com ConfigEstudo (deve estar dentro do ReformaProvider)
+function RoiLiveBanner({ imovel }) {
+  const { lanceEstudo, custoReformaAtual, cenarioSimplificado } = useReforma()
+  const { isMercadoDireto: _imd } = { isMercadoDireto: (url, t) => t === 'mercado_direto' || (url||'').includes('zapimoveis') || (url||'').includes('vivareal') }
+  const eMercado = imovel?.tipo_transacao === 'mercado_direto' || (imovel?.fonte_url||'').includes('zapimoveis')
+  const lance = lanceEstudo || parseFloat(imovel?.preco_pedido || imovel?.valor_minimo) || 0
+  const mercado = parseFloat(imovel?.valor_mercado_estimado) || 0
+  if (!lance || !mercado) return null
+
+  const { calcularBreakdownFinanceiro: calcBD } = { calcularBreakdownFinanceiro: null }
+  // Cálculo inline simplificado para o banner
+  const { CUSTOS_LEILAO: CL, CUSTOS_MERCADO: CM, IPTU_SOBRE_CONDO_RATIO: IPCR, HOLDING_MESES_PADRAO: HMP } = {
+    CUSTOS_LEILAO: { comissao_leiloeiro_pct: 5, itbi_pct: 3, advogado_pct: 5, documentacao_pct: 0.5, registro_fixo: 0 },
+    CUSTOS_MERCADO: { comissao_leiloeiro_pct: 0, itbi_pct: 3, advogado_pct: 0, documentacao_pct: 0.5, registro_fixo: 0 },
+    IPTU_SOBRE_CONDO_RATIO: 0.35,
+    HOLDING_MESES_PADRAO: 6,
+  }
+  const tab = eMercado ? CM : CL
+  const pctTaxas = (tab.comissao_leiloeiro_pct + tab.itbi_pct + tab.advogado_pct + tab.documentacao_pct) / 100
+  const condo = parseFloat(imovel?.condominio_mensal || 0)
+  const iptu = parseFloat(imovel?.iptu_mensal || 0) || (condo > 0 ? Math.round(condo * IPCR) : 0)
+  const holding = HMP * (condo + iptu)
+  const debitos = imovel?.responsabilidade_debitos === 'arrematante' ? parseFloat(imovel?.debitos_total_estimado || 0) : 0
+  const investTotal = lance * (1 + pctTaxas) + custoReformaAtual + holding + debitos
+  const lucro = mercado * 0.94 - investTotal
+  const roi = investTotal > 0 ? (lucro / investTotal) * 100 : 0
+  const roiColor = roi >= 20 ? '#065F46' : roi >= 10 ? '#D97706' : roi >= 0 ? '#92400E' : '#991B1B'
+  const roiBg = roi >= 20 ? '#ECFDF5' : roi >= 10 ? '#FEF3C7' : roi >= 0 ? '#FFFBEB' : '#FEF2F2'
+  const fmtV = v => `R$ ${Math.round(v).toLocaleString('pt-BR')}`
+  const CENARIO_LABEL = { sem_reforma: 'Sem reforma', basica: 'Básica', media: 'Média', completa: 'Completa' }
+  return (
+    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',
+      padding:'10px 14px',borderRadius:8,marginBottom:12,background:roiBg,
+      border:`1px solid ${roiColor}30`}}>
+      <div style={{fontSize:11,color:'#64748B'}}>
+        <div style={{fontWeight:600,color:'#334155'}}>ROI ao vivo — {CENARIO_LABEL[cenarioSimplificado]||cenarioSimplificado}</div>
+        <div>Lance {fmtV(lance)} · Reforma {fmtV(custoReformaAtual)} · Invest. {fmtV(investTotal)}</div>
+        <div style={{fontSize:9,color:'#94A3B8',marginTop:1}}>Líquido — inclui corretagem 6% + holding + débitos</div>
+      </div>
+      <div style={{textAlign:'right'}}>
+        <div style={{fontSize:22,fontWeight:800,color:roiColor,lineHeight:1}}>{roi >= 0 ? '+' : ''}{roi.toFixed(1)}%</div>
+        <div style={{fontSize:9,color:roiColor,fontWeight:600}}>ROI flip</div>
+        <div style={{fontSize:10,color:lucro>=0?'#065F46':'#991B1B',fontWeight:600}}>{fmtV(Math.abs(lucro))}</div>
+      </div>
     </div>
   )
 }
@@ -1272,7 +1320,7 @@ for (const s of SCORES) {
           {icon:'🚿',label:'Banheiros',value:p.banheiros||'—'},
           {icon:'🚗',label:'Vagas',value:p.vagas||'—'},
           ...(p.nome_condominio?[{icon:'🏢',label:'Condomínio',value:p.nome_condominio.split('(')[0].trim().substring(0,20),sub:p.condominio_mensal?`R$ ${Math.round(p.condominio_mensal)}/mês`:null}]:[]),
-          ...(p.roi_estimado?[{icon:'📈',label:'ROI',value:`${p.roi_estimado}%`,sub:'estimado'}]:[]),
+          // ROI estático removido — use o banner dinâmico abaixo do ConfigEstudo
         ].map((a,i) => (
           <div key={i} style={{background:'#fff',border:`1px solid ${C.borderW}`,borderRadius:10,padding:'10px 12px',textAlign:'center'}}>
             <div style={{fontSize:20,marginBottom:2}}>{a.icon}</div>
@@ -1416,8 +1464,18 @@ for (const s of SCORES) {
       {!isMercadoDireto(p.fonte_url, p.tipo_transacao) && <PainelLeilao imovel={p} isAdmin={isAdmin} />}
       {/* ═══ ReformaProvider: sincroniza cenário de reforma entre painéis ═══ */}
       <ReformaProvider imovel={p}>
+        {/* Sprint 22: Alerta jurídico alto antes do estudo financeiro */}
+        {(p.score_juridico != null && p.score_juridico < 4) && (
+          <div style={{padding:'10px 14px',borderRadius:8,marginBottom:12,
+            background:'#FEF2F2',border:'1.5px solid #FECACA',
+            fontSize:12,color:'#991B1B',fontWeight:600}}>
+            ⚠️ Risco jurídico alto (score {Number(p.score_juridico).toFixed(1)}) — revise a aba Jurídico antes de calcular o lance
+          </div>
+        )}
         {/* Sprint 18: Configuração global do estudo (lance + reforma) */}
         <ConfigEstudo imovel={p} />
+        {/* Sprint 22: ROI dinâmico — sincronizado com lance e reforma do ConfigEstudo */}
+        <RoiLiveBanner imovel={p} />
         {/* Mostrar PainelLancamento só para leilões */}
         {!isMercadoDireto(p.fonte_url, p.tipo_transacao) && <PainelLancamento imovel={p}/>}
         {/* Sprint 11: Breakdown financeiro + ROI + Preditor de Concorrência */}
@@ -1527,7 +1585,16 @@ for (const s of SCORES) {
       </div>
       <div style={{display:"grid",gridTemplateColumns:isPhone?"1fr":"1fr 1fr",gap:"14px",marginBottom:"14px"}}>
         <div style={card()}>
-          <div style={{fontWeight:"600",color:K.wh,marginBottom:"12px",fontSize:"13px"}}>⚖️ Jurídico</div>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:"12px"}}>
+            <div style={{fontWeight:"600",color:K.wh,fontSize:"13px"}}>⚖️ Jurídico</div>
+            {p.score_juridico != null && (
+              <span style={{fontSize:10,fontWeight:700,padding:'2px 8px',borderRadius:10,
+                background: p.score_juridico < 4 ? '#FEF2F2' : p.score_juridico < 6.5 ? '#FEF3C7' : '#ECFDF5',
+                color: p.score_juridico < 4 ? '#991B1B' : p.score_juridico < 6.5 ? '#D97706' : '#065F46'}}>
+                {p.score_juridico < 4 ? '🔴 Alto' : p.score_juridico < 6.5 ? '🟡 Moderado' : '🟢 Baixo'}
+              </span>
+            )}
+          </div>
           {[["Processos",p.processos_ativos,{Nenhum:K.grn,Possível:K.amb,Confirmado:K.red,Desconhecido:K.t3}],
             ["Matrícula",p.matricula_status,{Limpa:K.grn,"Com ônus":K.red,Desconhecido:K.t3}],
             ["Déb. condomínio",p.debitos_condominio,{"Sem débitos":K.grn,"Com débitos":K.red,Desconhecido:K.t3}],
@@ -1588,7 +1655,8 @@ for (const s of SCORES) {
             const _custos = calcularCustosAquisicao(precoBase, eMerc, _overrides)
             const custoCalc = p.custo_total_aquisicao || (_custos?.total || 0)
             return custoCalc>0?<>
-            <div style={{fontWeight:"600",color:K.amb,marginBottom:"10px",fontSize:"13px"}}>🧾 Custo total {p.custo_total_aquisicao?'real':'estimado'}</div>
+            <div style={{fontWeight:"600",color:K.amb,marginBottom:"4px",fontSize:"13px"}}>🧾 Custo total {p.custo_total_aquisicao?'real':'estimado'} <span style={{fontSize:9,fontWeight:500,color:K.t3}}>— snapshot IA</span></div>
+            <div style={{fontSize:10,color:K.t3,marginBottom:8}}>Para valores atualizados com seu lance, use os painéis acima.</div>
             {[[eMerc?"Preço pedido":"Lance mínimo",fmtC(precoBase)],...(!eMerc&&_custos?.comissao>0?[["Comissão leiloeiro",fmtC(_custos.comissao)]]:[]),["ITBI",fmtC(_custos?.itbi||0)],["Doc + Registro",fmtC((_custos?.documentacao||0)+(_custos?.registro||0))],...(!eMerc&&_custos?.advogado>0?[["Advogado",fmtC(_custos.advogado)]]:[]),["Regularização",fmtC(p.custo_regularizacao)]].filter(([,v])=>v&&v!=="R$ 0"&&v!=="R$ NaN").map(([l,v])=>(
               <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"4px 0",fontSize:"12px"}}>
                 <span style={{color:K.t3}}>{l}</span><span style={{color:K.tx}}>{v}</span>
