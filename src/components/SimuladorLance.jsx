@@ -5,7 +5,7 @@
  */
 import { useState, useMemo, useEffect } from 'react'
 import { C, card, fmtC } from '../appConstants.js'
-import { calcularBreakdownFinanceiro, calcularROI, calcularLanceMaximoParaROI, HOLDING_MESES_PADRAO, IPTU_SOBRE_CONDO_RATIO } from '../lib/constants.js'
+import { calcularBreakdownFinanceiro, calcularROI, calcularLanceMaximoParaROI, calcularPreditorConcorrencia, HOLDING_MESES_PADRAO, IPTU_SOBRE_CONDO_RATIO } from '../lib/constants.js'
 import { isMercadoDireto } from '../lib/detectarFonte.js'
 import { useReforma } from '../hooks/useReforma.jsx'
 import { InputMoeda } from './ConfigEstudo.jsx'
@@ -57,6 +57,14 @@ export default function SimuladorLance({ p, isPhone = false }) {
     const roi2 = calcularROI(bd2.investimentoTotal, mercado, aluguel)
     return { bd1, bd2, inv1: bd1.investimentoTotal, inv2: bd2.investimentoTotal, roi1, roi2 }
   }, [])
+
+  // Preditor de concorrência — quantos lances até perder o ROI alvo
+  const preditor = useMemo(() => {
+    if (eMercado || !mercado || !lanceMaxROI) return []
+    const custosFixos = sim.bd.totalCustos + (custoReformaManual || 0) + holdingEstudo +
+      (p.responsabilidade_debitos === 'arrematante' ? parseFloat(p.debitos_total_estimado || 0) : 0)
+    return calcularPreditorConcorrencia(lanceCustom, mercado, custosFixos, 5000)
+  }, [lanceCustom, mercado, lanceMaxROI, custoReformaManual])
 
   const roiVal = sim.roi?.roi ?? 0
   const roiColor = roiVal >= 15 ? '#065F46' : roiVal >= 0 ? '#92400E' : '#991B1B'
@@ -158,6 +166,37 @@ export default function SimuladorLance({ p, isPhone = false }) {
           </>
         )}
       </div>
+
+      {/* Preditor de Concorrência */}
+      {preditor.length > 0 && !eMercado && (
+        <div style={{marginTop:10, padding:'10px 12px', borderRadius:8,
+          background:'#0F172A', border:'1px solid #1E293B'}}>
+          <div style={{fontSize:10, fontWeight:700, color:'#94A3B8', textTransform:'uppercase',
+            letterSpacing:'.5px', marginBottom:8}}>
+            🎯 Lances disponíveis (incrementos R$ 5k)
+          </div>
+          <div style={{display:'flex', gap:6, flexWrap:'wrap'}}>
+            {preditor.slice(0, 4).map((nivel, i) => (
+              <button key={i} onClick={() => setLanceCustom(nivel.lanceAtual)}
+                style={{flex:1, minWidth:90, padding:'7px 6px', borderRadius:7, cursor:'pointer',
+                  border: lanceCustom === nivel.lanceAtual ? '2px solid #22D3EE' : '1px solid #334155',
+                  background: lanceCustom === nivel.lanceAtual ? '#164E63' : '#1E293B'}}>
+                <div style={{fontSize:10, color:'#94A3B8', fontWeight:600}}>{nivel.label}</div>
+                <div style={{fontSize:12, fontWeight:800, color:'#F1F5F9', marginTop:1}}>{fmtC(nivel.lanceAtual)}</div>
+                <div style={{fontSize:11, fontWeight:700,
+                  color: nivel.roiReal >= 20 ? '#4ADE80' : nivel.roiReal >= 10 ? '#FBBF24' : '#F87171',
+                  marginTop:1}}>
+                  ROI {nivel.roiReal > 0 ? '+' : ''}{nivel.roiReal}%
+                </div>
+                <div style={{fontSize:9, color:'#64748B', marginTop:1}}>+{nivel.numLances} lances</div>
+              </button>
+            ))}
+          </div>
+          <div style={{fontSize:9, color:'#475569', marginTop:6}}>
+            Clique para simular o lance naquele nível de concorrência
+          </div>
+        </div>
+      )}
 
       {/* Comparativo 1ª vs 2ª Praça */}
       {showComparativo && comp && (

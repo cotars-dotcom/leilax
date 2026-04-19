@@ -18,6 +18,7 @@ import TimelineMatricula from './TimelineMatricula.jsx'
 import PainelRentabilidade from './PainelRentabilidade.jsx'
 import { isMercadoDireto } from '../lib/detectarFonte.js'
 import { calcularCustosAquisicao, MULT_CUSTO_RAPIDO, CUSTOS_LEILAO, CUSTOS_MERCADO, IPTU_SOBRE_CONDO_RATIO, HOLDING_MESES_PADRAO, calcularLanceMaximoParaROI, calcularSobrecapitalizacao, IRPF_ISENCAO_TETO } from '../lib/constants.js'
+import { calcularConfidence } from '../lib/agenteConfidenceBadge.js'
 import CenariosReforma from './CenariosReforma.jsx'
 import { ReformaProvider, useReforma } from '../hooks/useReforma.jsx'
 import CustosReaisEditor from './CustosReaisEditor.jsx'
@@ -781,6 +782,36 @@ function AvaliacaoInfladaBanner({ imovel }) {
           Atenção também ao ITBI: calculado sobre o maior entre valor venal e valor da transação.
         </div>
       </div>
+    </div>
+  )
+}
+
+
+// Painel de confiança calculado dinamicamente pelo agenteConfidenceBadge
+function ConfidencePanel({ imovel }) {
+  const conf = calcularConfidence(imovel)
+  if (!imovel) return null
+  return (
+    <div style={{background:`${conf.cor}08`, border:`1px solid ${conf.cor}30`,
+      borderRadius:8, padding:'8px 14px', marginBottom:12}}>
+      <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:4}}>
+        <span style={{fontSize:11, fontWeight:700, color:conf.cor}}>
+          🎯 Confiança da análise: {conf.nivel} ({conf.score}/100)
+        </span>
+        <div style={{display:'flex', gap:2}}>
+          {[0,1,2,3,4].map(i => (
+            <div key={i} style={{
+              width:16, height:6, borderRadius:3,
+              background: conf.score >= (i+1)*20 ? conf.cor : `${conf.cor}25`
+            }}/>
+          ))}
+        </div>
+      </div>
+      {conf.fraquezas.length > 0 && (
+        <div style={{fontSize:10, color:'#64748B'}}>
+          ⚠️ {conf.fraquezas.slice(0,2).join(' · ')}
+        </div>
+      )}
     </div>
   )
 }
@@ -1672,6 +1703,7 @@ for (const s of SCORES) {
         <KillSwitchJuridicoBanner imovel={p} />
         <AvaliacaoInfladaBanner imovel={p} />
         <IsencaoIRPFBanner imovel={p} />
+        <ConfidencePanel imovel={p} />
         <SobrecapBanner imovel={p} />
         <DadosInsuficientesBanner imovel={p} />
         <LanceAcimaMercadoBanner imovel={p} />
