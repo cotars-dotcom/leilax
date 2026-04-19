@@ -56,11 +56,13 @@ export async function gerarAnalise(imovel) {
   const {
     valor_minimo: lance1, valor_avaliacao: aval, valor_mercado_estimado: vmercado,
     custo_reforma_calculado: reforma, custo_juridico_estimado: juridico,
-    comparaveis, area_m2, preco_m2_imovel, preco_m2_mercado,
+    comparaveis, area_m2, area_privativa_m2, area_usada_calculo_m2, preco_m2_imovel, preco_m2_mercado,
     num_leilao, data_leilao, classe_ipead, aluguel_mensal_estimado: aluguel,
     prazo_liberacao_estimado_meses: prazoLib,
     condominio_mensal, iptu_mensal, debitos_total_estimado, responsabilidade_debitos
   } = imovel
+
+  const areaCalculo = area_usada_calculo_m2 || area_privativa_m2 || area_m2
 
   const avaliacao  = parseFloat(aval) || 0
   const lancePrin  = parseFloat(lance1) || 0
@@ -143,7 +145,7 @@ export async function gerarAnalise(imovel) {
     desconto_mercado_pct: vMercado > 0 ? parseFloat(((1 - lancePrin/vMercado)*100).toFixed(1)) : 0,
     valor_mercado: vMercado,
     valor_pos_reforma: parseFloat(imovel.valor_pos_reforma_estimado) || null,
-    area_m2: parseFloat(area_m2),
+    area_m2: parseFloat(areaCalculo),
     preco_m2_imovel: parseFloat(preco_m2_imovel),
     preco_m2_mercado: parseFloat(preco_m2_mercado),
     lance_2_piso: Math.round(lance2Piso),

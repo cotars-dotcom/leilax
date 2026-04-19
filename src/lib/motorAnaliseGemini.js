@@ -573,8 +573,8 @@ export async function analisarComGemini(url, geminiKey, parametros, onProgress, 
 
   // Fallback: calcular aluguel se Gemini retornou 0
   if ((!analiseGemini.aluguel_mensal_estimado || analiseGemini.aluguel_mensal_estimado === 0) &&
-      analiseGemini.preco_m2_mercado > 0 && (camposBasicos.area_m2 || analiseGemini.area_m2)) {
-    const area = camposBasicos.area_m2 || analiseGemini.area_m2
+      analiseGemini.preco_m2_mercado > 0 && (camposBasicos.area_usada_calculo_m2 || camposBasicos.area_privativa_m2 || camposBasicos.area_m2 || analiseGemini.area_usada_calculo_m2 || analiseGemini.area_privativa_m2 || analiseGemini.area_m2)) {
+    const area = camposBasicos.area_usada_calculo_m2 || camposBasicos.area_privativa_m2 || camposBasicos.area_m2 || analiseGemini.area_usada_calculo_m2 || analiseGemini.area_privativa_m2 || analiseGemini.area_m2
     const yieldMap = { Popular: 0.075, Médio: 0.060, Medio: 0.060, Alto: 0.050, Luxo: 0.040 }
     const yieldAnual = contextoMercado?.yield_bruto_pct ? contextoMercado.yield_bruto_pct / 100
       : yieldMap[analiseGemini.classe_ipead] || 0.060
@@ -690,7 +690,7 @@ export async function analisarComGemini(url, geminiKey, parametros, onProgress, 
       )
       const custoReforma = calcularCustoReforma({
         escopo: analise.escopo_reforma || 'refresh_giro',
-        area_m2: analise.area_m2,
+        area_m2: analise.area_usada_calculo_m2 || analise.area_privativa_m2 || analise.area_m2,
         classe: classeDetectada?.classe,
         preco_m2_imovel: analise.preco_m2_imovel,
         valor_imovel: analise.valor_mercado_estimado || analise.valor_avaliacao

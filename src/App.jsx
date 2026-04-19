@@ -722,8 +722,8 @@ function NovoImovel({onSave,onCancel,onNav,trello,parametrosBanco,criteriosBanco
                       aluguel_mensal_estimado: alugRef,
                       condominio_mensal: info.condominioMensal || null,
                       valor_mercado_estimado: im.preco || 0,
-                      preco_m2_imovel: im.area_m2 > 0 ? Math.round((im.preco||0) / im.area_m2) : 0,
-                      preco_m2_mercado: im.area_m2 > 0 ? Math.round((im.preco||0) / im.area_m2) : 0,
+                      preco_m2_imovel: (im.area_usada_calculo_m2||im.area_privativa_m2||im.area_m2) > 0 ? Math.round((im.preco||0) / (im.area_usada_calculo_m2||im.area_privativa_m2||im.area_m2)) : 0,
+                      preco_m2_mercado: (im.area_usada_calculo_m2||im.area_privativa_m2||im.area_m2) > 0 ? Math.round((im.preco||0) / (im.area_usada_calculo_m2||im.area_privativa_m2||im.area_m2)) : 0,
                       score_total: 0, recomendacao: 'AGUARDAR',
                       _modelo_usado: 'gemini-grounding-condominio',
                       alertas: ['[INFO] Dados via Gemini Grounding — reanalisar para score completo'],
@@ -810,7 +810,7 @@ function NovoImovel({onSave,onCancel,onNav,trello,parametrosBanco,criteriosBanco
           }
           if (docs.rgi) {
             data.rgi_dados = docs.rgi
-            if (docs.rgi.area_m2 && !data.area_usada_calculo_m2) data.area_usada_calculo_m2 = docs.rgi.area_m2
+            if (!data.area_usada_calculo_m2) data.area_usada_calculo_m2 = docs.rgi.area_privativa_m2 || docs.rgi.area_m2
             if (docs.rgi.onus?.length > 0) data.riscos_presentes = [...(data.riscos_presentes||[]), ...docs.rgi.onus]
           }
           if (docs.debitos) {
