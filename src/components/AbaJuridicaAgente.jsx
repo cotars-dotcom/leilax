@@ -6,6 +6,7 @@ import { buscarDocumentosAuto, analisarTextoJuridicoGemini,
          analisarPDFBase64Gemini, calcularNovoScoreJuridico } from '../lib/agenteJuridico.js'
 import { processarDocumentoCompleto } from '../lib/documentosPDF.js'
 import { analisarImagemJuridicaGPT } from '../lib/analisadorJuridico.js'
+import { consultarProcesso, normalizarNumeroCNJ } from '../lib/agenteDatajud.js'
 
 const GRAVIDADE_COR = { critico:'#A32D2D', alto:C.mustard, medio:'#185FA5', baixo:C.emerald }
 const GRAVIDADE_BG  = { critico:'#FCEBEB', alto:'#FAEEDA', medio:'#E6F1FB', baixo:C.emeraldL }
@@ -271,6 +272,65 @@ function CardDoc({ doc, onAnalisarDoc }) {
 }
 
 // ─── COMPONENTE PRINCIPAL ────────────────────────────────────────────────────
+
+// Componente de consulta Datajud inline
+function DatajudConsulta({ imovelId, processoNumero }) {
+  const [dados, setDados] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [erro, setErro] = useState(null)
+
+  const consultar = async () => {
+    setLoading(true); setErro(null)
+    try {
+      const res = await consultarProcesso(processoNumero)
+      setDados(res)
+    } catch(e) {
+      setErro(e.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (!dados) return (
+    <button onClick={consultar} disabled={loading}
+      style={{marginTop:6, padding:'3px 10px', borderRadius:5, fontSize:10, fontWeight:700,
+        border:'1px solid #2563EB50', background:'#DBEAFE', color:'#1D4ED8',
+        cursor: loading ? 'wait' : 'pointer', opacity: loading ? 0.7 : 1}}>
+      {loading ? '⏳ Consultando Datajud...' : '🔍 Consultar no Datajud CNJ'}
+    </button>
+  )
+
+  if (dados.erro) return (
+    <div style={{fontSize:10, color:'#B91C1C', marginTop:4}}>
+      ⚠️ Erro Datajud: {dados.erro}
+    </div>
+  )
+
+  if (!dados.encontrado) return (
+    <div style={{fontSize:10, color:'#6B7280', marginTop:4}}>
+      Processo não localizado no Datajud ({dados.tribunal})
+    </div>
+  )
+
+  return (
+    <div style={{marginTop:6, fontSize:11, color:'#1E3A5F', lineHeight:1.6}}>
+      <div><strong>Classe:</strong> {dados.classe}</div>
+      <div><strong>Órgão:</strong> {dados.orgaoJulgador}</div>
+      <div><strong>Ajuizamento:</strong> {dados.dataAjuizamento} · <strong>Atualização:</strong> {dados.ultimaAtualizacao}</div>
+      {dados.movimentosRelevantes?.length > 0 && (
+        <div style={{marginTop:4}}>
+          <strong>Movimentos relevantes:</strong>
+          {dados.movimentosRelevantes.map((m, i) => (
+            <div key={i} style={{paddingLeft:8, fontSize:10, color:'#374151'}}>
+              {m.data} · {m.nome}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function AbaJuridicaAgente({ imovel, isAdmin, onReclassificado }) {
   const [subAba, setSubAba] = useState('situacao')
   const [docs, setDocs] = useState([])
@@ -755,6 +815,19 @@ export default function AbaJuridicaAgente({ imovel, isAdmin, onReclassificado })
             {imovel.obs_juridicas && (
               <div style={{marginTop:8, fontSize:11, color:C.muted, padding:'6px 10px', background:C.surface, borderRadius:6}}>
                 {imovel.obs_juridicas}
+              </div>
+            )}
+            {/* Número do processo formatado + link Datajud */}
+            {imovel.processo_numero && !imovel.processo_numero.includes('0000000-00') && (
+              <div style={{marginTop:10, padding:'8px 10px', background:'#EFF6FF', borderRadius:7, border:'1px solid #BFDBFE'}}>
+                <div style={{fontSize:10, color:'#1D4ED8', fontWeight:700, marginBottom:4}}>⚖️ Processo CNJ</div>
+                <div style={{fontSize:12, fontFamily:'monospace', color:'#1E40AF', fontWeight:600}}>
+                  {normalizarNumeroCNJ(imovel.processo_numero)}
+                </div>
+                {imovel.vara_judicial && (
+                  <div style={{fontSize:10, color:'#3B82F6', marginTop:2}}>{imovel.vara_judicial}</div>
+                )}
+                <DatajudConsulta imovelId={imovel.id} processoNumero={imovel.processo_numero} />
               </div>
             )}
           </div>

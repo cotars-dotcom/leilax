@@ -9,7 +9,7 @@ import { useState, useRef } from 'react'
 import { C, card, fmtC } from '../appConstants.js'
 import { useReforma } from '../hooks/useReforma.jsx'
 import { isMercadoDireto } from '../lib/detectarFonte.js'
-import { CUSTOS_LEILAO, CUSTOS_MERCADO, HOLDING_MESES_PADRAO, IPTU_SOBRE_CONDO_RATIO } from '../lib/constants.js'
+import { CUSTOS_LEILAO, CUSTOS_MERCADO, HOLDING_MESES_PADRAO, IPTU_SOBRE_CONDO_RATIO, calcularLanceMaximoParaROI } from '../lib/constants.js'
 
 /** Input com formatação de moeda brasileira */
 function InputMoeda({ value, onChange, label, cor, small }) {
@@ -90,6 +90,14 @@ export default function ConfigEstudo({ imovel }) {
     ? { texto: '⏳ Aguardar 2ª praça', lance: lance2p, destaque: true }
     : { texto: '1ª Praça', lance: lance1p }
 
+  // MAO Locação: lance máximo para yield de 6% (típico BH)
+  const yieldAlvoLocacao = 6  // % anual — ajustável
+  const aluguelMensal = parseFloat(p.aluguel_mensal_estimado || 0)
+  const maoLocacao = aluguelMensal > 0 && mercado > 0
+    ? Math.max(0, Math.round((aluguelMensal * 12 / (yieldAlvoLocacao / 100)) - custoReformaAtual - holding - debitosArr))
+    : parseFloat(p.mao_locacao || 0)
+  const acimaMAOLocacao = lanceEstudo > 0 && maoLocacao > 0 && lanceEstudo > maoLocacao
+
   const pctAvaliacao = avaliacao > 0 ? Math.round((lanceEstudo / avaliacao) * 100) : 0
   const acimaMAO = lanceEstudo > 0 && mao > 0 && lanceEstudo > mao
 
@@ -157,6 +165,37 @@ export default function ConfigEstudo({ imovel }) {
             </div>
           )}
         </div>
+
+        {/* MAO Locação */}
+        {maoLocacao > 0 && (
+          <div style={{ flex: '0 0 auto', minWidth: 140 }}>
+            <div style={{ fontSize: 9, color: acimaMAOLocacao ? '#B45309' : '#7C3AED', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.3px', marginBottom: 3 }}>
+              MAO p/ Locação {yieldAlvoLocacao}%
+            </div>
+            <div
+              onClick={() => maoLocacao > 0 && setLanceEstudo(maoLocacao)}
+              title="Clique para aplicar o MAO de locação como lance"
+              style={{
+                padding: '8px 12px', borderRadius: 8, cursor: 'pointer',
+                border: `2px solid ${acimaMAOLocacao ? '#B45309' : '#7C3AED'}30`,
+                background: acimaMAOLocacao ? '#FFFBEB' : '#F5F3FF',
+                fontSize: 15, fontWeight: 800, color: acimaMAOLocacao ? '#B45309' : '#7C3AED',
+                textAlign: 'right',
+              }}>
+              {fmtC(maoLocacao)}
+            </div>
+            {!acimaMAOLocacao && lanceEstudo > 0 && (
+              <div style={{ fontSize: 9, color: '#7C3AED', marginTop: 2, fontWeight: 600 }}>
+                ✅ Lance dentro do MAO locação
+              </div>
+            )}
+            {acimaMAOLocacao && (
+              <div style={{ fontSize: 9, color: '#B45309', marginTop: 2, fontWeight: 600 }}>
+                ⚠️ Excede MAO em {fmtC(lanceEstudo - maoLocacao)}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Reforma tabs */}
         <div style={{ flex: 1, minWidth: 200 }}>

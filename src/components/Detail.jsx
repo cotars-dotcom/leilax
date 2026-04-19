@@ -757,6 +757,34 @@ function LanceAcimaMercadoBanner({ imovel }) {
 }
 
 
+
+// Banner: avaliação judicial acima do mercado (sinal de inflação ou desatualização)
+function AvaliacaoInfladaBanner({ imovel }) {
+  const avaliacao = parseFloat(imovel?.valor_avaliacao) || 0
+  const mercado = parseFloat(imovel?.valor_mercado_estimado) || 0
+  const eLeilao = imovel?.tipo_transacao === 'leilao' || imovel?.tipo_transacao === 'leilao_judicial'
+  if (!eLeilao || !avaliacao || !mercado || avaliacao <= mercado * 1.20) return null
+  const pct = Math.round(((avaliacao / mercado) - 1) * 100)
+  return (
+    <div style={{background:'#FFFBEB',border:'1px solid #FDE68A',borderRadius:8,
+      padding:'10px 14px',marginBottom:12,display:'flex',alignItems:'flex-start',gap:10}}>
+      <span style={{fontSize:16,flexShrink:0}}>📋</span>
+      <div style={{flex:1}}>
+        <div style={{fontWeight:700,color:'#92400E',fontSize:12}}>
+          Avaliação judicial {pct}% acima do mercado
+        </div>
+        <div style={{fontSize:11,color:'#78350F',marginTop:3,lineHeight:1.5}}>
+          Avaliação: <strong>R$ {Math.round(avaliacao).toLocaleString('pt-BR')}</strong> · 
+          Mercado estimado: <strong>R$ {Math.round(mercado).toLocaleString('pt-BR')}</strong><br/>
+          Avaliações judiciais desatualizadas inflam a base do 1º leilão. 
+          O 2º leilão (mín. 50% da avaliação) pode ficar <strong>acima do valor real de mercado</strong>. 
+          Atenção também ao ITBI: calculado sobre o maior entre valor venal e valor da transação.
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // Kill-switch jurídico: faixa vermelha proeminente quando há risco fatal
 // Diferencial AXIS vs Leilão Ninja — sinaliza ANTES do score, não enterrado
 function KillSwitchJuridicoBanner({ imovel }) {
@@ -1642,6 +1670,7 @@ for (const s of SCORES) {
       <ReformaProvider imovel={p}>
         {/* Sprint 23: alertas pré-análise financeira */}
         <KillSwitchJuridicoBanner imovel={p} />
+        <AvaliacaoInfladaBanner imovel={p} />
         <IsencaoIRPFBanner imovel={p} />
         <SobrecapBanner imovel={p} />
         <DadosInsuficientesBanner imovel={p} />
@@ -1944,14 +1973,16 @@ for (const s of SCORES) {
         const dl = new Date(y, m-1, d); dl.setHours(0,0,0,0)
         const hoje = new Date(); hoje.setHours(0,0,0,0)
         const diff = Math.round((dl - hoje) / 86400000)
-        if (diff < 0 || diff > 7) return null
+        if (diff < 0 || diff > 30) return null
         return (
           <div style={{
-            background: diff <= 1 ? '#DC2626' : '#D97706', color:'#fff',
+            background: diff <= 1 ? '#DC2626' : diff <= 7 ? '#EA580C' : diff <= 15 ? '#D97706' : '#92400E',
+            color:'#fff',
             padding:'6px 14px', borderRadius:20, fontSize:11, fontWeight:700,
-            boxShadow:'0 4px 15px rgba(0,0,0,0.2)', animation: diff <= 1 ? 'pulse 2s infinite' : 'none'
+            boxShadow:'0 4px 15px rgba(0,0,0,0.2)',
+            animation: diff <= 1 ? 'pulse 2s infinite' : 'none'
           }}>
-            🔨 {diff === 0 ? 'LEILÃO HOJE!' : diff === 1 ? 'LEILÃO AMANHÃ!' : `Leilão em ${diff} dias`}
+            ⏳ {diff === 0 ? 'LEILÃO HOJE!' : diff === 1 ? 'LEILÃO AMANHÃ!' : `Leilão em ${diff} dias`}
           </div>
         )
       })()}
