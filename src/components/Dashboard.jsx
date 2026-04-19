@@ -211,7 +211,10 @@ function AxisHeader({profile:prof, imoveis=[], onNav, isPhone=false, isMobile=fa
         </p>}
       </div>
       <div style={{display:"flex",alignItems:"center",gap:14}}>
-        {!isPhone&&<button style={{
+        {!isPhone&&<button onClick={async () => {
+          const { exportarRelatorioCarteira } = await import('./RelatorioCarteiraHTML.jsx')
+          exportarRelatorioCarteira(imoveis, '')
+        }} style={{
           display:"flex",alignItems:"center",gap:7,whiteSpace:"nowrap",
           padding:"8px 16px",borderRadius:8,
           border:`1px solid ${C.borderW}`,background:C.white,color:C.navy,
@@ -221,7 +224,7 @@ function AxisHeader({profile:prof, imoveis=[], onNav, isPhone=false, isMobile=fa
             <path d="M7.5 10L3 5.5h3V1h3v4.5h3L7.5 10z" stroke={C.navy} strokeWidth="1.3" strokeLinejoin="round"/>
             <path d="M2 12h11" stroke={C.navy} strokeWidth="1.3" strokeLinecap="round"/>
           </svg>
-          Exportar
+          Relatório Carteira
         </button>}
         <div ref={notifRef} style={{position:"relative"}}>
           <div onClick={() => setNotifOpen(o => !o)} style={{position:"relative",cursor:"pointer",padding:4}}>
