@@ -132,27 +132,51 @@ function ScoreRing({score,size=80}) {
 }
 
 function NotasPrivadas({ imovelId }) {
-  const key = `axis_nota_${imovelId}`
-  const [nota, setNota] = useState(() => localStorage.getItem(key) || '')
+  const lsKey = `axis_nota_${imovelId}`
+  const [nota, setNota] = useState(() => localStorage.getItem(lsKey) || '')
   const [saved, setSaved] = useState(false)
-  const save = (v) => { localStorage.setItem(key, v); setSaved(true); setTimeout(() => setSaved(false), 1500) }
+  const [saving, setSaving] = useState(false)
+
+  const save = async (v) => {
+    // Salva localmente imediatamente
+    localStorage.setItem(lsKey, v)
+    setSaving(true)
+    // Persiste no banco via observacoes (campo notas_privadas)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.user?.id) {
+        await supabase.from('imoveis').update({
+          notas_privadas: v,
+          atualizado_em: new Date().toISOString()
+        }).eq('id', imovelId)
+      }
+    } catch(e) { console.warn('[AXIS Notas]', e.message) }
+    setSaving(false); setSaved(true)
+    setTimeout(() => setSaved(false), 1800)
+  }
+
   return (
     <div style={{background:'#FFFBEB', borderRadius:12, padding:'16px', border:'1px solid #FEF3C7', marginBottom:'14px'}}>
       <div style={{fontWeight:600,color:'#92400E',marginBottom:8,fontSize:13,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
         <span>📝 Notas privadas</span>
-        <span style={{fontSize:10,color:'#A16207',fontWeight:400}}>🔒 Somente neste dispositivo</span>
+        <span style={{fontSize:10,color:'#A16207',fontWeight:400}}>
+          {saving ? '⏳ Salvando...' : saved ? '✓ Salvo' : '📱 Local + ☁️ Banco'}
+        </span>
       </div>
       <textarea
         value={nota}
         onChange={e => setNota(e.target.value)}
         onBlur={e => save(e.target.value)}
-        placeholder="Suas anotações pessoais sobre este imóvel... (salvo automaticamente ao sair do campo)"
+        placeholder="Anotações pessoais sobre este imóvel... (salvo no dispositivo e no banco)"
         style={{width:'100%',minHeight:100,padding:'10px 12px',borderRadius:8,border:'1px solid #FDE68A',fontSize:12,color:'#1A1A2E',lineHeight:1.6,resize:'vertical',outline:'none',background:'#fff',boxSizing:'border-box',fontFamily:"'Inter',system-ui,sans-serif"}}
       />
-      <div style={{marginTop:8,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+      <div style={{marginTop:8,display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:6}}>
         <span style={{fontSize:10,color:'#A16207'}}>{nota.length} caracteres</span>
-        <button onClick={() => save(nota)} style={{padding:'4px 14px',borderRadius:6,border:'1px solid #FDE68A',background:saved?'#05A86D':'#FFFBEB',color:saved?'#fff':'#92400E',fontSize:11,fontWeight:600,cursor:'pointer',transition:'all 0.2s'}}>
-          {saved ? '✓ Salvo' : 'Salvar'}
+        <button onClick={() => save(nota)} disabled={saving}
+          style={{padding:'4px 14px',borderRadius:6,border:'1px solid #FDE68A',
+            background:saved?'#05A86D':saving?'#FEF3C7':'#FFFBEB',
+            color:saved?'#fff':'#92400E',fontSize:11,fontWeight:600,cursor:'pointer',transition:'all 0.2s'}}>
+          {saving ? '⏳' : saved ? '✓ Salvo' : 'Salvar'}
         </button>
       </div>
     </div>
