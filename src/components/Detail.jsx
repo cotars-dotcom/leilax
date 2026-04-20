@@ -381,6 +381,16 @@ function CardComparavel({item:c, K, isPhone, imovel}) {
   const fmtV = v => v ? `R$ ${Number(v).toLocaleString('pt-BR')}` : '—'
   // Helper: gerar slug para URLs de portais imobiliários
   const toSlug = s => (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,'-')
+  // Score de qualidade do comparável (0-100)
+  const scoreComp = Math.min(100,
+    (c.valor > 0 ? 30 : 0) +
+    (c.area_m2 > 0 ? 20 : 0) +
+    (c.link && !c._link_gerado ? 20 : c.link ? 10 : 0) +
+    (c.quartos > 0 ? 15 : 0) +
+    (c.preco_m2 > 0 ? 15 : 0)
+  )
+  const scoreCor = scoreComp >= 80 ? '#059669' : scoreComp >= 60 ? '#D97706' : '#94A3B8'
+
   return <div style={{marginBottom:6,borderRadius:8,overflow:"hidden",border:`1px solid ${K.bd}`}}>
     <div onClick={()=>setAberto(!aberto)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 12px",cursor:"pointer",background:K.s2}}>
       <div style={{flex:1,minWidth:0}}>
@@ -409,7 +419,12 @@ function CardComparavel({item:c, K, isPhone, imovel}) {
           <div style={{fontWeight:700,fontSize:13,color:K.teal}}>{c.valor?`${(c.valor/1000).toFixed(0)}K`:''}</div>
           {c.area_m2>0&&c.valor>0&&<div style={{fontSize:9,color:K.t3}}>R${Math.round(c.valor/c.area_m2).toLocaleString('pt-BR')}/m²</div>}
         </div>
-        <span style={{fontSize:14,color:K.t3}}>{aberto?'▲':'▼'}</span>
+        <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:2,marginLeft:4}}>
+          <div style={{fontSize:9,fontWeight:700,color:scoreCor,
+            background:`${scoreCor}15`,border:`1px solid ${scoreCor}30`,
+            padding:'1px 5px',borderRadius:3}}>{scoreComp}%</div>
+          <span style={{fontSize:12,color:K.t3}}>{aberto?'▲':'▼'}</span>
+        </div>
       </div>
     </div>
     {aberto&&<div style={{padding:"10px 12px",background:K.bg,borderTop:`1px solid ${K.bd}`,display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6}}>

@@ -858,13 +858,19 @@ function NovoImovel({onSave,onCancel,onNav,trello,parametrosBanco,criteriosBanco
       onSave(property)
       // F5: enriquecimento pós-análise (agentes silenciosos — falha não bloqueia)
       try {
-        setStep('🚀 Agentes F5 enriquecendo dados...')
+        setStep('🚀 Agentes F5: mercado, reforma, aluguel, MAO...')
         const { enriquecerImovel } = await import('./lib/agenteOrquestrador.js')
-        const result = await enriquecerImovel(property, { forcarMercado: true, forcarReforma: false, forcarJuridico: false })
+        const result = await enriquecerImovel(property, {
+          forcarMercado: true,
+          forcarReforma: true,
+          forcarJuridico: !!(property.processo_numero && !property.processo_numero.includes('0000000-00')),
+        })
         if (Object.keys(result.updates).length > 0) {
           const enriquecido = { ...property, ...result.updates }
-          // Salva no banco via onSave (que faz upsert por ID)
           onSave(enriquecido)
+          // Feedback de log resumido
+          const camposAtualizados = Object.keys(result.updates).length
+          console.debug(`[AXIS F5] ${camposAtualizados} campos enriquecidos:`, result.log.filter(l => l.startsWith('✅')))
         }
       } catch (eEnrich) {
         console.warn('[AXIS F5] Enriquecimento pós-análise falhou (não-bloqueante):', eEnrich.message)
