@@ -132,9 +132,14 @@ function ScoreRing({score,size=80}) {
   </div>
 }
 
-function NotasPrivadas({ imovelId }) {
+function NotasPrivadas({ imovelId, notaInicial }) {
   const lsKey = `axis_nota_${imovelId}`
-  const [nota, setNota] = useState(() => localStorage.getItem(lsKey) || '')
+  // Prioridade: banco (notaInicial prop) → localStorage → vazio
+  const [nota, setNota] = useState(() => {
+    const ls = localStorage.getItem(lsKey) || ''
+    if (notaInicial && notaInicial.length > ls.length) return notaInicial
+    return ls
+  })
   const [saved, setSaved] = useState(false)
   const [saving, setSaving] = useState(false)
 
@@ -2253,7 +2258,7 @@ for (const s of SCORES) {
           <PainelAtividades imovelId={p.id} />
         </div>
       )}
-      <NotasPrivadas imovelId={p.id} />
+      <NotasPrivadas imovelId={p.id} notaInicial={p.notas_privadas || ''} />
       </ReformaProvider>
       </>}
     </div>
