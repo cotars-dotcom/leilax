@@ -91,7 +91,17 @@ function PropCard({p,onNav,isPhone=false}) {
       📍 {[p.bairro,p.cidade].filter(Boolean).join(', ')}/{p.estado} · {tipFmt} · {(p.area_privativa_m2||p.area_m2)||'—'}m²
     </div>
 
-    {dataLeilao&&!eMercado&&<div style={{fontSize:10,color:K.t3,marginBottom:6}}>🗓️ Leilão: <strong style={{color:K.wh}}>{dataLeilao}</strong></div>}
+    {dataLeilao&&!eMercado&&(
+      <div style={{fontSize:10,color:K.t3,marginBottom:6,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+        <span>🗓️ Leilão: <strong style={{color:K.wh}}>{dataLeilao}</strong></span>
+        {p.data_leilao_2 && p.valor_minimo_2 && diasLeilao2 !== null && diasLeilao2 >= 0 && (
+          <span style={{fontSize:9,color:'#D97706',fontWeight:700,background:'#FEF3C720',
+            border:'1px solid #D9770640',padding:'1px 5px',borderRadius:3}}>
+            2ª {new Date(p.data_leilao_2+'T12:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})} · R${Math.round(p.valor_minimo_2/1000)}k
+          </span>
+        )}
+      </div>
+    )}
 
     <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:8}}>
       <Bdg c={rc} ch={p.recomendacao||"—"}/>
@@ -122,7 +132,12 @@ function PropCard({p,onNav,isPhone=false}) {
         </div>
       </div>
       <div style={{flexShrink:0,display:"flex",alignItems:"center",justifyContent:isPhone?"flex-end":"center",marginTop:isPhone?4:0}}>
-        <ScoreRing score={sc} size={isPhone?56:62}/>
+        <div style={{textAlign:'center'}}>
+          <ScoreRing score={sc} size={isPhone?56:62}/>
+          <div style={{fontSize:8,color:K.t3,marginTop:2,fontWeight:600}}>
+            {Math.round(sc*10)}/100
+          </div>
+        </div>
       </div>
     </div>
 
