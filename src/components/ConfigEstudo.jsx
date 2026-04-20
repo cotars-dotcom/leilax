@@ -222,16 +222,18 @@ export default function ConfigEstudo({ imovel }) {
         {!eMercado && (
           <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
             {[
-              { label: '1ª Praça', val: lance1p },
-              lance2p > 0 && { label: '2ª Praça', val: lance2p },
-              { label: '60%', val: Math.round(avaliacao * 0.60) },
-              { label: '70%', val: Math.round(avaliacao * 0.70) },
+              lance1p > 0 && { label: '1ª Praça', val: lance1p, cor: '#D97706' },
+              p.valor_minimo_2 > 0 && { label: '2ª Praça', val: parseFloat(p.valor_minimo_2), cor: '#7C3AED' },
+              !p.valor_minimo_2 && avaliacao > 0 && { label: '50% aval.', val: Math.round(avaliacao * 0.50), cor: '#7C3AED' },
+              avaliacao > 0 && { label: '57%', val: Math.round(avaliacao * 0.57), cor: '#3B82F6' },
+              avaliacao > 0 && { label: '65%', val: Math.round(avaliacao * 0.65), cor: '#D97706' },
+              mao > 0 && { label: 'MAO flip', val: mao, cor: '#059669' },
             ].filter(Boolean).map((b, i) => (
               <button key={i} onClick={() => setLanceEstudo(b.val)} style={{
                 padding: '3px 8px', borderRadius: 5, fontSize: 9, fontWeight: 600,
-                border: lanceEstudo === b.val ? '1px solid #059669' : '1px solid #E2E8F0',
-                background: lanceEstudo === b.val ? '#ECFDF5' : '#fff',
-                color: lanceEstudo === b.val ? '#065F46' : '#64748B', cursor: 'pointer',
+                border: lanceEstudo === b.val ? `1px solid ${b.cor||'#059669'}` : '1px solid #E2E8F0',
+                background: lanceEstudo === b.val ? `${b.cor||'#059669'}15` : '#fff',
+                color: lanceEstudo === b.val ? (b.cor||'#059669') : '#64748B', cursor: 'pointer',
               }}>{b.label} ({fmtC(b.val)})</button>
             ))}
           </div>

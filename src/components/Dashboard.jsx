@@ -237,6 +237,22 @@ function AxisHeader({profile:prof, imoveis=[], onNav, isPhone=false, isMobile=fa
       </div>
       <div style={{display:"flex",alignItems:"center",gap:14}}>
         {!isPhone&&<button onClick={async () => {
+          const { exportarExcelCarteira } = await import('./ExportarExcel.jsx')
+          const n = exportarExcelCarteira(imoveis)
+          // toast simples
+        }} style={{
+          display:"flex",alignItems:"center",gap:6,whiteSpace:"nowrap",
+          padding:"8px 16px",borderRadius:8,
+          border:`1px solid #16A34A30`,background:"#ECFDF5",color:"#065F46",
+          fontSize:13,fontWeight:500,cursor:"pointer", marginRight:4,
+        }}>
+          <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+            <rect x="2" y="1" width="11" height="13" rx="1" stroke="#065F46" strokeWidth="1.2" fill="none"/>
+            <path d="M4 5h7M4 7.5h7M4 10h4" stroke="#065F46" strokeWidth="1.2" strokeLinecap="round"/>
+          </svg>
+          Excel
+        </button>}
+        {!isPhone&&<button onClick={async () => {
           const { exportarRelatorioCarteira } = await import('./RelatorioCarteiraHTML.jsx')
           exportarRelatorioCarteira(imoveis, '')
         }} style={{
