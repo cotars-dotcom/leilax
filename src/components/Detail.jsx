@@ -17,6 +17,7 @@ import TimelineMatricula from './TimelineMatricula.jsx'
 import GraficoROIHorizonte from './GraficoROIHorizonte.jsx'
 import PainelYieldModalidades from './PainelYieldModalidades.jsx'
 import ResumoPreLeilao from './ResumoPreLeilao.jsx'
+import PainelAtividades from './PainelAtividades.jsx'
 import MapaCalorBairros from './MapaCalorBairros.jsx'
 import GraficoTendencia from './GraficoTendencia.jsx'
 import SimuladorLance from './SimuladorLance.jsx'
@@ -2245,6 +2246,13 @@ for (const s of SCORES) {
       </div>
 
       {/* Anotações privadas — localStorage */}
+      {/* Histórico de atividades */}
+      {isAdmin && (
+        <div style={{...card(), padding:14, marginBottom:12}}>
+          <div style={{fontWeight:600, color:K.wh, marginBottom:10, fontSize:13}}>📋 Histórico</div>
+          <PainelAtividades imovelId={p.id} />
+        </div>
+      )}
       <NotasPrivadas imovelId={p.id} />
       </ReformaProvider>
       </>}
