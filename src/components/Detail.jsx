@@ -1515,6 +1515,40 @@ for (const s of SCORES) {
           Ao Vivo
         </button>
         {isAdmin&&onArchive&&<button style={{...btn("s"),background:`${C.mustardL}`,color:C.mustard,border:`1px solid ${C.mustard}40`}} onClick={()=>onArchive(p.id)}>📦 Arquivar</button>}
+        {isAdmin && (() => {
+          const hoje = Date.now()
+          const d1 = p.data_leilao ? Math.ceil((new Date(p.data_leilao+'T12:00')-hoje)/86400000) : null
+          const d2 = p.data_leilao_2 ? Math.ceil((new Date(p.data_leilao_2+'T12:00')-hoje)/86400000) : null
+          const leilaoPendente = (d1!==null&&d1<=0) || (d2!==null&&d2<=0)
+          if (!leilaoPendente || p.status_operacional==='arrematado') return null
+          return <>
+            <button style={{...btn("s"),background:'#ECFDF5',color:'#059669',border:'1px solid #6EE7B7',fontWeight:700}}
+              onClick={async()=>{
+                const lance = prompt('Lance arrematado (R$):','')
+                if(!lance) return
+                await supabase.from('imoveis').update({
+                  status_operacional:'arrematado',
+                  investimento_total: parseFloat(lance.replace(/[^0-9.]/g,'')),
+                  atualizado_em: new Date().toISOString()
+                }).eq('id',p.id)
+                if(onUpdateProp) onUpdateProp({...p, status_operacional:'arrematado'})
+                showToast(`✅ ${p.codigo_axis} marcado como arrematado!`,'#059669')
+              }}>
+              ✅ Arrematei
+            </button>
+            <button style={{...btn("s"),background:'#FEF2F2',color:'#991B1B',border:'1px solid #FCA5A5'}}
+              onClick={async()=>{
+                await supabase.from('imoveis').update({
+                  status_operacional:'nao_arrematado',
+                  atualizado_em: new Date().toISOString()
+                }).eq('id',p.id)
+                if(onUpdateProp) onUpdateProp({...p, status_operacional:'nao_arrematado'})
+                showToast(`${p.codigo_axis} marcado como não arrematado`,'#DC2626')
+              }}>
+              ❌ Não arrematei
+            </button>
+          </>
+        })()}
         {isAdmin&&<button style={{...btn("s"),background:'#EBF4FF',color:'#002B80',border:'1px solid #002B8030',fontSize:11.5,fontWeight:600}}
           onClick={async()=>{
             try {

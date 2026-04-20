@@ -198,6 +198,24 @@ export default function ProximosLeiloes({ imoveis, onNav }) {
                     {p.sintese_executiva.slice(0, 180)}{p.sintese_executiva.length > 180 ? '…' : ''}
                   </div>
                 )}
+                {/* Ações rápidas */}
+                <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}
+                  onClick={e => e.stopPropagation()}>
+                  <button onClick={() => onNav?.('detail', {id: p.id})}
+                    style={{ fontSize: 10, padding: '4px 10px', borderRadius: 5, cursor: 'pointer',
+                      background: '#EFF6FF', border: '1px solid #BFDBFE', color: '#1D4ED8', fontWeight: 600 }}>
+                    📊 Ver Análise Completa →
+                  </button>
+                  <button onClick={async () => {
+                    const { gerarHTMLReport } = await import('./ExportarPDF.jsx').catch(() => ({gerarHTMLReport: null}))
+                    if (gerarHTMLReport) gerarHTMLReport(p)
+                    else onNav?.('detail', {id: p.id})
+                  }}
+                    style={{ fontSize: 10, padding: '4px 10px', borderRadius: 5, cursor: 'pointer',
+                      background: '#FEF2F2', border: '1px solid #FECACA', color: '#991B1B', fontWeight: 600 }}>
+                    📄 PDF Decisão
+                  </button>
+                </div>
               </div>
             </div>
           )
