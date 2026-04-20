@@ -15,6 +15,7 @@ import {
   REFERENCIAS_BH,
   YIELD_POR_ZONA,
 } from '../data/metricas_bairros_bh.js'
+import { getBairroDadosOnline } from './agenteValorMercado.js'
 import { calcularCustoReforma, verificarSobrecapitalizacao } from '../data/custos_reforma.js'
 import { calcularCustoJuridico } from '../data/riscos_juridicos.js'
 
@@ -1432,7 +1433,12 @@ DADOS DE BAIRRO (parcial):
   // ── CALIBRAÇÃO DE SCORES COM DADOS REAIS (metricas_bairros_bh + Supabase) ──
   // Pós-análise: ajustar score_mercado e score_liquidez com dados verificáveis
   const bairroAnalise = analise.bairro || dadosGPT?.bairro || ''
-  const dadosBairroCalib = getBairroDados(bairroAnalise)
+  // Tentar dados do Supabase primeiro (mais atualizados), fallback para arquivo local
+  let dadosBairroCalib = null
+  try {
+    dadosBairroCalib = await getBairroDadosOnline(bairroAnalise)
+  } catch(e) { /* silencioso */ }
+  if (!dadosBairroCalib) dadosBairroCalib = getBairroDados(bairroAnalise)
   if (dadosBairroCalib) {
     // score_mercado: calibrar pela classe IPEAD + yield + tendência
     const classeScore = { 4: 8.5, 3: 7.0, 2: 5.5, 1: 4.0 }

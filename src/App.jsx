@@ -1433,6 +1433,13 @@ function Comparativo({props}) {
     ["Retorno revenda",p=>p.retorno_venda_pct?`+${p.retorno_venda_pct}%`:"—",()=>K.grn],
     ["Retorno locação",p=>p.retorno_locacao_anual_pct?`${p.retorno_locacao_anual_pct}%a.a.`:"—",()=>K.pur],
     ["Data Leilão",p=>p.data_leilao?new Date(p.data_leilao+'T12:00').toLocaleDateString('pt-BR'):"—",()=>K.t2],
+    ["2ª Praça",p=>{
+      const d=p.data_leilao_2?new Date(p.data_leilao_2+'T12:00').toLocaleDateString('pt-BR'):null
+      const v=p.valor_minimo_2?fmtC(p.valor_minimo_2):null
+      return d?`${d}${v?' · '+v:''}`:("—")
+    },()=>K.amb],
+    ["Confiança",p=>p.confidence_score!=null?`${p.confidence_score}%`:"—",p=>(p.confidence_score||0)>=75?K.grn:(p.confidence_score||0)>=50?K.amb:K.red],
+    ["Yield Bruto",p=>p.yield_bruto_pct?`${p.yield_bruto_pct}% a.a.`:"—",p=>(p.yield_bruto_pct||0)>=6?K.grn:K.amb],
   ]
   return <div>
     <Hdr title="Comparativo" sub="Selecione até 3 imóveis"/>

@@ -100,3 +100,31 @@ export function inferirClasseIPEAD(preco_m2) {
   if (preco_m2 >= 4000)  return { classe: 2, label: 'Classe 2 - Médio' }
   return { classe: 1, label: 'Classe 1 - Popular' }
 }
+
+/**
+ * Busca dados do bairro no Supabase e retorna no mesmo formato do metricas_bairros_bh.js
+ * Usado como substituto de getBairroDados() para dados atualizados
+ */
+export async function getBairroDadosOnline(nomeBairro, cidade = 'Belo Horizonte') {
+  if (!nomeBairro) return null
+  const vm = await buscarValorMercado(nomeBairro, cidade)
+  if (!vm || vm.fonte !== 'banco_interno') return null
+  
+  // Normalizar para o formato esperado pelo motorIA
+  const classeNum = vm.classe_ipead?.replace(/\D/g, '') || '2'
+  return {
+    label: vm.bairro,
+    zona: null,
+    classeIpead: parseInt(classeNum) || 2,
+    classeIpeadLabel: vm.classe_label?.replace('Classe \d - ', '') || 'Médio',
+    precoContratoM2: vm.preco_contrato_m2,
+    precoAnuncioM2: vm.preco_anuncio_m2,
+    yieldBruto: vm.yield_bruto,
+    tendencia12m: vm.tendencia_12m,
+    fatorElevador: 0.85,
+    liquidez: vm.liquidez_label,
+    tempoVendaDias: null,  // vem do join separado
+    _fonte: 'supabase',
+    _atualizado_em: vm.atualizado_em,
+  }
+}
