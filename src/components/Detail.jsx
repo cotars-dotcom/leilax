@@ -14,6 +14,7 @@ import PainelInvestimento from './PainelInvestimento.jsx'
 import AtributosPredio from './AtributosPredio.jsx'
 import ScoreRadar from './ScoreRadar.jsx'
 import TimelineMatricula from './TimelineMatricula.jsx'
+import GraficoROIHorizonte from './GraficoROIHorizonte.jsx'
 import MapaCalorBairros from './MapaCalorBairros.jsx'
 import GraficoTendencia from './GraficoTendencia.jsx'
 import SimuladorLance from './SimuladorLance.jsx'
@@ -949,6 +950,17 @@ function IsencaoIRPFBanner({ imovel }) {
   )
 }
 
+
+// Wrapper para GraficoROIHorizonte — lê lanceEstudo/custoReformaAtual do ReformaProvider
+function GraficoROIHorizonteWrapper({ imovel }) {
+  const { lanceEstudo, custoReformaAtual } = useReforma()
+  return (
+    <div style={{...card(), padding:14, marginBottom:12}}>
+      <GraficoROIHorizonte imovel={imovel} lanceEstudo={lanceEstudo} custoReformaAtual={custoReformaAtual}/>
+    </div>
+  )
+}
+
 export default function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze,isAdmin,onArchive,isMobile,isPhone}) {
   const [sending,setSending]=useState(false)
   const [showRadar, setShowRadar] = useState(false)
@@ -1854,6 +1866,9 @@ for (const s of SCORES) {
         <DadosInsuficientesBanner imovel={p} />
         <LanceAcimaMercadoBanner imovel={p} />
         <LanceAlertaBanner imovel={p} />
+        {parseFloat(p.valor_mercado_estimado) > 0 && (
+          <GraficoROIHorizonteWrapper imovel={p} />
+        )}
         {/* Sprint 22: Alerta jurídico alto antes do estudo financeiro */}
         {(p.score_juridico != null && p.score_juridico < 4) && (
           <div style={{padding:'10px 14px',borderRadius:8,marginBottom:12,
@@ -2161,6 +2176,15 @@ for (const s of SCORES) {
             animation: diff <= 1 ? 'pulse 2s infinite' : 'none'
           }}>
             ⏳ {diff === 0 ? 'LEILÃO HOJE!' : diff === 1 ? 'LEILÃO AMANHÃ!' : `Leilão em ${diff} dias`}
+            {p.data_leilao_2 && (() => {
+              const [y2,m2,d2] = p.data_leilao_2.split('-').map(Number)
+              const dl2 = new Date(y2,m2-1,d2); dl2.setHours(0,0,0,0)
+              const hoje2 = new Date(); hoje2.setHours(0,0,0,0)
+              const diff2 = Math.round((dl2-hoje2)/86400000)
+              return diff2 >= 0 ? <span style={{marginLeft:8,fontSize:9,opacity:0.85}}>
+                · 2ª praça: {diff2 === 0 ? 'HOJE' : diff2 + 'd'} · mín. R${Math.round(p.valor_minimo_2||0).toLocaleString('pt-BR')}
+              </span> : null
+            })()}
           </div>
         )
       })()}

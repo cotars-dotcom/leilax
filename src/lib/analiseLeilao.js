@@ -5,7 +5,7 @@
  */
 
 import { supabase } from './supabase.js'
-import { IPTU_SOBRE_CONDO_RATIO, HOLDING_MESES_PADRAO } from './constants.js'
+import { IPTU_SOBRE_CONDO_RATIO, HOLDING_MESES_PADRAO, IRPF_ISENCAO_TETO } from './constants.js'
 
 // ─── MOTOR DE CÁLCULO INTERNO (sem API) ─────────────────────────────────────
 
@@ -27,13 +27,15 @@ function calcularCenario(lance, vmercado, reforma, juridico, params, extras = {}
   const debitos   = parseFloat(extras.debitos || 0)
   const holding   = parseFloat(extras.holding || 0)
   const custoTotal = lance + c.comissao + c.itbi + c.doc + c.adv + c.reg + reforma + (juridico||0) + debitos + holding
-  const irpf      = Math.max(0, (vmercado - custoTotal) * irpf_pct)
+  // Isenção IRPF: valor de venda ≤ R$440k (Lei 9.250/1995 + Lei 11.196/2005)
+  const elegivel_isencao = vmercado <= IRPF_ISENCAO_TETO
+  const irpf      = elegivel_isencao ? 0 : Math.max(0, (vmercado - custoTotal) * irpf_pct)
   const corretagem = vmercado * corr_pct
   const lucro     = vmercado - custoTotal - irpf - corretagem
   const roi       = custoTotal > 0 ? (lucro / custoTotal) * 100 : 0
   const mao       = vmercado * params.thresholds.margem_seguranca_mao - (c.comissao + c.itbi + c.doc + c.adv + c.reg + reforma + (juridico||0) + debitos + holding)
   return {
-    custo_total: Math.round(custoTotal), irpf: Math.round(irpf),
+    custo_total: Math.round(custoTotal), irpf: Math.round(irpf), irpf_isento: elegivel_isencao,
     corretagem: Math.round(corretagem), lucro: Math.round(lucro),
     roi: parseFloat(roi.toFixed(1)), mao: Math.round(mao),
     debitos: Math.round(debitos), holding: Math.round(holding),
