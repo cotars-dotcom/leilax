@@ -344,7 +344,22 @@ export default function Dashboard({props,onNav,profile:prof,isMobile,isPhone}) {
   const avg=total?(props.reduce((s,p)=>s+(p.score_total||0),0)/total).toFixed(2):"0"
   const avgPct=total?Math.round((props.reduce((s,p)=>s+(p.score_total||0),0)/total)*10):0
   const recentes=[...props].sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt)).slice(0,4)
-  const topAlerta=[...props].filter(p=>p.recomendacao!=="EVITAR").sort((a,b)=>(b.score_total||0)-(a.score_total||0))[0]
+  // Card 3: priorizar imóvel com leilão mais próximo (urgente > score alto)
+  const hoje = Date.now()
+  const diasP = (d) => d ? Math.ceil((new Date(d+'T12:00') - hoje) / 86400000) : null
+  const propComLeilao = [...props]
+    .filter(p => {
+      const d1 = diasP(p.data_leilao); const d2 = diasP(p.data_leilao_2)
+      return (d1 !== null && d1 >= 0 && d1 <= 30) || (d2 !== null && d2 >= 0 && d2 <= 30)
+    })
+    .sort((a, b) => {
+      const da = Math.min(...[diasP(a.data_leilao), diasP(a.data_leilao_2)].filter(x => x !== null && x >= 0))
+      const db = Math.min(...[diasP(b.data_leilao), diasP(b.data_leilao_2)].filter(x => x !== null && x >= 0))
+      return da - db
+    })[0]
+  const topAlerta = propComLeilao || [...props].filter(p=>p.recomendacao!=="EVITAR").sort((a,b)=>(b.score_total||0)-(a.score_total||0))[0]
+  const alertaDias = topAlerta ? Math.min(...[diasP(topAlerta.data_leilao), diasP(topAlerta.data_leilao_2)].filter(x => x !== null && x >= 0).concat([999])) : null
+  const alertaUrgente = alertaDias !== null && alertaDias <= 30
   const totalValor=props.reduce((s,p)=>s+(p.valor_minimo||0),0)
   const fmtM=v=>{if(v>=1e6)return`R$ ${(v/1e6).toFixed(1)}M`;if(v>=1e3)return`R$ ${(v/1e3).toFixed(0)}K`;return`R$ ${v}`}
   const [leads, setLeads] = useState([])
@@ -420,8 +435,10 @@ export default function Dashboard({props,onNav,profile:prof,isMobile,isPhone}) {
           borderRadius:14,padding:isPhone?"16px 18px":"22px 24px",
           boxShadow:"0 2px 12px rgba(0,43,128,0.06)",
         }}>
-          <p style={{margin:"0 0 8px",fontSize:isPhone?10:11,fontWeight:600,color:C.muted,textTransform:"uppercase",letterSpacing:"0.8px"}}>
-            Alertas e Destaques
+          <p style={{margin:"0 0 8px",fontSize:isPhone?10:11,fontWeight:600,
+            color: alertaUrgente ? '#DC2626' : C.muted,
+            textTransform:"uppercase",letterSpacing:"0.8px",display:'flex',alignItems:'center',gap:5}}>
+            {alertaUrgente ? '🚨' : '⭐'} {alertaUrgente ? `Leilão em ${alertaDias === 0 ? 'HOJE' : alertaDias + ' dias'}` : 'Destaque da Carteira'}
           </p>
           {topAlerta?<>
             <div style={{padding:"10px 12px",borderRadius:8,background:C.surface,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
@@ -445,10 +462,11 @@ export default function Dashboard({props,onNav,profile:prof,isMobile,isPhone}) {
             </div>
             <button onClick={()=>onNav("detail",{id:topAlerta.id})} style={{
               marginTop:10,width:"100%",padding:"8px 0",borderRadius:7,
-              background:C.emerald,color:"#fff",border:"none",fontSize:12.5,fontWeight:600,cursor:"pointer",
+              background: alertaUrgente ? '#DC2626' : C.emerald,
+              color:"#fff",border:"none",fontSize:12.5,fontWeight:600,cursor:"pointer",
               display:"flex",alignItems:"center",justifyContent:"center",gap:6,
             }}>
-              Analisar Ativo <ArrowUpRight size={15} />
+              {alertaUrgente ? '⚡ Ver Decisão de Lance' : 'Analisar Ativo'} <ArrowUpRight size={15} />
             </button>
           </>:<p style={{fontSize:13,color:C.hint}}>Nenhum ativo analisado</p>}
         </div>
