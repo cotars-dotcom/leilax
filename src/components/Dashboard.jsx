@@ -41,9 +41,13 @@ function PropCard({p,onNav,isPhone=false}) {
   const eMercado = isMercadoDireto(p.fonte_url, p.tipo_transacao)
   const diasLeilao = p.data_leilao && !eMercado && p.status_operacional !== 'arquivado'
     ? Math.ceil((new Date(p.data_leilao+'T12:00') - Date.now()) / 86400000) : null
-  const urgColor = diasLeilao !== null && diasLeilao <= 7 ? '#DC2626'
-    : diasLeilao !== null && diasLeilao <= 15 ? '#EA580C'
-    : diasLeilao !== null && diasLeilao <= 30 ? '#D97706' : null
+  const diasLeilao2 = p.data_leilao_2 && !eMercado && p.status_operacional !== 'arquivado'
+    ? Math.ceil((new Date(p.data_leilao_2+'T12:00') - Date.now()) / 86400000) : null
+  const diasUrgente = diasLeilao !== null && diasLeilao >= 0 ? diasLeilao
+    : diasLeilao2 !== null && diasLeilao2 >= 0 ? diasLeilao2 : null
+  const urgColor = diasUrgente !== null && diasUrgente <= 7 ? '#DC2626'
+    : diasUrgente !== null && diasUrgente <= 15 ? '#EA580C'
+    : diasUrgente !== null && diasUrgente <= 30 ? '#D97706' : null
   const scoreDelta = p.preco_m2_imovel && p.preco_m2_mercado
     ? ((1 - p.preco_m2_imovel/p.preco_m2_mercado)*100).toFixed(0) : null
   const conf = calcularConfidence(p)
@@ -54,12 +58,18 @@ function PropCard({p,onNav,isPhone=false}) {
     onMouseEnter={e=>{e.currentTarget.style.borderColor=K.teal;e.currentTarget.style.transform="translateY(-2px)"}}
     onMouseLeave={e=>{e.currentTarget.style.borderColor=K.bd;e.currentTarget.style.transform="none"}}>
 
-    {urgColor && diasLeilao !== null && (
+    {urgColor && diasUrgente !== null && (
       <div style={{background:urgColor,color:'#fff',fontSize:10,fontWeight:800,
         padding:'4px 10px',borderRadius:5,marginBottom:8,display:'flex',
         alignItems:'center',gap:6,letterSpacing:0.3}}>
         <span>⏳</span>
-        <span>{diasLeilao <= 0 ? 'LEILÃO HOJE!' : diasLeilao === 1 ? 'LEILÃO AMANHÃ!' : `LEILÃO EM ${diasLeilao} DIAS`}</span>
+        <span>
+          {diasLeilao !== null && diasLeilao >= 0
+            ? (diasLeilao === 0 ? 'LEILÃO HOJE!' : diasLeilao === 1 ? 'LEILÃO AMANHÃ!' : `LEILÃO EM ${diasLeilao} DIAS`)
+            : diasLeilao2 !== null && diasLeilao2 >= 0
+              ? (diasLeilao2 === 0 ? '2ª PRAÇA HOJE!' : diasLeilao2 === 1 ? '2ª PRAÇA AMANHÃ!' : `2ª PRAÇA EM ${diasLeilao2} DIAS`)
+              : 'LEILÃO'}
+        </span>
         {p.praca && <span style={{marginLeft:'auto',fontWeight:700,fontSize:9,opacity:0.9}}>{p.praca}ª PRAÇA · {dataLeilao}</span>}
       </div>
     )}

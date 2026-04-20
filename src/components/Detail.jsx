@@ -15,6 +15,7 @@ import AtributosPredio from './AtributosPredio.jsx'
 import ScoreRadar from './ScoreRadar.jsx'
 import TimelineMatricula from './TimelineMatricula.jsx'
 import GraficoROIHorizonte from './GraficoROIHorizonte.jsx'
+import PainelYieldModalidades from './PainelYieldModalidades.jsx'
 import MapaCalorBairros from './MapaCalorBairros.jsx'
 import GraficoTendencia from './GraficoTendencia.jsx'
 import SimuladorLance from './SimuladorLance.jsx'
@@ -950,6 +951,16 @@ function IsencaoIRPFBanner({ imovel }) {
   )
 }
 
+
+// Wrapper para PainelYieldModalidades — lê do ReformaProvider
+function PainelYieldWrapper({ imovel }) {
+  const { lanceEstudo, custoReformaAtual } = useReforma()
+  return (
+    <div style={{...card(), padding:14, marginBottom:12}}>
+      <PainelYieldModalidades imovel={imovel} lanceEstudo={lanceEstudo} custoReformaAtual={custoReformaAtual}/>
+    </div>
+  )
+}
 
 // Wrapper para GraficoROIHorizonte — lê lanceEstudo/custoReformaAtual do ReformaProvider
 function GraficoROIHorizonteWrapper({ imovel }) {
@@ -1919,6 +1930,9 @@ for (const s of SCORES) {
         <LanceAlertaBanner imovel={p} />
         {parseFloat(p.valor_mercado_estimado) > 0 && (
           <GraficoROIHorizonteWrapper imovel={p} />
+        )}
+        {parseFloat(p.aluguel_mensal_estimado) > 0 && (
+          <PainelYieldWrapper imovel={p} />
         )}
         {/* Sprint 22: Alerta jurídico alto antes do estudo financeiro */}
         {(p.score_juridico != null && p.score_juridico < 4) && (
