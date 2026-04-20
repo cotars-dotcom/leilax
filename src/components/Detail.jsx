@@ -1124,6 +1124,42 @@ export default function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze
     }
   }
 
+  // Regenerar síntese executiva via Gemini
+  const [genSintese, setGenSintese] = useState(false)
+  const handleGerarSintese = async () => {
+    if (!isAdmin) return
+    setGenSintese(true)
+    try {
+      const keys = await loadApiKeys(session?.user?.id)
+      const geminiKey = keys?.gemini_key || localStorage.getItem('axis-gemini-key')
+      if (!geminiKey) { alert('Configure a chave Gemini em Admin → Diagnóstico'); return }
+      const { chamarGeminiCascata, parseJSONResposta } = await import('../lib/constants.js')
+      const prompt = `Você é analista de leilões judiciais imobiliários em BH/MG.
+Gere uma síntese executiva de 3-4 linhas sobre este imóvel, focando na decisão de investimento.
+Seja direto e quantitativo. Mencione: recomendação, desconto sobre mercado, MAO e estratégia ideal.
+
+Dados: ${JSON.stringify({
+  codigo: p.codigo_axis, bairro: p.bairro, cidade: p.cidade,
+  recomendacao: p.recomendacao, score_total: p.score_total,
+  valor_minimo: p.valor_minimo, valor_mercado: p.valor_mercado_estimado,
+  mao_flip: p.mao_flip, mao_locacao: p.mao_locacao,
+  aluguel: p.aluguel_mensal_estimado, yield: p.yield_bruto_pct,
+  data_leilao: p.data_leilao, data_leilao_2: p.data_leilao_2,
+  debitos: p.debitos_total_estimado, occupacao: p.ocupacao,
+  confidence: p.confidence_score
+})}
+
+Responda apenas com o texto da síntese, sem JSON, sem markdown.`
+      const { texto } = await chamarGeminiCascata(prompt, geminiKey, { maxTokens: 256, temperature: 0.2 })
+      if (texto && onUpdateProp) {
+        const updated = { ...p, sintese_executiva: texto.trim() }
+        await saveImovelCompleto(updated, session?.user?.id)
+        onUpdateProp(updated)
+      }
+    } catch(e) { alert('Erro ao gerar síntese: ' + e.message) }
+    finally { setGenSintese(false) }
+  }
+
   const handleReanalyze=async()=>{
     if(!p?.fonte_url){setMsg("⚠️ Imóvel sem URL de origem para reanalisar");return}
     // Buscar chaves — localStorage primeiro, banco como fallback
@@ -1780,6 +1816,14 @@ for (const s of SCORES) {
         ) : null
       })()}
       {/* Síntese executiva */}
+      {isAdmin && !p.sintese_executiva && (
+        <div style={{marginBottom:12}}>
+          <button onClick={handleGerarSintese} disabled={genSintese}
+            style={{...btn('s'), background:'#002B8010', color:C.navy, border:'1px solid #002B8030', fontSize:11}}>
+            {genSintese ? '⏳ Gerando síntese...' : '✍️ Gerar Síntese com Gemini'}
+          </button>
+        </div>
+      )}
       {p.sintese_executiva && (
         <div style={{
           background: C.navyAlfa || '#F0F4FF',
@@ -1808,6 +1852,13 @@ for (const s of SCORES) {
                 : p.sintese_executiva
             )}
           </p>
+          {isAdmin && (
+            <button onClick={handleGerarSintese} disabled={genSintese}
+              style={{marginTop:6,fontSize:9,color:C.navy,background:'none',
+                border:'none',cursor:'pointer',opacity:0.6,textDecoration:'underline'}}>
+              {genSintese ? 'Gerando...' : '↺ Regenerar'}
+            </button>
+          )}
         </div>
       )}
       <div style={{display:"grid",gridTemplateColumns:isPhone?"1fr":"1fr 1fr",gap:"14px",marginBottom:"14px"}}>
