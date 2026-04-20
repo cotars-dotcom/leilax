@@ -2,6 +2,26 @@
 import { createClient } from '@supabase/supabase-js'
 import { SCORE_PESOS, CUSTO_POR_TOKEN } from './constants.js'
 
+// ─── Normalização de campos array ────────────────────────────────────────────
+// Campos que o banco pode devolver como string JSON ou como null em vez de array
+const ARRAY_FIELDS = [
+  'positivos','negativos','alertas','riscos_presentes','fotos',
+  'comparaveis','coproprietarios','infraestrutura','distribuicao_pavimentos',
+]
+function toArr(v) {
+  if (Array.isArray(v)) return v
+  if (!v) return []
+  try { const p = JSON.parse(v); return Array.isArray(p) ? p : [] } catch { return [] }
+}
+export function normalizarImovel(d) {
+  if (!d) return d
+  const out = { ...d }
+  ARRAY_FIELDS.forEach(f => { out[f] = toArr(d[f]) })
+  return out
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
+
 // Cache simples em memória para reduzir chamadas redundantes
 const _cache = {}
 const CACHE_TTL = 30000 // 30 segundos
@@ -89,9 +109,9 @@ export async function getImoveis() {
       .from('imoveis').select('*')
       .order('criado_em', { ascending: false }).limit(100)
     if (e2) throw e2
-    return d2 || []
+    return (d2 || []).map(normalizarImovel)
   }
-  return (data || []).map(d => ({
+  return (data || []).map(d => normalizarImovel({
     ...d,
     criador_nome: d.criador?.nome || null,
     criador: undefined
@@ -105,7 +125,7 @@ export async function saveImovel(imovel, userId) {
     .select().single()
   if (error) throw error
   invalidarCache('imoveis')
-  return data
+  return normalizarImovel(data)
 }
 
 // Colunas conhecidas da tabela imoveis — tudo fora disso é descartado
@@ -395,7 +415,7 @@ if (atual.comparaveis?.length > 2) {
     throw error
   }
   invalidarCache('imoveis')
-  return data
+  return normalizarImovel(data)
 }
 
 export async function deleteImovel(id) {

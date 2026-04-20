@@ -30,6 +30,10 @@ import CenariosReforma from './CenariosReforma.jsx'
 import { ReformaProvider, useReforma } from '../hooks/useReforma.jsx'
 import CustosReaisEditor from './CustosReaisEditor.jsx'
 import ComparaveisComFiltros from './ComparaveisComFiltros.jsx'
+
+// Guard: converte campo array que pode vir como string JSON do banco
+const toArr = v => Array.isArray(v) ? v : (!v ? [] : (() => { try { const p=JSON.parse(v); return Array.isArray(p)?p:[] } catch{return[]} })())
+
 const LazyMapaLocais = lazy(() => import('./MapaLocaisProximos.jsx'))
 // ExportarPDF: loaded dynamically via import() in share menu
 
@@ -245,13 +249,13 @@ ${p.obs_juridicas?`\n${p.obs_juridicas}`:""}
 ---
 
 ### ✅ Pontos Positivos
-${(p.positivos||[]).map(x=>`- ${x}`).join("\n")||"—"}
+${toArr(p.positivos).map(x=>`- ${x}`).join("\n")||"—"}
 
 ### ⚠️ Pontos de Atenção
-${(p.negativos||[]).map(x=>`- ${x}`).join("\n")||"—"}
+${toArr(p.negativos).map(x=>`- ${x}`).join("\n")||"—"}
 
 ### 🚨 Alertas
-${(p.alertas||[]).map(x=>`- ${x}`).join("\n")||"Nenhum"}
+${toArr(p.alertas).map(x=>`- ${x}`).join("\n")||"Nenhum"}
 
 ---
 
@@ -890,7 +894,7 @@ function KillSwitchJuridicoBanner({ imovel }) {
   }
   
   // 4. Riscos presentes com keywords críticas
-  const riscosTexto = (imovel?.riscos_presentes || []).join(' ').toLowerCase()
+  const riscosTexto = toArr(imovel?.riscos_presentes).join(' ').toLowerCase()
   if (riscosTexto.includes('penhora') && riscosTexto.includes('dupla')) {
     motivos.push({ icone: '🔒', texto: 'Penhora dupla detectada — pode haver disputas de preferência entre credores' })
   }
@@ -1845,9 +1849,9 @@ for (const s of SCORES) {
           </div>
         ))}
       </div>
-      {p.alertas?.length>0&&<div style={{background:`${K.red}10`,border:`1px solid ${K.red}30`,borderRadius:"8px",padding:"14px",marginBottom:"14px"}}>
+      {toArr(p.alertas).length>0&&<div style={{background:`${K.red}10`,border:`1px solid ${K.red}30`,borderRadius:"8px",padding:"14px",marginBottom:"14px"}}>
         <div style={{fontSize:"11px",color:K.red,fontWeight:"700",textTransform:"uppercase",letterSpacing:"1px",marginBottom:"8px"}}>🚨 Alertas Críticos</div>
-        {p.alertas.map((a,i)=><div key={i} style={{fontSize:"12.5px",color:K.tx,marginBottom:"4px"}}>• {normalizarTextoAlerta(a)}</div>)}
+        {toArr(p.alertas).map((a,i)=><div key={i} style={{fontSize:"12.5px",color:K.tx,marginBottom:"4px"}}>• {normalizarTextoAlerta(a)}</div>)}
       </div>}
       {/* Estratégia recomendada badge */}
       {/* Sprint 12: Info cards extras */}
@@ -2228,11 +2232,11 @@ for (const s of SCORES) {
       {(p.positivos?.length>0||p.negativos?.length>0)&&<div style={{display:"grid",gridTemplateColumns:isPhone?"1fr":"1fr 1fr",gap:"14px",marginBottom:"14px"}}>
         <div style={{...card(),borderTop:`2px solid ${K.grn}`}}>
           <div style={{fontWeight:"600",color:K.grn,marginBottom:"10px",fontSize:"13px"}}>✅ Pontos Positivos</div>
-          {(p.positivos||[]).map((pt,i)=><div key={i} style={{fontSize:"12.5px",color:K.tx,marginBottom:"6px",display:"flex",gap:"8px"}}><span style={{color:K.grn}}>+</span>{normalizarTextoAlerta(pt)}</div>)}
+          {toArr(p.positivos).map((pt,i)=><div key={i} style={{fontSize:"12.5px",color:K.tx,marginBottom:"6px",display:"flex",gap:"8px"}}><span style={{color:K.grn}}>+</span>{normalizarTextoAlerta(pt)}</div>)}
         </div>
         <div style={{...card(),borderTop:`2px solid ${K.red}`}}>
           <div style={{fontWeight:"600",color:K.red,marginBottom:"10px",fontSize:"13px"}}>⚠️ Pontos de Atenção</div>
-          {(p.negativos||[]).map((pt,i)=><div key={i} style={{fontSize:"12.5px",color:K.tx,marginBottom:"6px",display:"flex",gap:"8px"}}><span style={{color:K.red}}>−</span>{normalizarTextoAlerta(pt)}</div>)}
+          {toArr(p.negativos).map((pt,i)=><div key={i} style={{fontSize:"12.5px",color:K.tx,marginBottom:"6px",display:"flex",gap:"8px"}}><span style={{color:K.red}}>−</span>{normalizarTextoAlerta(pt)}</div>)}
         </div>
       </div>}
       {p.endereco&&<div style={{...card(),marginBottom:"14px"}}><div style={{fontWeight:"600",color:K.wh,marginBottom:"6px",fontSize:"13px"}}>📍 Localização</div><div style={{fontSize:"13px",color:K.t2}}>{p.endereco}</div></div>}

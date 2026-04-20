@@ -3,7 +3,7 @@ import { C, RED, ESTRATEGIA_CONFIG } from "../appConstants.js"
 import { isMercadoDireto } from '../lib/detectarFonte.js'
 import {
   CUSTOS_LEILAO, CUSTOS_MERCADO, calcularFatorHomogeneizacao,
-  IPTU_SOBRE_CONDO_RATIO, HOLDING_MESES_PADRAO, calcularLanceMaximoParaROI,
+  IPTU_SOBRE_CONDO_RATIO, HOLDING_MESES_PADRAO, calcularLanceMaximoParaROI, normalizarClasseIPEAD,
 } from '../lib/constants.js'
 import { useReforma } from '../hooks/useReforma.jsx'
 
