@@ -872,6 +872,47 @@ function ConfidencePanel({ imovel }) {
   )
 }
 
+
+// Accordion de alertas informativos (não-críticos) — colapsável para não poluir o topo
+function AlertasInfoAccordion({ imovel }) {
+  const [aberto, setAberto] = React.useState(false)
+
+  // Verificar se há algum alerta informativo relevante
+  const temAvalInflada = (() => {
+    const av = parseFloat(imovel?.valor_avaliacao) || 0
+    const mk = parseFloat(imovel?.valor_mercado_estimado) || 0
+    return !isMercadoDireto(imovel?.fonte_url, imovel?.tipo_transacao) && av > 0 && mk > 0 && av > mk * 1.20
+  })()
+  const temIRPF = parseFloat(imovel?.valor_mercado_estimado) > 0 &&
+    parseFloat(imovel?.valor_mercado_estimado) <= 440000 &&
+    !isMercadoDireto(imovel?.fonte_url, imovel?.tipo_transacao)
+  const temConf = imovel?.confidence_score != null && imovel.confidence_score < 60
+  const temSobrecap = false // calculado internamente — só mostrar se relevante
+
+  const count = [temAvalInflada, temIRPF, temConf].filter(Boolean).length
+  if (count === 0) return null
+
+  return (
+    <div style={{ marginBottom: 10 }}>
+      <button onClick={() => setAberto(a => !a)}
+        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '8px 12px', borderRadius: 8, border: '1px solid #FDE68A',
+          background: '#FFFBEB', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: '#92400E' }}>
+        <span>💡 {count} aviso{count > 1 ? 's' : ''} informativo{count > 1 ? 's' : ''}</span>
+        <span style={{ fontSize: 10, color: '#B45309' }}>{aberto ? '▲ fechar' : '▼ ver'}</span>
+      </button>
+      {aberto && (
+        <div style={{ border: '1px solid #FDE68A', borderTop: 'none', borderRadius: '0 0 8px 8px', overflow: 'hidden' }}>
+          <AvaliacaoInfladaBanner imovel={imovel} />
+          <IsencaoIRPFBanner imovel={imovel} />
+          <ConfidencePanel imovel={imovel} />
+          <SobrecapBanner imovel={imovel} />
+        </div>
+      )}
+    </div>
+  )
+}
+
 // Kill-switch jurídico: faixa vermelha proeminente quando há risco fatal
 // Diferencial AXIS vs Leilão Ninja — sinaliza ANTES do score, não enterrado
 function KillSwitchJuridicoBanner({ imovel }) {
@@ -1796,6 +1837,8 @@ for (const s of SCORES) {
       </div>}
 
       {abaDetalhe==='resumo'&&<>
+      {/* Zona de decisão: aparece no topo quando há leilão próximo */}
+      <ResumoPreLeilao imovel={p} onUpdate={() => onUpdateProp && onUpdateProp({...p})} onGerarSintese={isAdmin ? handleGerarSintese : null} />
       {p.foto_principal&&(
         <div style={{width:'100%',maxHeight:420,borderRadius:12,overflow:'hidden',marginBottom:16,background:'#f0f0f0',willChange:'transform'}}>
           <img src={p.foto_principal} alt={p.titulo||'Foto'} referrerPolicy="no-referrer"
@@ -1836,22 +1879,21 @@ for (const s of SCORES) {
           {p.praca&&<Bdg c={p.praca>=2?"#D97706":"#065F46"} ch={`${p.praca}ª Praça`}/>}
         </div>
       </div>
-      {/* Sprint 12: Cards de atributos do imóvel (estilo Ninja) */}
-      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(110px, 1fr))',gap:8,marginBottom:16}}>
+      {/* Atributos rápidos — linha compacta */}
+      <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:12}}>
         {[
-          {icon:'📐',label:'Área',value:parseFloat(p.area_construida_m2||p.area_privativa_m2||p.area_m2)?`${Math.round(parseFloat(p.area_construida_m2||p.area_privativa_m2||p.area_m2))} m²`:'—',sub:p.area_construida_m2?'construída':'total'},
-          {icon:'🛏',label:'Quartos',value:p.quartos||'—',sub:p.suites?`${p.suites} suíte${p.suites>1?'s':''}`:null},
-          {icon:'🚿',label:'Banheiros',value:p.banheiros||'—'},
-          {icon:'🚗',label:'Vagas',value:p.vagas||'—'},
-          ...(p.nome_condominio?[{icon:'🏢',label:'Condomínio',value:p.nome_condominio.split('(')[0].trim().substring(0,20),sub:p.condominio_mensal?`R$ ${Math.round(p.condominio_mensal)}/mês`:null}]:[]),
-          // ROI estático removido — use o banner dinâmico abaixo do ConfigEstudo
-        ].map((a,i) => (
-          <div key={i} style={{background:'#fff',border:`1px solid ${C.borderW}`,borderRadius:10,padding:'10px 12px',textAlign:'center'}}>
-            <div style={{fontSize:20,marginBottom:2}}>{a.icon}</div>
-            <div style={{fontSize:14,fontWeight:700,color:C.navy}}>{a.value}</div>
-            <div style={{fontSize:9.5,color:C.muted,textTransform:'uppercase',letterSpacing:'.3px'}}>{a.label}</div>
-            {a.sub&&<div style={{fontSize:8.5,color:C.hint,marginTop:1}}>{a.sub}</div>}
-          </div>
+          parseFloat(p.area_construida_m2||p.area_privativa_m2||p.area_m2) && `📐 ${Math.round(parseFloat(p.area_construida_m2||p.area_privativa_m2||p.area_m2))}m²`,
+          p.quartos && `🛏 ${p.quartos}q${p.suites?`/${p.suites}s`:''}`,
+          p.banheiros && `🚿 ${p.banheiros}`,
+          p.vagas && `🚗 ${p.vagas} vaga${p.vagas>1?'s':''}`,
+          p.andar && `🏢 ${p.andar}º andar`,
+          p.condominio_mensal && `Cond. R$${Math.round(p.condominio_mensal).toLocaleString('pt-BR')}/mês`,
+          p.elevador === false && '⚠️ Sem elevador',
+        ].filter(Boolean).map((t,i)=>(
+          <span key={i} style={{fontSize:11,padding:'4px 10px',borderRadius:20,
+            background:C.offwhite,border:`1px solid ${C.borderW}`,color:C.navy,fontWeight:600}}>
+            {t}
+          </span>
         ))}
       </div>
       {toArr(p.alertas).length>0&&<div style={{background:`${K.red}10`,border:`1px solid ${K.red}30`,borderRadius:"8px",padding:"14px",marginBottom:"14px"}}>
@@ -1998,15 +2040,13 @@ for (const s of SCORES) {
       {!isMercadoDireto(p.fonte_url, p.tipo_transacao) && <PainelLeilao imovel={p} isAdmin={isAdmin} />}
       {/* ═══ ReformaProvider: sincroniza cenário de reforma entre painéis ═══ */}
       <ReformaProvider imovel={p}>
-        {/* Sprint 23: alertas pré-análise financeira */}
+        {/* Banners críticos: sempre visíveis */}
         <KillSwitchJuridicoBanner imovel={p} />
-        <AvaliacaoInfladaBanner imovel={p} />
-        <IsencaoIRPFBanner imovel={p} />
-        <ConfidencePanel imovel={p} />
-        <SobrecapBanner imovel={p} />
         <DadosInsuficientesBanner imovel={p} />
         <LanceAcimaMercadoBanner imovel={p} />
         <LanceAlertaBanner imovel={p} />
+        {/* Banners informativos: accordion colapsável */}
+        <AlertasInfoAccordion imovel={p} />
         {parseFloat(p.valor_mercado_estimado) > 0 && (
           <GraficoROIHorizonteWrapper imovel={p} />
         )}
@@ -2022,7 +2062,6 @@ for (const s of SCORES) {
           </div>
         )}
         {/* Sprint 18: Configuração global do estudo (lance + reforma) */}
-        <ResumoPreLeilao imovel={p} onUpdate={() => onUpdateProp && onUpdateProp({...p})} onGerarSintese={isAdmin ? handleGerarSintese : null} />
         <ConfigEstudo imovel={p} />
         {/* Sprint 22: ROI dinâmico — sincronizado com lance e reforma do ConfigEstudo */}
         <RoiLiveBanner imovel={p} />
