@@ -1606,6 +1606,13 @@ for (const s of SCORES) {
           Ao Vivo
         </button>
         {isAdmin&&onArchive&&<button style={{...btn("s"),background:`${C.mustardL}`,color:C.mustard,border:`1px solid ${C.mustard}40`}} onClick={()=>onArchive(p.id)}>📦 Arquivar</button>}
+        {isAdmin && p.campos_travados?.length > 0 && (
+          <span title={`Campos protegidos: ${(p.campos_travados||[]).join(', ')}`}
+            style={{fontSize:10,padding:'4px 8px',borderRadius:5,background:'#F0F4FF',
+              border:'1px solid #002B8020',color:'#002B80',cursor:'help',fontWeight:600}}>
+            🔒 {p.campos_travados.length} protegido{p.campos_travados.length>1?'s':''}
+          </span>
+        )}
         {isAdmin && (() => {
           const hoje = Date.now()
           const d1 = p.data_leilao ? Math.ceil((new Date(p.data_leilao+'T12:00')-hoje)/86400000) : null

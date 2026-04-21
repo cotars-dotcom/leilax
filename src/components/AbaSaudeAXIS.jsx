@@ -19,6 +19,8 @@ export default function AbaSaudeAXIS({ isPhone = false, onNav = null }) {
   const [lastCheck, setLastCheck] = useState(null)
   const [enrichProgress, setEnrichProgress] = useState(null)
 
+  const [bloqueios, setBloqueios] = React.useState([])
+
   const verificar = async () => {
     setLoading(true)
     try {
@@ -36,6 +38,14 @@ export default function AbaSaudeAXIS({ isPhone = false, onNav = null }) {
         .eq('status', 'analisado')
         .order('codigo_axis')
       setImoveis(imoveisData || [])
+      // 3. Campos bloqueados por imóvel
+      const { data: bloqData } = await supabase
+        .from('vw_bloqueios_imovel')
+        .select('codigo_axis, bairro, criado_em, descricao, campos_bloqueados')
+        .order('criado_em', { ascending: false })
+        .limit(20)
+      setBloqueios(bloqData || [])
+
       setLastCheck(new Date())
     } catch (e) {
       console.warn('[AXIS Saúde]', e.message)
@@ -268,6 +278,33 @@ export default function AbaSaudeAXIS({ isPhone = false, onNav = null }) {
           </div>
         )
       })()}
+
+      {/* Seção: campos protegidos por imóvel */}
+      {bloqueios.length > 0 && (
+        <div style={{ ...card(), padding: 14 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#0F172A', marginBottom: 10 }}>
+            🔒 Histórico de campos protegidos
+            <span style={{ fontSize: 10, fontWeight: 400, color: '#64748B', marginLeft: 8 }}>
+              Trigger impede sobrescrita de dados validados manualmente
+            </span>
+          </div>
+          {bloqueios.slice(0, 8).map((b, i) => (
+            <div key={i} style={{ fontSize: 11, padding: '6px 10px', marginBottom: 4,
+              background: '#F8FAFC', borderRadius: 6, border: '1px solid #E2E8F0',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+              <div>
+                <span style={{ fontWeight: 700, color: '#0F172A', fontFamily: 'monospace', fontSize: 10 }}>
+                  {b.codigo_axis}
+                </span>
+                <span style={{ color: '#475569', marginLeft: 8 }}>{b.descricao}</span>
+              </div>
+              <span style={{ fontSize: 10, color: '#94A3B8', flexShrink: 0 }}>
+                {new Date(b.criado_em).toLocaleDateString('pt-BR')}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
