@@ -370,10 +370,12 @@ function AxisHeader({profile:prof, imoveis=[], onNav, isPhone=false, isMobile=fa
 }
 
 export default function Dashboard({props,onNav,profile:prof,isMobile,isPhone}) {
-  const total=props.length, comprar=props.filter(p=>p.recomendacao==="COMPRAR").length
-  const forte=props.filter(p=>(p.score_total||0)>=7.5).length
-  const avg=total?(props.reduce((s,p)=>s+(p.score_total||0),0)/total).toFixed(2):"0"
-  const avgPct=total?Math.round((props.reduce((s,p)=>s+(p.score_total||0),0)/total)*10):0
+  // Excluir imóveis sem dados suficientes das métricas (não distorcem médias)
+  const propsAnalised = props.filter(p => p.recomendacao !== 'DADOS_INSUFICIENTES')
+  const total=propsAnalised.length, comprar=propsAnalised.filter(p=>p.recomendacao==="COMPRAR").length
+  const forte=propsAnalised.filter(p=>(p.score_total||0)>=7.5).length
+  const avg=total?(propsAnalised.reduce((s,p)=>s+(p.score_total||0),0)/total).toFixed(2):"0"
+  const avgPct=total?Math.round((propsAnalised.reduce((s,p)=>s+(p.score_total||0),0)/total)*10):0
   const recentes=[...props].sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt)).slice(0,4)
   // Card 3: priorizar imóvel com leilão mais próximo (urgente > score alto)
   const hoje = Date.now()

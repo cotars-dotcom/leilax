@@ -47,7 +47,7 @@ const ROW_GROUPS = [
   {
     titulo: '📊 Score AXIS',
     rows: [
-      { label: 'Score Total', fn: p => p.score_total ? `${Math.round(p.score_total * 10)}/100` : '—', destaque: true, cor: p => scoreColor(p.score_total || 0) },
+      { label: 'Score Total', fn: p => p.score_total ? `${Number(p.score_total).toFixed(1)}/10` : '—', destaque: true, cor: p => scoreColor(p.score_total || 0) },
       { label: 'Confiança', fn: p => p.confidence_score != null ? `${p.confidence_score}%` : '—', cor: p => (p.confidence_score || 0) >= 75 ? '#059669' : '#D97706' },
       { label: 'Recomendação', fn: p => p.recomendacao || '—', cor: p => p.recomendacao === 'COMPRAR' ? '#059669' : p.recomendacao === 'INVIAVEL' ? '#DC2626' : '#D97706' },
       { label: 'Desconto/Mercado', fn: p => {

@@ -12,7 +12,7 @@
  */
 
 const DATAJUD_BASE = 'https://api-publica.datajud.cnj.jus.br'
-const DATAJUD_KEY  = 'cDZHYzlZa0JadVREZDJCendQbXY6SkJlTzNjLV9TRENyQk1RdnFKZGRQdw=='
+const DATAJUD_KEY  = import.meta.env.VITE_DATAJUD_KEY || 'cDZHYzlZa0JadVREZDJCendQbXY6SkJlTzNjLV9TRENyQk1RdnFKZGRQdw=='
 
 // Mapeamento tribunal → endpoint
 const TRIBUNAL_ENDPOINT = {
