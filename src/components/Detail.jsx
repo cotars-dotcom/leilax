@@ -1512,6 +1512,16 @@ for (const s of SCORES) {
                 <span style={{fontSize:18}}>🎯</span>
                 <div><div>Decisão de Lance PDF</div><div style={{fontSize:10,color:C.muted,fontWeight:400}}>1 página · lance + ROI + cenários</div></div>
               </button>
+              <button onClick={async () => {
+                const { abrirResumoSimples } = await import('./ExportarResumoSimples.jsx')
+                abrirResumoSimples(p)
+                setShowShareMenu(false)
+              }} style={{display:'flex',alignItems:'center',gap:8,width:'100%',padding:'10px 12px',
+                border:'none',background:'#EFF6FF',cursor:'pointer',borderRadius:8,fontSize:13,color:'#1D4ED8',fontWeight:600,
+                textAlign:'left'}}>
+                <span style={{fontSize:18}}>📋</span>
+                <div><div>Resumo Simplificado</div><div style={{fontSize:10,color:C.muted,fontWeight:400}}>3 zonas · decisão + financeiro + detalhes</div></div>
+              </button>
               <button onClick={() => {
                 import('../lib/supabase.js').then(({ exportarAnaliseJSON }) => { exportarAnaliseJSON(p) })
                 setShowShareMenu(false)
