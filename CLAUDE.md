@@ -106,7 +106,8 @@ Deno-based. Three functions: `ai-proxy` (routes AI calls, holds API keys), `get-
 ### DB health notes
 - `riscos_imovel` backfilled in sprint36b from `riscos_presentes` — 14 rows across 7 properties. Auto-populated on every `saveImovelCompleto()` going forward.
 - `sprint_24_changelog` dropped — do not reference.
-- `agent_cache`, `atualizacoes_mercado`, `criterios_avaliacao`, `csv_imports`, `trello_sync_log` have 0 rows — features planned but never activated.
+- `trello_sync_log`, `riscos_imovel` — populated automatically; `tarefas` — UI exists but never used in practice.
+- `agent_cache`, `atualizacoes_mercado`, `criterios_avaliacao`, `csv_imports` — dropped in sprint36i (no code references, 0 rows, unimplemented features).
 - `metricas_bairros` (32 rows) is the live source for neighborhood data. `mercado_regional` (16 rows) is the fallback. `metricas_bairros_bh.js` is a static snapshot — update when market data changes.
 
 ### Files over 500 lines (split candidates)
