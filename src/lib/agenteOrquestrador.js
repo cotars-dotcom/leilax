@@ -116,7 +116,16 @@ export async function enriquecerImovel(imovel, opts = {}) {
       const pEnriquecido = { ...p, ...updates }
       updates.mao_flip    = calcularLanceMaximoParaROI(20, pEnriquecido, { eMercado: false, custoReforma: reformaMedia, mercadoBruto: vmFinal })
       updates.mao_locacao = calcularLanceMaximoParaROI(6,  pEnriquecido, { eMercado: false, custoReforma: 0, mercadoBruto: vmFinal })
-      log.push(`✅ MAO flip: R$${updates.mao_flip?.toLocaleString('pt-BR')} / locação: R$${updates.mao_locacao?.toLocaleString('pt-BR')}`)
+      // Verificar se MAO está protegido (campos_travados)
+      const travados = Array.isArray(imovel.campos_travados) ? imovel.campos_travados : []
+      const maoProtegido = travados.includes('mao_flip')
+      if (maoProtegido) {
+        log.push(`ℹ️ MAO calculado (bloqueado): flip R$${updates.mao_flip?.toLocaleString('pt-BR')} / locação R$${updates.mao_locacao?.toLocaleString('pt-BR')} — campos protegidos, valor do banco mantido`)
+        delete updates.mao_flip
+        delete updates.mao_locacao
+      } else {
+        log.push(`✅ MAO flip: R$${updates.mao_flip?.toLocaleString('pt-BR')} / locação: R$${updates.mao_locacao?.toLocaleString('pt-BR')}`)
+      }
     } catch(e) { log.push(`⚠️ MAO falhou: ${e.message}`) }
   }
 

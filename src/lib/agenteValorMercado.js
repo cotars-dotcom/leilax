@@ -18,13 +18,16 @@ const SIDRA_SINAPI_URL =
  */
 export async function buscarValorMercado(bairro, cidade = 'Belo Horizonte') {
   // 1. Banco interno (fonte primária — atualizado pelos prompts de delegação)
-  const { data } = await supabase
-    .from('metricas_bairros')
-    .select('*')
-    .ilike('bairro', bairro.trim())
-    .limit(1)
-    .single()
-    .catch(() => ({ data: null }))
+  let data = null
+  try {
+    const res = await supabase
+      .from('metricas_bairros')
+      .select('*')
+      .ilike('bairro', bairro.trim())
+      .limit(1)
+      .single()
+    data = res.data
+  } catch { data = null }
 
   if (data) {
     return {

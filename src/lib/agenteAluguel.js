@@ -13,13 +13,16 @@ import { supabase } from './supabase.js'
  * Estima aluguel mensal para um imóvel
  */
 export async function estimarAluguel(bairro, area_m2, quartos = 2, atributos = {}) {
-  const { data: mb } = await supabase
-    .from('metricas_bairros')
-    .select('aluguel_2q_tipico, aluguel_3q_tipico, aluguel_m2_com_elevador, aluguel_m2_sem_elevador, fator_elevador, fator_piscina, fator_lazer, yield_bruto')
-    .ilike('bairro', bairro.trim())
-    .limit(1)
-    .single()
-    .catch(() => ({ data: null }))
+  let mb = null
+  try {
+    const res = await supabase
+      .from('metricas_bairros')
+      .select('aluguel_2q_tipico, aluguel_3q_tipico, aluguel_m2_com_elevador, aluguel_m2_sem_elevador, fator_elevador, fator_piscina, fator_lazer, yield_bruto')
+      .ilike('bairro', bairro.trim())
+      .limit(1)
+      .single()
+    mb = res.data
+  } catch { mb = null }
 
   if (!mb) return null
 
