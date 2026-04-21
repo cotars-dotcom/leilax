@@ -23,6 +23,7 @@ import MapaCalorBairros from './MapaCalorBairros.jsx'
 import GraficoTendencia from './GraficoTendencia.jsx'
 import SimuladorLance from './SimuladorLance.jsx'
 import ConfigEstudo from './ConfigEstudo.jsx'
+import ResumoCard from './ResumoCard.jsx'
 import PainelRentabilidade from './PainelRentabilidade.jsx'
 import { isMercadoDireto } from '../lib/detectarFonte.js'
 import { calcularCustosAquisicao, MULT_CUSTO_RAPIDO, CUSTOS_LEILAO, CUSTOS_MERCADO, IPTU_SOBRE_CONDO_RATIO, HOLDING_MESES_PADRAO, calcularLanceMaximoParaROI, calcularSobrecapitalizacao, IRPF_ISENCAO_TETO } from '../lib/constants.js'
@@ -33,7 +34,7 @@ import CustosReaisEditor from './CustosReaisEditor.jsx'
 import ComparaveisComFiltros from './ComparaveisComFiltros.jsx'
 
 // ErrorBoundary local para isolar falhas por seção do Detail
-class SectionErrorBoundary extends React.Component {
+export class SectionErrorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { hasError: false } }
   static getDerivedStateFromError() { return { hasError: true } }
   componentDidCatch(err) { console.warn('[AXIS Detail]', this.props.nome, err.message) }
@@ -1877,47 +1878,18 @@ for (const s of SCORES) {
       {abaDetalhe==='resumo'&&<>
       {/* Zona de decisão: aparece no topo quando há leilão próximo */}
       <ResumoPreLeilao imovel={p} onUpdate={() => onUpdateProp && onUpdateProp({...p})} onGerarSintese={isAdmin ? handleGerarSintese : null} />
+      {/* Foto do imóvel */}
       {p.foto_principal&&(
-        <div style={{width:'100%',maxHeight:420,borderRadius:12,overflow:'hidden',marginBottom:16,background:'#f0f0f0',willChange:'transform'}}>
+        <div style={{width:'100%',maxHeight:320,borderRadius:12,overflow:'hidden',marginBottom:12,background:'#f0f0f0',willChange:'transform'}}>
           <img src={p.foto_principal} alt={p.titulo||'Foto'} referrerPolicy="no-referrer"
-            style={{width:'100%',height:'auto',maxHeight:420,objectFit:'cover',display:'block'}}
+            style={{width:'100%',height:'auto',maxHeight:320,objectFit:'cover',display:'block'}}
             onError={e=>{e.target.parentElement.style.display='none'}}/>
         </div>
       )}
-      <div style={{background:`${rc}10`,border:`1px solid ${rc}30`,borderRadius:"10px",padding:"20px",marginBottom:"16px",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:"16px"}}>
-        <div style={{display:"flex",alignItems:"center",gap:"20px"}}>
-          {sc > 0 ? (
-              showRadar
-                ? <div onClick={() => setShowRadar(false)} title="Clique para voltar ao gauge" style={{cursor:'pointer'}}>
-                    <SectionErrorBoundary nome="ScoreRadar"><ScoreRadar imovel={p} size={200} /></SectionErrorBoundary>
-                  </div>
-                : <div onClick={() => setShowRadar(true)} title="Clique para ver radar de dimensões" style={{cursor:'pointer'}}>
-                    <ScoreRing score={sc} size={90}/>
-                    <div style={{fontSize:8,color:'#64748B',textAlign:'center',marginTop:2}}>ver radar ↗</div>
-                  </div>
-            ) : (
-              <div style={{width:90,height:90,borderRadius:'50%',border:'3px dashed #D4D4D8',display:'flex',alignItems:'center',justifyContent:'center',flexDirection:'column'}}>
-                <div style={{fontSize:16,fontWeight:700,color:C.muted}}>N/A</div>
-                <div style={{fontSize:8,color:C.hint}}>dados insuf.</div>
-              </div>
-            )}
-          <div>
-            <div style={{fontSize:"11px",color:K.t3,textTransform:"uppercase",letterSpacing:"1px",marginBottom:"4px"}}>Recomendação</div>
-            <div style={{fontSize:"28px",fontWeight:"800",color:rc}}>{p.recomendacao||"—"}</div>
-            <div style={{fontSize:"12px",color:K.t2,marginTop:"4px",maxWidth:"400px"}}>{p.justificativa}</div>
-          </div>
-        </div>
-        <div style={{display:"flex",gap:"6px",flexWrap:"wrap"}}>
-          <Bdg c={p.ocupacao==="Desocupado"?K.grn:K.red} ch={p.ocupacao||"—"}/>
-          <Bdg c={p.financiavel?K.blue:K.t3} ch={p.financiavel?"Financiável":"Sem financ."}/>
-          {p.fgts_aceito&&<Bdg c={K.pur} ch="FGTS"/>}
-          <Bdg c={K.t3} ch={p.modalidade||"—"}/>
-          {p.parcelamento_aceito&&<Bdg c="#2563EB" ch="💳 Parcelável"/>}
-          {p.elevador===false&&<Bdg c="#D97706" ch="⚠️ Sem elevador"/>}
-          {p.praca&&<Bdg c={p.praca>=2?"#D97706":"#065F46"} ch={`${p.praca}ª Praça`}/>}
-        </div>
-      </div>
-      {/* Atributos rápidos — linha compacta */}
+      {/* ResumoCard — substituição do bloco antigo (sem duplicatas) */}
+      <ResumoCard p={p} isAdmin={isAdmin} isMobile={isMobile}
+        onUpdateProp={onUpdateProp} handleGerarSintese={handleGerarSintese} />
+      {/* Atributos rápidos — linha compacta (só exibidos aqui, não duplicados abaixo) */}
       <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:12}}>
         {[
           parseFloat(p.area_construida_m2||p.area_privativa_m2||p.area_m2) && `📐 ${Math.round(parseFloat(p.area_construida_m2||p.area_privativa_m2||p.area_m2))}m²`,
@@ -2099,10 +2071,9 @@ for (const s of SCORES) {
             ⚠️ Risco jurídico alto (score {Number(p.score_juridico).toFixed(1)}) — revise a aba Jurídico antes de calcular o lance
           </div>
         )}
-        {/* Sprint 18: Configuração global do estudo (lance + reforma) */}
+        {/* ConfigEstudo: slider de lance e reforma — sincroniza toda a aba financeira */}
         <ConfigEstudo imovel={p} />
-        {/* Sprint 22: ROI dinâmico — sincronizado com lance e reforma do ConfigEstudo */}
-        <RoiLiveBanner imovel={p} />
+        {/* RoiLiveBanner removido — ROI disponível no SimuladorLance abaixo */}
         {/* Mostrar PainelLancamento só para leilões */}
         {!isMercadoDireto(p.fonte_url, p.tipo_transacao) && <SectionErrorBoundary nome="PainelLancamento"><PainelLancamento imovel={p}/></SectionErrorBoundary>}
         {/* Sprint 11: Breakdown financeiro + ROI + Preditor de Concorrência */}
@@ -2110,7 +2081,7 @@ for (const s of SCORES) {
         {/* Sprint 16: Simulador de Lance Interativo */}
         <SectionErrorBoundary nome="SimuladorLance"><SimuladorLance p={p} isPhone={isPhone} /></SectionErrorBoundary>
         {/* Sprint 16: Atributos do Prédio */}
-        <AtributosPredio p={p} />
+        {/* AtributosPredio removido — info integrada nos chips do ResumoCard */}
         {/* Sprint 12.2: Timeline da Matrícula */}
         <SectionErrorBoundary nome="TimelineMatricula"><TimelineMatricula imovel={p} /></SectionErrorBoundary>
         {/* Mercado direto: badge de oportunidade */}
