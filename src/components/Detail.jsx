@@ -935,6 +935,24 @@ function AlertasInfoAccordion({ imovel }) {
   )
 }
 
+
+// Banner: yield de locação abaixo da Selic (risco de oportunidade)
+function YieldAbaixoSelicBanner({ imovel }) {
+  const selic = 14.75 // Selic abr/2026 (Copom 18/03/2026)
+  const yld = parseFloat(imovel?.yield_bruto_pct) || 0
+  const aluguel = parseFloat(imovel?.aluguel_mensal_estimado) || 0
+  const mao = parseFloat(imovel?.mao_locacao) || 0
+  if (!aluguel || yld <= 0 || yld >= selic) return null
+  const gap = (selic - yld).toFixed(1)
+  return (
+    <div style={{background:'#FEF2F2',border:'1px solid #FECACA',borderRadius:8,
+      padding:'8px 12px',marginBottom:10,fontSize:12,color:'#991B1B'}}>
+      ⚠️ <strong>Yield bruto ({yld}% a.a.) abaixo da Selic ({selic}%)</strong> — {gap}pp de diferença.
+      Considere o risco de oportunidade vs renda fixa. O MAO de locação ({mao > 0 ? 'R$'+Math.round(mao).toLocaleString('pt-BR') : '—'}) já compensa isso para o lance certo.
+    </div>
+  )
+}
+
 // Kill-switch jurídico: faixa vermelha proeminente quando há risco fatal
 // Diferencial AXIS vs Leilão Ninja — sinaliza ANTES do score, não enterrado
 function KillSwitchJuridicoBanner({ imovel }) {
@@ -2056,6 +2074,7 @@ for (const s of SCORES) {
         <LanceAcimaMercadoBanner imovel={p} />
         <LanceAlertaBanner imovel={p} />
         {/* Banners informativos: accordion colapsável */}
+        <YieldAbaixoSelicBanner imovel={p} />
         <AlertasInfoAccordion imovel={p} />
         {parseFloat(p.valor_mercado_estimado) > 0 && (
           <SectionErrorBoundary nome="GraficoROI"><GraficoROIHorizonteWrapper imovel={p} /></SectionErrorBoundary>
