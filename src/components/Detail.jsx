@@ -17,6 +17,7 @@ import TimelineMatricula from './TimelineMatricula.jsx'
 import GraficoROIHorizonte from './GraficoROIHorizonte.jsx'
 import PainelYieldModalidades from './PainelYieldModalidades.jsx'
 import ResumoPreLeilao from './ResumoPreLeilao.jsx'
+import DatajudCard from './DatajudCard.jsx'
 import PainelAtividades from './PainelAtividades.jsx'
 import MapaCalorBairros from './MapaCalorBairros.jsx'
 import GraficoTendencia from './GraficoTendencia.jsx'
@@ -1858,12 +1859,7 @@ for (const s of SCORES) {
       {(p.distribuicao_pavimentos || p.parcelamento_detalhes || p.processo_numero || p.coproprietarios) && (
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:14}}>
           {p.processo_numero && (
-            <div style={{background:'#F0F4FF',border:'1px solid #002B8020',borderRadius:8,padding:'8px 12px',cursor:'pointer'}}
-              onClick={() => { navigator.clipboard?.writeText(p.processo_numero); }}>
-              <div style={{fontSize:9,color:C.muted,textTransform:'uppercase'}}>⚖️ Processo</div>
-              <div style={{fontSize:11.5,fontWeight:600,color:C.navy,fontFamily:'monospace'}}>{p.processo_numero}</div>
-              <div style={{fontSize:8,color:C.hint}}>clique p/ copiar</div>
-            </div>
+            <DatajudCard imovel={p} onUpdate={() => onUpdateProp && onUpdateProp({...p})} />
           )}
           {p.parcelamento_detalhes && (
             <div style={{background:'#EFF6FF',border:'1px solid #2563EB20',borderRadius:8,padding:'8px 12px'}}>
