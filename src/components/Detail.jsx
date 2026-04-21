@@ -1107,7 +1107,7 @@ export default function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze
                 preco_m2_mercado: p.preco_m2_mercado || data.preco_anuncio_m2 || data.preco_contrato_m2,
                 yield_bruto_pct: p.yield_bruto_pct || data.yield_bruto,
               }
-              onUpdateProp(enriched)
+              onUpdateProp(enriched.id || p.id, enriched)
             }
           }
         }).catch(() => {})
@@ -1161,7 +1161,7 @@ export default function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze
       if (Object.keys(result.updates).length > 0) {
         const { data: { session } } = await supabase.auth.getSession()
         await saveImovelCompleto({ ...p, ...result.updates }, session?.user?.id)
-        if (onUpdateProp) onUpdateProp({ ...p, ...result.updates })
+        if (onUpdateProp) onUpdateProp(p.id, { ...p, ...result.updates })
       }
       setEnrichLog(result.log)
     } catch(e) {
@@ -1205,7 +1205,7 @@ Responda apenas com o texto da síntese, sem JSON, sem markdown.`
       if (texto && onUpdateProp) {
         const updated = { ...p, sintese_executiva: texto.trim() }
         await saveImovelCompleto(updated, session?.user?.id)
-        onUpdateProp(updated)
+        onUpdateProp(updated.id || p.id, updated)
       }
     } catch(e) { alert('Erro ao gerar síntese: ' + e.message) }
     finally { setGenSintese(false) }
@@ -1550,7 +1550,7 @@ for (const s of SCORES) {
                   investimento_total: parseFloat(lance.replace(/[^0-9.]/g,'')),
                   atualizado_em: new Date().toISOString()
                 }).eq('id',p.id)
-                if(onUpdateProp) onUpdateProp({...p, status_operacional:'arrematado'})
+                if(onUpdateProp) onUpdateProp(p.id, {...p, status_operacional:'arrematado'})
                 showToast(`✅ ${p.codigo_axis} marcado como arrematado!`,'#059669')
               }}>
               ✅ Arrematei
@@ -1561,7 +1561,7 @@ for (const s of SCORES) {
                   status_operacional:'nao_arrematado',
                   atualizado_em: new Date().toISOString()
                 }).eq('id',p.id)
-                if(onUpdateProp) onUpdateProp({...p, status_operacional:'nao_arrematado'})
+                if(onUpdateProp) onUpdateProp(p.id, {...p, status_operacional:'nao_arrematado'})
                 showToast(`${p.codigo_axis} marcado como não arrematado`,'#DC2626')
               }}>
               ❌ Não arrematei
