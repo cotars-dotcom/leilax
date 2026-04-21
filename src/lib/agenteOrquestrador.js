@@ -13,6 +13,7 @@ import { estimarAluguel, calcularYield } from './agenteAluguel.js'
 import { consultarProcesso } from './agenteDatajud.js'
 import { calcularConfidence } from './agenteConfidenceBadge.js'
 import { calcularLanceMaximoParaROI, CUSTOS_LEILAO } from './constants.js'
+import { calcularCustoJuridico } from '../data/riscos_juridicos.js'
 
 /**
  * Enriquece um imóvel com dados de todos os agentes.
@@ -89,6 +90,23 @@ export async function enriquecerImovel(imovel, opts = {}) {
       }
     } catch(e) { log.push(`⚠️ Datajud falhou: ${e.message}`) }
   }
+
+  // ── 4.5. CUSTO JURÍDICO ─────────────────────────────────────────────────────
+  try {
+    const pAtual = { ...p, ...updates }
+    const riscos = Array.isArray(pAtual.riscos_presentes)
+      ? pAtual.riscos_presentes
+      : (() => { try { return JSON.parse(pAtual.riscos_presentes || '[]') } catch { return [] } })()
+    if (riscos.length > 0) {
+      const aluguel = parseFloat(updates.aluguel_mensal_estimado || p.aluguel_mensal_estimado) || 0
+      const custoJur = calcularCustoJuridico(riscos, aluguel)
+      if (custoJur?.custo_total_max > 0) {
+        updates.custo_juridico_estimado      = custoJur.custo_total_max
+        updates.prazo_liberacao_estimado_meses = custoJur.prazo_liberacao_meses_max || p.prazo_liberacao_estimado_meses
+        log.push(`✅ Custo jurídico: R$${custoJur.custo_total_max.toLocaleString('pt-BR')} · prazo ${custoJur.prazo_liberacao_meses_max}m`)
+      }
+    }
+  } catch(e) { log.push(`⚠️ Custo jurídico falhou: ${e.message}`) }
 
   // ── 5. MAO ──────────────────────────────────────────────────────────────────
   const vmFinal = parseFloat(updates.valor_mercado_estimado || p.valor_mercado_estimado) || 0
