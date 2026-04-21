@@ -312,7 +312,7 @@ export default function PainelInvestimento({ imovel }) {
             {p.distribuicao_pavimentos && (
               <span style={{ fontSize: 9.5, padding: '3px 8px', borderRadius: 5, background: '#F3F4F6', color: '#374151' }}
                 title={p.distribuicao_pavimentos}>
-                🏗️ {p.distribuicao_pavimentos.split('|').length} pavimentos
+                🏗️ {String(p.distribuicao_pavimentos).split('|').length} pavimentos
               </span>
             )}
           </div>

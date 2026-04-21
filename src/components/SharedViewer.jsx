@@ -251,7 +251,7 @@ export default function SharedViewer({ token }) {
 
         {/* JURÍDICO */}
         {(p.processos_ativos||p.matricula_status||p.obs_juridicas) && <div style={card()}>{secTitle('Análise Jurídica','⚖️')}
-          <Row label="Processo" value={p.processo_numero||(p.processos_ativos?p.processos_ativos.substring(0,100):null)} />
+          <Row label="Processo" value={p.processo_numero||(p.processos_ativos?String(p.processos_ativos).substring(0,100):null)} />
           <Row label="Vara" value={p.vara_judicial} />
           <Row label="Tribunal" value={p.tipo_justica} />
           <Row label="Matrícula" value={p.matricula_status} />

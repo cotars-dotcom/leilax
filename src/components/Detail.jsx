@@ -1868,7 +1868,7 @@ for (const s of SCORES) {
           {p.parcelamento_detalhes && (
             <div style={{background:'#EFF6FF',border:'1px solid #2563EB20',borderRadius:8,padding:'8px 12px'}}>
               <div style={{fontSize:9,color:C.muted,textTransform:'uppercase'}}>💳 Parcelamento</div>
-              <div style={{fontSize:11,color:'#1D4ED8',lineHeight:1.4}}>{p.parcelamento_detalhes.substring(0,120)}</div>
+              <div style={{fontSize:11,color:'#1D4ED8',lineHeight:1.4}}>{String(p.parcelamento_detalhes).substring(0,120)}</div>
             </div>
           )}
           {p.distribuicao_pavimentos && (
