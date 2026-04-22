@@ -34,6 +34,7 @@ function estimarAirbnb(bairro, aluguelResidencial, quartos) {
 }
 
 export default function PainelYieldModalidades({ imovel, lanceEstudo, custoReformaAtual }) {
+  if (!imovel) return null
   const lance = lanceEstudo || parseFloat(imovel?.valor_minimo || imovel?.preco_pedido) || 0
   const aluguelRes = parseFloat(imovel?.aluguel_mensal_estimado) || 0
   const condo = parseFloat(imovel?.condominio_mensal || 0)

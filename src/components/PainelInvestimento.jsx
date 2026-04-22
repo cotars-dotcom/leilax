@@ -28,6 +28,7 @@ function BarraVisual({ label, valor, total, cor }) {
 }
 
 export default function PainelInvestimento({ imovel }) {
+  if (!imovel) return null
   const [expandido, setExpandido] = useState(false)
   const [mesesHolding, setMesesHolding] = useState(4)
   const { lanceEstudo, custoReformaAtual } = useReforma()

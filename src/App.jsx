@@ -595,8 +595,8 @@ function ApiKeyModal({onClose, session}) {
 }
 
 // ── NOVO IMÓVEL ───────────────────────────────────────────────────────────────
-function NovoImovel({onSave,onCancel,onNav,trello,parametrosBanco,criteriosBanco,isPhone,existingProps=[]}) {
-  const [url,setUrl]=useState("")
+function NovoImovel({onSave,onCancel,onNav,trello,parametrosBanco,criteriosBanco,isPhone,existingProps=[],initialUrl=""}) {
+  const [url,setUrl]=useState(initialUrl||"")
   const [loading,setLoading]=useState(false)
   const [step,setStep]=useState("")
   const [error,setError]=useState("")
@@ -1766,6 +1766,7 @@ export default function App() {
   const [showTrelloModal,setShowTrelloModal]=useState(false)
   const [parametrosBanco,setParametrosBanco]=useState([])
   const [criteriosBanco,setCriteriosBanco]=useState([])
+  const [urlParaAnalisar,setUrlParaAnalisar]=useState('')  // Link vindo da BuscaGPT
   const [apiOk,setApiKey]=useState(localStorage.getItem("axis-api-key"))
   const isMobile = useIsMobile(900)
   const isPhone  = useIsMobile(480)
@@ -2048,12 +2049,12 @@ export default function App() {
     {/* CONTENT */}
     <div className="axis-main" style={{flex:1,overflowY:"auto",background:C.offwhite,display:"flex",flexDirection:"column",minWidth:0,willChange:"transform"}}>
       {view==="dashboard"&&<Suspense fallback={<div style={{padding:40,textAlign:"center",color:C.muted}}>Carregando...</div>}><LazyDashboard props={props} onNav={nav} profile={profile} isMobile={isMobile} isPhone={isPhone}/></Suspense>}
-  {view==="novo"&&(isAdmin?<NovoImovel onSave={addProp} onCancel={()=>nav("imoveis")} onNav={nav} trello={trello} parametrosBanco={parametrosBanco} criteriosBanco={criteriosBanco} isPhone={isPhone} existingProps={props}/>:<AcessoNegado mensagem="Análise de imóveis é restrita ao administrador."/>)}
+  {view==="novo"&&(isAdmin?<NovoImovel onSave={addProp} onCancel={()=>{setUrlParaAnalisar("");nav("imoveis")}} onNav={nav} trello={trello} parametrosBanco={parametrosBanco} criteriosBanco={criteriosBanco} isPhone={isPhone} existingProps={props} initialUrl={urlParaAnalisar}/>:<AcessoNegado mensagem="Análise de imóveis é restrita ao administrador."/>)}
       {view==="imoveis"&&<Lista props={props} onNav={nav} onDelete={delProp} trello={trello} onUpdateProp={(id,updates)=>setProps(ps=>ps.map(p=>p.id===id?{...p,...updates}:p))}/>}
       {view==="detail"&&<Suspense fallback={<div style={{padding:40,textAlign:"center",color:C.muted}}>Carregando...</div>}><LazyDetail p={selP} onDelete={delProp} onNav={nav} trello={trello} onUpdateProp={(id,updates)=>setProps(ps=>ps.map(p=>p.id===id?{...p,...updates}:p))} isAdmin={isAdmin} onArchive={handleArquivar} isMobile={isMobile} isPhone={isPhone} onReanalyze={(id,updates)=>setProps(ps=>ps.map(p=>p.id===id?{...p,...updates}:p))}/></Suspense>}
       {view==="comparar"&&<Comparativo props={props}/>}
       {view==="leiloes"&&<Suspense fallback={<div style={{padding:40,textAlign:'center',color:C.muted}}>Carregando...</div>}><LazyProximosLeiloes imoveis={props} onNav={nav}/></Suspense>}
-    {view==="busca"&&(isAdmin?<LazyBuscaGPT onAnalisar={(link)=>{nav("novo");setTimeout(()=>{},100)}}/>:<AcessoNegado mensagem="Busca com IA é restrita ao administrador."/>)}
+    {view==="busca"&&(isAdmin?<LazyBuscaGPT onAnalisar={(link)=>{setUrlParaAnalisar(link||"");nav("novo")}}/>:<AcessoNegado mensagem="Busca com IA é restrita ao administrador."/>)}
     {view==="graficos"&&<div><div style={{padding:isPhone?"16px":"22px 28px 16px",borderBottom:`1px solid ${C.borderW}`,background:C.white}}><div style={{fontWeight:700,fontSize:19,color:C.text}}>Gráficos</div></div><div style={{padding:isPhone?"16px":"20px 28px"}}><Suspense fallback={<div style={{padding:40,textAlign:'center',color:C.muted}}>Carregando gráficos...</div>}><Charts properties={props}/></Suspense></div></div>}
     {view==="tarefas"&&<LazyTarefas/>}
     {view==="arquivados"&&<BancoArquivados session={session} isAdmin={isAdmin} isPhone={isPhone}/>}
