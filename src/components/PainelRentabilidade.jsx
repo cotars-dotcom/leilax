@@ -65,9 +65,8 @@ function calcLocacao(lance, aluguelMensal, reforma, vmercado, prazoMeses = 120, 
   const yieldBruto   = investimento > 0 ? (aluguelMensal * 12 / investimento * 100) : 0
   const yieldLiq     = investimento > 0 ? (receita12m / investimento * 100) : 0
   const payback      = receita12m > 0 ? Math.ceil(investimento / receita12m * 12) : 999
-  // Valorização baseada em tendência do bairro (campo banco) ou fallback 3% a.a. BH
-  const tendencia12m = parseFloat(imovelRef?.mercado_tendencia_pct_12m || 0)
-  const valAnual     = tendencia12m > 0 ? tendencia12m / 100 : 0.03
+  // Valorização: 3% a.a. fallback (tendência do bairro é passada via vmercado ajustado)
+  const valAnual = 0.03
   const vf           = vmercado * Math.pow(1 + valAnual, prazoMeses / 12)
   const patrimonioFinal = vf * 0.94 // -6% corretagem na venda futura
   return { investimento, receita12m, yieldBruto, yieldLiq, payback, patrimonioFinal, viavel: yieldLiq >= 5 }
