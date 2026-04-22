@@ -1000,7 +1000,7 @@ function PropCard({p,onNav}) {
   const cidCor = getCidadeCor(p.cidade)
 
   return <div onClick={()=>onNav("detail",{id:p.id})}
-    style={{...card(),cursor:"pointer",transition:"all .15s",padding:isPhone?"12px":"14px",borderLeft:`3px solid ${cidCor.accent}`}}
+    style={{...card(),cursor:"pointer",transition:"all .15s",padding:isPhone?"12px":"14px",borderLeft:`3px solid ${cidCor.accent}`,position:"relative"}}
     onMouseEnter={e=>{e.currentTarget.style.borderColor=K.teal;e.currentTarget.style.transform="translateY(-2px)"}}
     onMouseLeave={e=>{e.currentTarget.style.borderColor=K.bd;e.currentTarget.style.borderLeftColor=cidCor.accent;e.currentTarget.style.transform="none"}}>
 
@@ -1147,6 +1147,17 @@ function PropCard({p,onNav}) {
       <span>{fmtD(p.createdAt)}</span>
       <span>{p.modalidade_leilao||p.modalidade||'—'}</span>
     </div>
+    {/* Overlay INVIÁVEL / DADOS_INSUFICIENTES */}
+    {p.recomendacao==='INVIAVEL'&&<div style={{position:'absolute',inset:0,borderRadius:'inherit',
+      background:'rgba(220,38,38,0.06)',border:'1.5px solid #DC2626',pointerEvents:'none',
+      display:'flex',alignItems:'flex-start',justifyContent:'flex-end',padding:6,borderRadius:10}}>
+      <span style={{background:'#DC2626',color:'#fff',fontSize:8,fontWeight:800,padding:'2px 6px',borderRadius:3}}>INVIÁVEL</span>
+    </div>}
+    {p.recomendacao==='DADOS_INSUFICIENTES'&&<div style={{position:'absolute',inset:0,
+      background:'rgba(148,163,184,0.06)',border:'1.5px solid #94A3B8',pointerEvents:'none',
+      display:'flex',alignItems:'flex-start',justifyContent:'flex-end',padding:6,borderRadius:10}}>
+      <span style={{background:'#94A3B8',color:'#fff',fontSize:8,fontWeight:800,padding:'2px 6px',borderRadius:3}}>SEM DADOS</span>
+    </div>}
   </div>
 }
 

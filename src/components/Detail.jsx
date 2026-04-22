@@ -1630,7 +1630,7 @@ for (const s of SCORES) {
           <span title={`Campos protegidos: ${(p.campos_travados||[]).join(', ')}`}
             style={{fontSize:10,padding:'4px 8px',borderRadius:5,background:'#F0F4FF',
               border:'1px solid #002B8020',color:'#002B80',cursor:'help',fontWeight:600}}>
-            🔒 {p.campos_travados.length} protegido{p.campos_travados.length>1?'s':''}
+            🔒 {(p.campos_travados||[]).length} protegido{(p.campos_travados||[]).length>1?'s':''}
           </span>
         )}
         {isAdmin && (() => {
@@ -1896,7 +1896,7 @@ for (const s of SCORES) {
 
       {abaDetalhe==='resumo'&&<>
       {/* Zona de decisão: aparece no topo quando há leilão próximo */}
-      <ResumoPreLeilao imovel={p} onUpdate={() => onUpdateProp && onUpdateProp({...p})} onGerarSintese={isAdmin ? handleGerarSintese : null} />
+      <ResumoPreLeilao imovel={p} onUpdate={() => { if(onUpdateProp) onUpdateProp(p.id, p) }} onGerarSintese={isAdmin ? handleGerarSintese : null} />
       {/* Foto do imóvel */}
       {p.foto_principal&&(
         <div style={{width:'100%',maxHeight:320,borderRadius:12,overflow:'hidden',marginBottom:12,background:'#f0f0f0',willChange:'transform'}}>
@@ -1934,7 +1934,7 @@ for (const s of SCORES) {
       {(p.distribuicao_pavimentos || p.parcelamento_detalhes || p.processo_numero || p.coproprietarios) && (
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:14}}>
           {p.processo_numero && (
-            <DatajudCard imovel={p} onUpdate={() => onUpdateProp && onUpdateProp({...p})} />
+            <DatajudCard imovel={p} onUpdate={() => { if(onUpdateProp) onUpdateProp(p.id, p) }} />
           )}
           {p.parcelamento_detalhes && (
             <div style={{background:'#EFF6FF',border:'1px solid #2563EB20',borderRadius:8,padding:'8px 12px'}}>
