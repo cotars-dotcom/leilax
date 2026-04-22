@@ -298,5 +298,13 @@ Retorne APENAS JSON com os campos atualizados:
   // Usar thresholds canônicos de constants.js (antes: 8.0/7.0/6.0 — divergia do motorIA)
   analiseAtualizada.recomendacao = recomendacaoDeScore(analiseAtualizada.score_total)
 
+  // Atualizar confidence_score e motor
+  try {
+    const { calcularConfidence } = await import('./agenteConfidenceBadge.js')
+    const conf = calcularConfidence(analiseAtualizada)
+    if (conf?.score) analiseAtualizada.confidence_score = conf.score
+  } catch(e) { /* não crítico */ }
+  analiseAtualizada.motor_ia_usado = analiseAtualizada._modelo_usado || 'gemini-reanálise'
+
   return analiseAtualizada
 }
