@@ -68,7 +68,7 @@ function KpiRow({ label, valor, cor, sub }) {
   )
 }
 
-export default function ResumoCard({ p, isAdmin, isMobile, onUpdateProp, handleGerarSintese }) {
+export default function ResumoCard({ p, isAdmin, isMobile, onUpdateProp }) {
   const [showRadar, setShowRadar] = useState(false)
   if (!p) return null
 

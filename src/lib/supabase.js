@@ -76,7 +76,7 @@ export async function getSession() {
 export async function getProfile(userId) {
   return cachedQuery(`profile_${userId}`, async () => {
     const { data, error } = await supabase
-      .from('profiles').select('*').eq('id', userId).single()
+      .from('profiles').select('*').eq('id', userId).maybeSingle()
     if (error) throw error
     return data
   })
@@ -817,7 +817,8 @@ export async function salvarDocumentoJuridico(doc) {
 export async function reclassificarImovel(imovelId, novaAnalise, documentoId) {
   const { data: imovel } = await supabase
     .from('imoveis').select('historico_juridico, score_juridico, recomendacao')
-    .eq('id', imovelId).single()
+    .eq('id', imovelId).maybeSingle()
+  if (!imovel) throw new Error(`Imóvel ${imovelId} não encontrado`)
 
   const historico = imovel?.historico_juridico || []
   historico.push({

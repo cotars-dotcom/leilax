@@ -1373,11 +1373,11 @@ if (original.comparaveis?.length > 2) {
     merged.comparaveis = original.comparaveis
   }
 }
-// Proteção de scores no merge: não deixar degradar > 2.5 pontos
+// Proteção de scores no merge: threshold 3.5 (sincronizado com supabase.js)
 const SCORES = ['score_localizacao','score_desconto','score_juridico','score_ocupacao','score_liquidez','score_mercado']
 for (const s of SCORES) {
   if (original[s] != null && novo[s] != null) {
-    if (Math.abs(parseFloat(novo[s]) - parseFloat(original[s])) > 2.5) {
+    if (Math.abs(parseFloat(novo[s]) - parseFloat(original[s])) > 3.5) {
       merged[s] = original[s]
     }
   }
@@ -1398,7 +1398,7 @@ for (const s of SCORES) {
         setMsg('⚠️ Gemini não respondeu — dados anteriores preservados. Configure a chave Gemini para reanálise completa.')
         // Continuar salvamento com dados preservados (não bloqueio total)
       }
-      const merged={...protegerCampos(p, novaAnalise),id:p.id,createdAt:p.createdAt,criado_por:p.criado_por}
+      const merged={...protegerCampos(p, novaAnalise),id:p.id,createdAt:p.createdAt,criado_por:p.criado_por,_forceScoreUpdate:true}
       if(onUpdateProp) onUpdateProp(p.id,merged)
       // Salvar no Supabase — buscar session corretamente
       try {

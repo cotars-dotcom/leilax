@@ -1756,7 +1756,7 @@ export default function App() {
   // ALL hooks MUST be before any conditional return (React Rules of Hooks)
   const [view,setView]=useState("dashboard")
   const [vp,setVp]=useState({})
-  const CACHE_VERSION = 'v36'  // Incrementar ao adicionar campos novos ao schema
+  const CACHE_VERSION = 'v38'  // v38: motor_ia_usado, mao corrigido, forceScoreUpdate
   const [props,setProps]=useState([])
   const [loaded,setL]=useState(false)
   const [toast,setToast]=useState(null)

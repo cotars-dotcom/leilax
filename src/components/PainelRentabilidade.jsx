@@ -257,7 +257,7 @@ export default function PainelRentabilidade({ imovel }) {
   const melhoresCenarios = cenarios.map(c => {
     const desc = ((avaliacao - c.lance) / avaliacao * 100)
     const _overrides = { comissao_leiloeiro_pct: imovel.comissao_leiloeiro_pct }
-    const f = calcFlip(c.lance, vmercado, reformaValor, 0, eMercado, _overrides, debitosArr)
+    const f = calcFlip(c.lance, vmercado, reformaValor, 0, eMercado, _overrides, debitosArr, imovel)
     // Injetar vmercadoLiq diretamente no flip para evitar stale prop no CardLance
     f.vmercadoLiq = Math.round(vmercado * 0.94)
     const l = calcLocacao(c.lance, aluguelAtual, reformaValor, vmercado, 120, eMercado, _overrides)
