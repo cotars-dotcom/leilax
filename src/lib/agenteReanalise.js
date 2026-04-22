@@ -306,5 +306,21 @@ Retorne APENAS JSON com os campos atualizados:
   } catch(e) { /* não crítico */ }
   analiseAtualizada.motor_ia_usado = analiseAtualizada._modelo_usado || 'gemini-reanálise'
 
+  // Proteger campos_travados — nunca sobrescrever com dados da reanálise
+  try {
+    const travados = Array.isArray(imovelAtual.campos_travados) ? imovelAtual.campos_travados : []
+    const scoreFields = ['score_localizacao','score_desconto','score_juridico','score_ocupacao','score_liquidez','score_mercado','score_total','recomendacao']
+    const extraFields = ['ocupacao','mao_flip','mao_locacao','valor_mercado_estimado','aluguel_mensal_estimado']
+    for (const campo of [...travados, ...scoreFields.filter(f => travados.includes(f)), ...extraFields.filter(f => travados.includes(f))]) {
+      if (imovelAtual[campo] !== undefined && imovelAtual[campo] !== null) {
+        analiseAtualizada[campo] = imovelAtual[campo]
+      }
+    }
+    // Preservar riscos_presentes existente — não zerar
+    if (imovelAtual.riscos_presentes?.length > 0 && !analiseAtualizada.riscos_presentes?.length) {
+      analiseAtualizada.riscos_presentes = imovelAtual.riscos_presentes
+    }
+  } catch(e) { console.warn('[AXIS reanálise] proteção campos_travados:', e.message) }
+
   return analiseAtualizada
 }

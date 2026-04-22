@@ -717,7 +717,7 @@ Use apenas tags de texto: [CRITICO] [ATENCAO] [OK] [INFO]
 
   const jsonMatch = txt.match(/\{[\s\S]*\}/)
   if (!jsonMatch) throw new Error('Claude não retornou JSON válido')
-  return JSON.parse(jsonMatch[0])
+  try { return JSON.parse(jsonMatch[0]) } catch(e) { throw new Error('Claude retornou JSON malformado: ' + e.message) }
 }
 
 // ── FASE 3: Calcular score total com pesos do banco ──────────────

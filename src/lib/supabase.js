@@ -255,7 +255,7 @@ export async function saveImovelCompleto(imovel, userId) {
     try {
       const { data: atual } = await supabase
         .from('imoveis')
-        .select('valor_minimo,valor_avaliacao,titulo,score_total,score_localizacao,score_desconto,score_juridico,score_ocupacao,score_liquidez,score_mercado,recomendacao,fotos,comparaveis,justificativa,sintese_executiva,codigo_axis,bairro,endereco')
+        .select('valor_minimo,valor_avaliacao,titulo,score_total,score_localizacao,score_desconto,score_juridico,score_ocupacao,score_liquidez,score_mercado,recomendacao,fotos,comparaveis,justificativa,sintese_executiva,codigo_axis,bairro,endereco,campos_travados,riscos_presentes')
         .eq('id', imovel.id)
         .single()
 
@@ -272,7 +272,8 @@ export async function saveImovelCompleto(imovel, userId) {
           'data_leilao_2','valor_minimo_2',
           'mao_flip','mao_locacao','confidence_score',
           'coordenadas_lat','coordenadas_lng','endereco_validado',
-          'prazo_revenda_meses','prazo_liberacao_estimado_meses']
+          'prazo_revenda_meses','prazo_liberacao_estimado_meses',
+          'ocupacao','riscos_presentes','debitos_total_estimado','custo_juridico_estimado']
         const camposNuncaZero = ['valor_minimo','valor_avaliacao','desconto_percentual',
           'preco_m2_mercado','preco_m2_imovel','aluguel_mensal_estimado','valor_mercado_estimado',
           'num_leilao','desconto_sobre_mercado_pct',
@@ -331,6 +332,17 @@ export async function saveImovelCompleto(imovel, userId) {
         if (SCORES_PROTEGIDOS.some(s => payload[s] === atual[s])) {
           const novoTotal = SCORES_PROTEGIDOS.slice(0,-1).reduce((acc,s) => acc + (parseFloat(payload[s]||0) * (pesosScore[s]||0)), 0)
           if (novoTotal > 0) payload.score_total = parseFloat(novoTotal.toFixed(2))
+        }
+
+        // Proteção DINÂMICA: respeitar campos_travados do banco
+        const camposTravadosBanco = Array.isArray(atual.campos_travados) ? atual.campos_travados : []
+        for (const campo of camposTravadosBanco) {
+          if (atual[campo] !== undefined && atual[campo] !== null && atual[campo] !== '') {
+            if (payload[campo] !== atual[campo]) {
+              console.debug('[AXIS Supabase] campo_travado protegido:', campo, '=', atual[campo])
+              payload[campo] = atual[campo]
+            }
+          }
         }
 
         // Proteção campo a campo: restaurar do banco se payload traz vazio/zero para campos críticos
@@ -904,7 +916,13 @@ export async function registrarResultadoLeilao(imovelId, resultado, userId) {
  * Faz upsert — seguro para chamar múltiplas vezes.
  */
 export async function salvarRiscosImovel(imovelId, riscoIds = []) {
-  if (!imovelId || !riscoIds.length) return
+  if (!imovelId) return
+  // Só deletar se tiver novos dados para inserir — evitar zerar acidentalmente
+  // riscos_presentes vazio → preservar riscos manuais existentes
+  if (!riscoIds.length) {
+    console.debug('[AXIS] salvarRiscosImovel: riscoIds vazio — preservando riscos existentes')
+    return
+  }
   // Deletar riscos antigos e reinserir (garantir consistência)
   await supabase.from('riscos_imovel').delete().eq('imovel_id', imovelId)
   const ALIASES = {
