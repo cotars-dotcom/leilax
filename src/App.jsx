@@ -1263,7 +1263,15 @@ function Lista({props,onNav,onDelete,trello,onUpdateProp}) {
   const [loteProgresso, setLoteProgresso] = useState('')
   let list=[...props]
   if(q) list=list.filter(p=>`${p.titulo} ${p.cidade} ${p.tipo} ${p.bairro}`.toLowerCase().includes(q.toLowerCase()))
-  if(filter!=="todos") list=list.filter(p=>p.recomendacao===filter.toUpperCase())
+  if(filter==="todos") {
+    // Ordenar: ativos acionáveis primeiro, INVIÁVEL/DADOS_INSUFICIENTES no fim
+    list.sort((a,b) => {
+      const ordem = {COMPRAR:0, AGUARDAR:1, EVITAR:2, DADOS_INSUFICIENTES:3, INVIAVEL:4}
+      return (ordem[a.recomendacao]??2) - (ordem[b.recomendacao]??2)
+    })
+  } else {
+    list=list.filter(p=>p.recomendacao===filter.toUpperCase())
+  }
   if(filterTipo==="leilao") list=list.filter(p=>p.tipo_transacao==='leilao'||p.tipo_transacao==='leilao_judicial')
   if(filterTipo==="mercado") list=list.filter(p=>p.tipo_transacao==='mercado_direto')
   if(filterUrgente) {

@@ -581,7 +581,7 @@ Use apenas tags de texto: [CRITICO] [ATENCAO] [OK] [INFO]
   "liquidez": "Alta|Média|Baixa",
   "prazo_revenda_meses": 0,
   "score_localizacao": 0.0,  // ESCALA 0.0 a 10.0 (ex: 7.5, 8.2, 6.0) — NUNCA use 0-100
-  "score_desconto": 0.0,     // Calibração: desconto 40%→7.0, 60%+→9.5, 20%→4.0
+  "score_desconto": 0.0,     // Calibração sobre MERCADO REAL: 50%→8.5, 40%→7.0, 30%→5.5, 20%→4.0, 10%→2.5, negativo→1.0
   "score_juridico": 0.0,     // Calibração: sem processos→8.0, risco alto→3.0
   "score_ocupacao": 0.0,     // Calibração: desocupado confirmado→8.5, ocupado→3.0
   "score_liquidez": 0.0,     // Calibração: alta demanda bairro nobre→8.5, periferia→4.0

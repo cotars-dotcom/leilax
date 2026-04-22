@@ -479,6 +479,10 @@ export default function Dashboard({props,onNav,profile:prof,isMobile,isPhone}) {
             {avg}/10
           </p>
           <p style={{margin:"2px 0 0",fontSize:isPhone?11:12.5,color:C.muted}}>Média da carteira ativa</p>
+          <p style={{margin:"3px 0 0",fontSize:isPhone?9.5:10.5,fontWeight:600,
+            color:parseFloat(avg)>=7.5?C.emerald:parseFloat(avg)>=6?'#D97706':'#DC2626'}}>
+            {parseFloat(avg)>=7.5?'✅ Excelente — pronto para comprar':parseFloat(avg)>=6?'⏳ Aguardar 2ª praça':'⚠️ Revisão necessária'}
+          </p>
           <div style={{
             marginTop:isPhone?10:14,display:"flex",gap:12,
             paddingTop:isPhone?8:12,borderTop:`1px solid ${C.borderW}`,
