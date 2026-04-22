@@ -146,6 +146,15 @@ Se o imóvel for cobertura, penthouse, duplex ou diferenciado:
   → buscar comparáveis específicos dessa tipologia
   → não usar média geral do bairro como referência
 
+ATENÇÃO — HOMOGENEIZAÇÃO (CRÍTICO):
+O preço médio do bairro (R$/m²) JÁ REFLETE a média de imóveis com e sem elevador/piscina.
+NÃO aplique multiplicadores como (1.16 × 1.05) sobre a média do bairro — isso SUPERESTIMA o valor.
+Os fatores de ajuste (elevador +16%, piscina +5%) servem SOMENTE para corrigir imóveis
+que estão ABAIXO da média porque NÃO possuem esses itens (fator < 1.0 = penalidade).
+Para imóvel COM elevador e piscina em bairro onde já é o padrão: use o preço médio diretamente.
+Regra prática: valor_mercado_estimado = area_privativa_m2 × preco_m2_mercado_bairro (sem multiplicadores adicionais)
+Validação: se seu valor/m² calculado > preco_anuncio_m2 do bairro, você está ACIMA DO TETO — revise.
+
 --- PASSIVOS (IPTU, CONDOMÍNIO) ---
 Regra por modalidade (CRÍTICO):
 LEILÃO JUDICIAL (CPC/2015):
@@ -483,7 +492,13 @@ INSTRUÇÕES:
 1. Acesse a URL e extraia todos os dados disponíveis do imóvel
 2. Use os dados do ChatGPT para calibrar scores de localização e mercado
 3. Calcule o score_total como média ponderada usando os pesos acima
-4. Calcule mao_flip = (valor_mercado_estimado × 0.80) - (custo_reforma_estimado + valor_minimo × 0.10)
+4. Calcule mao_flip (Lance Máximo para ROI 20%):
+   Fórmula correta: mao_flip = (valor_mercado × 0.94 / 1.20 - custos_fixos) / (1 + pct_custos)
+   Onde: custos_fixos = reforma_basica + debitos_arrematante + custo_juridico + holding_6m
+   Onde: pct_custos = comissão(5%) + ITBI(3%) + advogado(5%) + docs(2.5%) = 15.5%
+   Holding_6m = 6 × (condominio_mensal + iptu_mensal)
+   NÃO use (VM × 0.80) — essa aproximação ignora custos fixos e gera MAO incorreto
+   Validação: se lance_atual <= mao_flip → operação viável para flip com ROI ≥ 20%
    Calcule mao_locacao = aluguel_mensal_estimado × 120 × 0.90
    Se valor_minimo > mao_flip → adicione [CRITICO] Lance acima do MAO nos alertas
 4. score_total já reflete o juridico e ocupacao via pesos — não aplique penalizações adicionais
@@ -582,8 +597,14 @@ Use apenas tags de texto: [CRITICO] [ATENCAO] [OK] [INFO]
   "liquidez": "Alta|Média|Baixa",
   "prazo_revenda_meses": 0,
   "score_localizacao": 0.0,  // ESCALA 0.0 a 10.0 (ex: 7.5, 8.2, 6.0) — NUNCA use 0-100
-  "score_desconto": 0.0,     // Calibração sobre MERCADO REAL: 50%→8.5, 40%→7.0, 30%→5.5, 20%→4.0, 10%→2.5, negativo→1.0
+  "score_desconto": 0.0,     // Calibração: desconto sobre MERCADO REAL (NÃO sobre avaliação judicial)
+  // Calcule: (1 - lance_minimo / valor_mercado_estimado) × 100 = desconto_real
+  // 65%+→10.0, 50%→8.5, 40%→7.0, 30%→5.5, 20%→4.0, 10%→2.5, negativo→1.0
+  // ATENÇÃO: 40% sobre avaliação judicial pode ser só 15% sobre mercado real — use o mercado
   "score_juridico": 0.0,     // Calibração: sem processos→8.0, risco alto→3.0
+  // PENALIDADE: se debitos_propter_rem > 15% do valor_mercado → -2.0 pontos
+  // Desocupado confirmado: +1.5 vs incerto | Matrícula limpa: +1.0 vs com gravame
+  // Exemplo Buritis: débitos R$88k / mercado R$523k = 16.8% → penalidade -2.0
   "score_ocupacao": 0.0,     // Calibração: desocupado confirmado→8.5, ocupado→3.0
   "score_liquidez": 0.0,     // Calibração: alta demanda bairro nobre→8.5, periferia→4.0
   "score_mercado": 0.0,      // Calibração: BH classe 4 Luxo→8.5, classe 2 Médio→5.5
@@ -769,6 +790,18 @@ export function validarECorrigirAnalise(analise) {
     )
   }
 
+  // 0a. Validar valor_mercado_estimado contra banda do banco de bairros
+  // Se o valor calculado pelo agente for > 20% acima do preco_anuncio_m2 do bairro, cap automático
+  if (analise.valor_mercado_estimado && dadosBairroCalib?.precoAnuncioM2) {
+    const areaUsada_ = analise.area_usada_calculo_m2 || analise.area_privativa_m2 || analise.area_m2 || 0
+    const tetoMercado = areaUsada_ * dadosBairroCalib.precoAnuncioM2 * 1.10  // 10% acima do anúncio máximo
+    if (parseFloat(analise.valor_mercado_estimado) > tetoMercado && tetoMercado > 0) {
+      const valorOriginal = analise.valor_mercado_estimado
+      analise.valor_mercado_estimado = Math.round(tetoMercado)
+      avisos.push(`CALIBRADO: valor_mercado era R$${Math.round(valorOriginal).toLocaleString('pt-BR')} (acima do teto do bairro R$${Math.round(tetoMercado).toLocaleString('pt-BR')}). Provavelmente homogeneização incorreta — fatores já incluídos na média do bairro.`)
+    }
+  }
+
   // 0. Normalizar scores que vieram em escala 0-100 para 0-10
   const camposScore = ['score_localizacao','score_desconto','score_juridico',
                        'score_ocupacao','score_liquidez','score_mercado']
@@ -901,6 +934,21 @@ export function validarECorrigirAnalise(analise) {
       (analise.score_ocupacao || 0) < 7.0) {
     avisos.push('AJUSTE: imóvel nunca habitado/desocupado — score_ocupacao ajustado')
     analise.score_ocupacao = Math.max(analise.score_ocupacao || 5.0, 7.5)
+  }
+
+  // 6b. Penalidade score_juridico por débitos propter rem elevados (sugestão DeepSeek/Critical Analysis)
+  const _debitosTotal = parseFloat(analise.debitos_total_estimado || 0)
+  const _mercadoRef = parseFloat(analise.valor_mercado_estimado || 0)
+  if (_debitosTotal > 0 && _mercadoRef > 0) {
+    const _pctDeb = _debitosTotal / _mercadoRef
+    const _sjAtual = parseFloat(analise.score_juridico || 5)
+    if (_pctDeb > 0.20 && _sjAtual > 4.0) {
+      analise.score_juridico = Math.min(_sjAtual, 4.0)
+      avisos.push(`AJUSTE: débitos propter rem ${(_pctDeb*100).toFixed(1)}% do mercado → score_juridico cap 4.0`)
+    } else if (_pctDeb > 0.15 && _sjAtual > 5.5) {
+      analise.score_juridico = Math.min(_sjAtual, 5.5)
+      avisos.push(`AJUSTE: débitos propter rem ${(_pctDeb*100).toFixed(1)}% do mercado → score_juridico cap 5.5`)
+    }
   }
 
   // 7. Recalcular score total se houve correções (fonte: constants.js)
