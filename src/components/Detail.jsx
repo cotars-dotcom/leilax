@@ -13,18 +13,18 @@ import PainelLancamento from './PainelLancamento.jsx'
 import PainelInvestimento from './PainelInvestimento.jsx'
 import AtributosPredio from './AtributosPredio.jsx'
 import ScoreRadar from './ScoreRadar.jsx'
-import TimelineMatricula from './TimelineMatricula.jsx'
-import GraficoROIHorizonte from './GraficoROIHorizonte.jsx'
+const TimelineMatricula = lazy(() => import('./TimelineMatricula.jsx'))
+const GraficoROIHorizonte = lazy(() => import('./GraficoROIHorizonte.jsx'))
 import PainelYieldModalidades from './PainelYieldModalidades.jsx'
 import ResumoPreLeilao from './ResumoPreLeilao.jsx'
 import DatajudCard from './DatajudCard.jsx'
 import PainelAtividades from './PainelAtividades.jsx'
-import MapaCalorBairros from './MapaCalorBairros.jsx'
-import GraficoTendencia from './GraficoTendencia.jsx'
+const MapaCalorBairros = lazy(() => import('./MapaCalorBairros.jsx'))
+const GraficoTendencia = lazy(() => import('./GraficoTendencia.jsx'))
 import SimuladorLance from './SimuladorLance.jsx'
 import ConfigEstudo from './ConfigEstudo.jsx'
 import ResumoCard from './ResumoCard.jsx'
-import PainelRentabilidade from './PainelRentabilidade.jsx'
+const PainelRentabilidade = lazy(() => import('./PainelRentabilidade.jsx'))
 import { isMercadoDireto } from '../lib/detectarFonte.js'
 import { calcularCustosAquisicao, MULT_CUSTO_RAPIDO, CUSTOS_LEILAO, CUSTOS_MERCADO, IPTU_SOBRE_CONDO_RATIO, HOLDING_MESES_PADRAO, calcularLanceMaximoParaROI, calcularSobrecapitalizacao, IRPF_ISENCAO_TETO } from '../lib/constants.js'
 import { calcularConfidence } from '../lib/agenteConfidenceBadge.js'
@@ -2191,7 +2191,7 @@ for (const s of SCORES) {
           </div>
         )}
         <CustosReaisEditor imovel={p} onUpdateProp={onUpdateProp} isAdmin={isAdmin} />
-        <PainelRentabilidade imovel={p}/>
+        <Suspense fallback={<div style={{padding:20,textAlign:'center',color:'#999',fontSize:12}}>Carregando rentabilidade...</div>}><PainelRentabilidade imovel={p}/></Suspense>
       {/* Cenários de Reforma */}
       <CenariosReforma imovel={p} isAdmin={isAdmin} />
       {/* Calculadora ROI — dentro do Provider para sincronizar com ConfigEstudo */}
