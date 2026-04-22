@@ -150,97 +150,163 @@ export default function BuscaGPT({ onAnalisar }) {
   const fmtC = v => v ? `R$ ${Number(v).toLocaleString("pt-BR")}` : "—";
 
   return (
-    <div style={{ padding: isPhone ? "16px" : "20px 28px" }}>
-      <div style={{ fontWeight: 700, fontSize: 19, color: K.wh, marginBottom: 4 }}>🔎 Busca de Imóveis com ChatGPT</div>
-      <div style={{ fontSize: 11, color: K.t3, marginBottom: 20 }}>ChatGPT busca em tempo real nos portais de leilão brasileiros</div>
+    <div style={{ padding: isPhone ? "16px" : "24px 32px", maxWidth: 960, margin: "0 auto" }}>
 
-      <div style={{ background: `${K.gpt}10`, border: `1px solid ${K.gpt}40`, borderRadius: 8, padding: 14, marginBottom: 18 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-          <div style={{ fontSize: 12.5, color: K.wh, fontWeight: 600 }}>🤖 ChatGPT (OpenAI)</div>
-          <span style={{ fontSize: 9, background: (openaiKey||geminiKey) ? `${K.grn}20` : `${K.red}20`, color: (openaiKey||geminiKey) ? K.grn : K.red, padding: "2px 8px", borderRadius: 4, fontWeight: 700 }}>{openaiKey ? "OpenAI OK" : geminiKey ? "Gemini OK" : "PENDENTE"}</span>
-        </div>
-        {!openaiKey || showKey ? (
+      {/* Header */}
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+          <div style={{ width: 32, height: 32, borderRadius: 8, background: `${K.gpt}20`,
+            display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>🔎</div>
           <div>
-            <input style={inp} type="password" placeholder="sk-..." value={openaiKey} onChange={e => saveKey(e.target.value)} />
-            <div style={{ fontSize: 10.5, color: K.t3, marginTop: 4 }}>Obtenha em: <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" style={{ color: "#4A9EFF" }}>platform.openai.com/api-keys</a></div>
+            <div style={{ fontWeight: 800, fontSize: 20, color: K.wh, letterSpacing: -.3 }}>Busca Inteligente</div>
+            <div style={{ fontSize: 11, color: K.t3 }}>IA pesquisa em tempo real nos portais de leilão brasileiros</div>
           </div>
-        ) : (
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <span style={{ fontSize: 12, color: K.t2 }}>••••••••••••••••</span>
-            <button onClick={() => setShowKey(true)} style={{ background: "none", border: "none", color: K.teal, cursor: "pointer", fontSize: 11 }}>Alterar</button>
+          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}>
+            <div style={{ width: 6, height: 6, borderRadius: "50%", background: (openaiKey||geminiKey) ? K.grn : K.red }} />
+            <span style={{ fontSize: 10, color: (openaiKey||geminiKey) ? K.grn : K.red, fontWeight: 700 }}>
+              {openaiKey ? "OpenAI" : geminiKey ? "Gemini" : "Sem chave"}
+            </span>
+            {(openaiKey||geminiKey) && <button onClick={() => setShowKey(!showKey)}
+              style={{ background: "none", border: `1px solid ${K.bd}`, color: K.t3, borderRadius: 4,
+                padding: "2px 8px", fontSize: 10, cursor: "pointer" }}>⚙️</button>}
           </div>
-        )}
-      </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: isPhone ? "1fr" : "2fr 1fr 1fr 1fr", gap: 12, marginBottom: 16 }}>
-        <div>
-          <div style={{ fontSize: 10, color: K.t3, textTransform: "uppercase", letterSpacing: 1, marginBottom: 5 }}>Cidade / Região *</div>
-          <input style={inp} placeholder="Ex: Belo Horizonte MG" value={cidade} onChange={e => setCidade(e.target.value)} onKeyDown={e => e.key === "Enter" && buscar()} />
-        </div>
-        <div>
-          <div style={{ fontSize: 10, color: K.t3, textTransform: "uppercase", letterSpacing: 1, marginBottom: 5 }}>Tipo</div>
-          <select style={{ ...inp, cursor: "pointer" }} value={tipo} onChange={e => setTipo(e.target.value)}>
-            <option>Apartamento</option><option>Casa</option><option>Terreno</option><option>Comercial</option><option>Qualquer</option>
-          </select>
-        </div>
-        <div>
-          <div style={{ fontSize: 10, color: K.t3, textTransform: "uppercase", letterSpacing: 1, marginBottom: 5 }}>Valor máx (R$)</div>
-          <input style={inp} placeholder="500000" value={maxValor} onChange={e => setMaxValor(e.target.value)} />
-        </div>
-        <div>
-          <div style={{ fontSize: 10, color: K.t3, textTransform: "uppercase", letterSpacing: 1, marginBottom: 5 }}>Desconto mín %</div>
-          <input style={inp} placeholder="20" value={minDesconto} onChange={e => setMinDesconto(e.target.value)} />
         </div>
       </div>
 
-      {error && <div style={{ background: `${K.red}15`, border: `1px solid ${K.red}40`, borderRadius: 6, padding: "10px 14px", marginBottom: 14, fontSize: 12.5, color: K.red }}>⚠️ {error}</div>}
-
-      {loading && (
-        <div style={{ background: `${K.gpt}10`, border: `1px solid ${K.gpt}30`, borderRadius: 7, padding: 16, marginBottom: 16 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ width: 8, height: 8, borderRadius: "50%", background: K.gpt }} />
-            <div style={{ fontSize: 13, color: K.gpt, fontWeight: 600 }}>ChatGPT buscando imóveis em {cidade}...</div>
+      {/* Config chave (colapsável) */}
+      {(!openaiKey || showKey) && (
+        <div style={{ background: K.s2, border: `1px solid ${K.bd}`, borderRadius: 10,
+          padding: "12px 16px", marginBottom: 20 }}>
+          <div style={{ fontSize: 11, color: K.t2, fontWeight: 600, marginBottom: 8 }}>
+            🔑 Chave de API {openaiKey ? "(alterar)" : "necessária"}
           </div>
-          <div style={{ fontSize: 11, color: K.t3, marginTop: 6 }}>Pesquisando portais de leilão em tempo real — pode levar 15-30 segundos</div>
+          <input style={{ ...inp, fontFamily: "monospace" }} type="password"
+            placeholder="sk-... (OpenAI) ou AIza... (Gemini)" value={openaiKey}
+            onChange={e => saveKey(e.target.value)} />
+          <div style={{ fontSize: 10, color: K.t3, marginTop: 6 }}>
+            A busca usa GPT-4o Browse ou Gemini Grounding. A chave fica salva localmente.
+          </div>
         </div>
       )}
 
-      <button onClick={buscar} disabled={loading} style={{ background: loading ? `${K.gpt}40` : K.gpt, color: "#000", border: "none", borderRadius: 6, padding: "9px 20px", fontSize: 13, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", marginBottom: 20 }}>
-        {loading ? "⏳ Buscando..." : "🔍 Buscar com ChatGPT"}
+      {/* Filtros — layout moderno */}
+      <div style={{ background: K.s2, border: `1px solid ${K.bd}`, borderRadius: 12,
+        padding: "16px 20px", marginBottom: 16 }}>
+        <div style={{ fontSize: 11, color: K.t3, textTransform: "uppercase", letterSpacing: 1,
+          fontWeight: 700, marginBottom: 12 }}>Filtros de busca</div>
+        <div style={{ display: "grid", gridTemplateColumns: isPhone ? "1fr" : "2fr 1fr 1fr 1fr", gap: 12 }}>
+          <div>
+            <div style={{ fontSize: 10, color: K.t3, marginBottom: 4 }}>📍 Cidade / Região *</div>
+            <input style={inp} placeholder="Ex: Belo Horizonte, MG" value={cidade}
+              onChange={e => setCidade(e.target.value)} onKeyDown={e => e.key === "Enter" && buscar()} />
+          </div>
+          <div>
+            <div style={{ fontSize: 10, color: K.t3, marginBottom: 4 }}>🏠 Tipo</div>
+            <select style={{ ...inp, cursor: "pointer" }} value={tipo} onChange={e => setTipo(e.target.value)}>
+              <option>Apartamento</option><option>Casa</option><option>Terreno</option>
+              <option>Comercial</option><option>Qualquer</option>
+            </select>
+          </div>
+          <div>
+            <div style={{ fontSize: 10, color: K.t3, marginBottom: 4 }}>💰 Valor máx</div>
+            <input style={inp} placeholder="500.000" value={maxValor} onChange={e => setMaxValor(e.target.value)} />
+          </div>
+          <div>
+            <div style={{ fontSize: 10, color: K.t3, marginBottom: 4 }}>% Desconto mín</div>
+            <input style={inp} placeholder="20" value={minDesconto} onChange={e => setMinDesconto(e.target.value)} />
+          </div>
+        </div>
+      </div>
+
+      {error && (
+        <div style={{ background: `${K.red}12`, border: `1px solid ${K.red}30`, borderRadius: 8,
+          padding: "10px 14px", marginBottom: 14, fontSize: 12.5, color: K.red, display: "flex", gap: 8 }}>
+          <span>⚠️</span><span>{error}</span>
+        </div>
+      )}
+
+      {loading && (
+        <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "16px 20px",
+          background: `${K.gpt}08`, border: `1px solid ${K.gpt}20`, borderRadius: 10, marginBottom: 16 }}>
+          <div style={{ width: 28, height: 28, border: `3px solid ${K.gpt}40`,
+            borderTopColor: K.gpt, borderRadius: "50%", animation: "spin 1s linear infinite" }} />
+          <div>
+            <div style={{ fontSize: 13, color: K.gpt, fontWeight: 700 }}>Pesquisando em {cidade}...</div>
+            <div style={{ fontSize: 11, color: K.t3, marginTop: 2 }}>Pode levar 15-30 segundos</div>
+          </div>
+        </div>
+      )}
+
+      <button onClick={buscar} disabled={loading}
+        style={{ background: loading ? `${K.gpt}40` : `linear-gradient(135deg,${K.gpt},${K.gpt}CC)`,
+          color: "#000", border: "none", borderRadius: 8, padding: "11px 28px", fontSize: 14,
+          fontWeight: 800, cursor: loading ? "not-allowed" : "pointer", marginBottom: 24,
+          boxShadow: loading ? "none" : `0 4px 14px ${K.gpt}30`, letterSpacing: -.2,
+          display: "flex", alignItems: "center", gap: 8 }}>
+        {loading ? <><span style={{ opacity: .6 }}>⏳</span> Buscando...</> : <><span>🔍</span> Buscar Imóveis</>}
       </button>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
 
       {results && (
         <div>
-          <div style={{ fontWeight: 600, color: K.wh, marginBottom: 12 }}>
-            {results.total_encontrados || results.imoveis?.length || 0} imóveis encontrados em {results.regiao_pesquisada}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: K.wh }}>
+              {results.total_encontrados || results.imoveis?.length || 0} imóveis encontrados
+            </div>
+            <div style={{ fontSize: 11, color: K.t3 }}>em {results.regiao_pesquisada}</div>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: isPhone ? "1fr" : "repeat(auto-fill, minmax(300px, 1fr))", gap: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: isPhone ? "1fr" : "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
             {(results.imoveis || []).map((im, i) => (
-              <div key={i} style={{ background: "#111620", border: `1px solid ${K.bd}`, borderRadius: 8, padding: 16 }}>
-                <div style={{ fontWeight: 600, fontSize: 13, color: K.wh, marginBottom: 4 }}>{im.titulo}</div>
-                <div style={{ fontSize: 10.5, color: K.t3, marginBottom: 10 }}>📍 {im.cidade}/{im.estado} · {im.tipo}{im.area_m2 ? ` · ${im.area_m2}m²` : ""}</div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 10 }}>
-                  <div style={{ background: K.s2, borderRadius: 5, padding: "6px 10px" }}>
-                    <div style={{ fontSize: 9, color: K.t3 }}>MÍNIMO</div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: K.amb }}>{fmtC(im.valor_minimo)}</div>
+              <div key={i} style={{ background: "#111620", border: `1px solid ${K.bd}`, borderRadius: 10,
+                padding: 16, transition: "border-color .2s", cursor: "default" }}
+                onMouseEnter={e => e.currentTarget.style.borderColor = K.teal}
+                onMouseLeave={e => e.currentTarget.style.borderColor = K.bd}>
+                {/* Badge desconto */}
+                {im.desconto_percentual && (
+                  <div style={{ display: "inline-block", background: `${K.grn}20`, color: K.grn,
+                    fontSize: 10, fontWeight: 800, padding: "2px 8px", borderRadius: 4, marginBottom: 8 }}>
+                    ↓{im.desconto_percentual}% desconto
                   </div>
-                  <div style={{ background: K.s2, borderRadius: 5, padding: "6px 10px" }}>
-                    <div style={{ fontSize: 9, color: K.t3 }}>DESCONTO</div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: K.grn }}>{im.desconto_percentual ? `${im.desconto_percentual}%` : "—"}</div>
+                )}
+                <div style={{ fontWeight: 700, fontSize: 13.5, color: K.wh, marginBottom: 4, lineHeight: 1.3 }}>
+                  {im.titulo}
+                </div>
+                <div style={{ fontSize: 11, color: K.t3, marginBottom: 12 }}>
+                  📍 {im.cidade}/{im.estado}{im.tipo ? ` · ${im.tipo}` : ""}{im.area_m2 ? ` · ${im.area_m2}m²` : ""}
+                </div>
+                <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+                  <div style={{ flex: 1, background: K.s2, borderRadius: 6, padding: "8px 10px" }}>
+                    <div style={{ fontSize: 9, color: K.t3, textTransform: "uppercase" }}>Lance mín.</div>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: K.amb }}>{fmtC(im.valor_minimo)}</div>
                   </div>
+                  {im.valor_avaliacao && (
+                    <div style={{ flex: 1, background: K.s2, borderRadius: 6, padding: "8px 10px" }}>
+                      <div style={{ fontSize: 9, color: K.t3, textTransform: "uppercase" }}>Avaliação</div>
+                      <div style={{ fontSize: 15, fontWeight: 800, color: K.t2 }}>{fmtC(im.valor_avaliacao)}</div>
+                    </div>
+                  )}
                 </div>
-                <div style={{ fontSize: 11, color: K.t3, marginBottom: 10 }}>
-                  {im.modalidade} · {im.data_leilao || "—"} · {im.fonte}
-                </div>
-                <div style={{ display: "flex", gap: 8 }}>
+                {(im.modalidade || im.data_leilao) && (
+                  <div style={{ fontSize: 10.5, color: K.t3, marginBottom: 12,
+                    padding: "6px 10px", background: K.s2, borderRadius: 6 }}>
+                    🔨 {[im.modalidade, im.data_leilao, im.fonte].filter(Boolean).join(" · ")}
+                  </div>
+                )}
+                <div style={{ display: "flex", gap: 6 }}>
                   {im.link && (
-                    <a href={im.link} target="_blank" rel="noopener noreferrer" style={{ background: K.s2, color: K.t2, border: `1px solid ${K.bd}`, borderRadius: 5, padding: "5px 10px", fontSize: 11, textDecoration: "none", fontWeight: 600 }}>
-                      🔗 Ver anúncio
+                    <a href={im.link} target="_blank" rel="noopener noreferrer"
+                      style={{ flex: 1, background: K.s2, color: K.t2, border: `1px solid ${K.bd}`,
+                        borderRadius: 6, padding: "7px 0", fontSize: 11, textDecoration: "none",
+                        fontWeight: 600, textAlign: "center" }}>
+                      🔗 Ver edital
                     </a>
                   )}
                   {onAnalisar && (
-                    <button onClick={() => onAnalisar(im.link || "")} style={{ background: `${K.teal}20`, color: K.teal, border: `1px solid ${K.teal}40`, borderRadius: 5, padding: "5px 10px", fontSize: 11, cursor: "pointer", fontWeight: 600 }}>
-                      🧠 Analisar com IA
+                    <button onClick={() => onAnalisar(im.link || "")}
+                      style={{ flex: 1, background: `${K.teal}15`, color: K.teal,
+                        border: `1px solid ${K.teal}40`, borderRadius: 6, padding: "7px 0",
+                        fontSize: 11, cursor: "pointer", fontWeight: 700 }}>
+                      ⚡ Analisar
                     </button>
                   )}
                 </div>

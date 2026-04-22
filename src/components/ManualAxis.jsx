@@ -328,6 +328,26 @@ function SvgCascata() {
 export default function ManualAxis({ isMobile }) {
   const [cnts, setCnts] = useState({})
   const [aba, setAba] = useState('guia')
+  const [dadosVivos, setDadosVivos] = useState(null)
+  const [carregandoVivos, setCarregandoVivos] = useState(false)
+
+  // Carregar dados ao vivo ao abrir a aba banco
+  useEffect(() => {
+    if (aba !== 'banco' || dadosVivos) return
+    setCarregandoVivos(true)
+    import('../lib/supabase.js').then(async ({ supabase }) => {
+      try {
+        // Buritis como exemplo — bairro do imóvel ativo MG-007
+        const [bairros, imovel] = await Promise.all([
+          supabase.from('metricas_bairros').select('bairro,classe_ipead_label,preco_anuncio_m2,preco_contrato_m2,aluguel_2q_tipico,yield_bruto,tendencia_12m,vacancia_pct,liquidez_label,tempo_venda_dias,atualizado_em').order('bairro').limit(10),
+          supabase.from('imoveis').select('codigo_axis,titulo,score_total,recomendacao,valor_mercado_estimado,mao_flip,aluguel_mensal_estimado,atualizado_em').eq('status_operacional','ativo').is('status_operacional', null).limit(3)
+        ])
+        const ativos = await supabase.from('imoveis').select('codigo_axis,titulo,score_total,recomendacao,valor_mercado_estimado,mao_flip,atualizado_em').or('status_operacional.eq.ativo,status_operacional.is.null').order('atualizado_em', { ascending: false }).limit(5)
+        setDadosVivos({ bairros: bairros.data || [], ativos: ativos.data || [] })
+      } catch(e) { console.warn('[Manual] dados vivos:', e.message) }
+      finally { setCarregandoVivos(false) }
+    })
+  }, [aba])
   const [busca, setBusca] = useState('')
   const [tabIdx, setTabIdx] = useState(0)
   const [dimSel, setDimSel] = useState(null)
@@ -782,6 +802,42 @@ export default function ManualAxis({ isMobile }) {
       {/* ─── ABA: BASE DE DADOS ──────────────────────────────────────── */}
       {aba === 'banco' && (
         <div>
+          {/* Dados ao vivo do banco */}
+          {carregandoVivos && <div style={{ fontSize:12, color:P.gray, padding: '12px 0' }}>⏳ Carregando dados do banco...</div>}
+          {dadosVivos && dadosVivos.bairros.length > 0 && (
+            <div style={{ marginBottom:16, background:P.navyL, border:`1px solid ${P.navy}20`, borderRadius:10, padding:'12px 14px' }}>
+              <div style={{ fontSize:12, fontWeight:700, color:P.navy, marginBottom:8 }}>
+                📡 Dados em tempo real — metricas_bairros (Top bairros BH)
+              </div>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width:'100%', borderCollapse:'collapse', fontSize:10.5 }}>
+                  <thead>
+                    <tr style={{ background:`${P.navy}10` }}>
+                      {['Bairro','Classe','Anúncio/m²','Contrato/m²','Aluguel 2q','Yield','Tend.12m','Vacância','Atualizado'].map(h => (
+                        <th key={h} style={{ padding:'5px 8px', textAlign:'left', color:P.navy, fontWeight:700, whiteSpace:'nowrap', borderBottom:`1px solid ${P.border}` }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dadosVivos.bairros.map((b,i) => (
+                      <tr key={b.bairro} style={{ background: i%2===0 ? P.white : P.surface }}>
+                        <td style={{ padding:'5px 8px', fontWeight:600, color:P.text }}>{b.bairro}</td>
+                        <td style={{ padding:'5px 8px', color:P.gray }}>{b.classe_ipead_label||'—'}</td>
+                        <td style={{ padding:'5px 8px', color:P.emerald, fontWeight:600 }}>R${Number(b.preco_anuncio_m2||0).toLocaleString('pt-BR')}</td>
+                        <td style={{ padding:'5px 8px', color:P.navy, fontWeight:700 }}>R${Number(b.preco_contrato_m2||0).toLocaleString('pt-BR')}</td>
+                        <td style={{ padding:'5px 8px', color:P.purple }}>R${Number(b.aluguel_2q_tipico||0).toLocaleString('pt-BR')}/m²</td>
+                        <td style={{ padding:'5px 8px', color:P.mustard }}>{b.yield_bruto||'—'}%</td>
+                        <td style={{ padding:'5px 8px', color:Number(b.tendencia_12m)>0?P.emerald:P.red }}>{b.tendencia_12m>0?'+':''}{b.tendencia_12m||'—'}%</td>
+                        <td style={{ padding:'5px 8px', color:P.gray }}>{b.vacancia_pct||'—'}%</td>
+                        <td style={{ padding:'5px 8px', color:P.gray, fontSize:9.5 }}>{b.atualizado_em ? new Date(b.atualizado_em).toLocaleDateString('pt-BR') : '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
           <div style={{ fontSize:12, color:P.gray, marginBottom:12, lineHeight:1.6 }}>
             O AXIS usa <strong>bases de dados proprietárias</strong> para análise — sem consultas externas em tempo real.
             Cada tabela tem fonte auditável, data de atualização e amostragem documentada.
