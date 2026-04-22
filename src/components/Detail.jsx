@@ -1821,8 +1821,13 @@ for (const s of SCORES) {
                 /></Suspense>
               </div>
             )}
-            <div style={{marginTop:6,fontSize:9,color:'#94A3B8'}}>
-              Fontes: QuintoAndar 3T2025 · FipeZAP fev/2026 · IPEAD/UFMG · Supabase mercado_regional
+            <div style={{marginTop:6,fontSize:9,color:'#94A3B8',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+              <span>📚 QuintoAndar 3T2025 · FipeZAP P1/P5 2026 · IPEAD/UFMG</span>
+              {p._dados_bairro_axis?.atualizado_em && (
+                <span style={{fontSize:8,background:'#E0F2FE',color:'#0369A1',padding:'1px 5px',borderRadius:3}}>
+                  Atualizado {new Date(p._dados_bairro_axis.atualizado_em).toLocaleDateString('pt-BR')}
+                </span>
+              )}
             </div>
           </div>
         )}

@@ -911,9 +911,13 @@ function NovoImovel({onSave,onCancel,onNav,trello,parametrosBanco,criteriosBanco
         </div>}
 
       <div style={{marginBottom:"16px"}}>
-        <div style={{fontSize:"10px",color:K.t3,textTransform:"uppercase",letterSpacing:"1px",marginBottom:"6px"}}>Link do Imóvel *</div>
-        <input type="url" inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false} style={{...inp(),fontSize:isPhone?16:14,padding:isPhone?'14px 16px':'10px 14px'}} placeholder="https://www.quintoandar.com.br/... ou https://venda-imoveis.caixa.gov.br/..." value={url} onChange={e=>setUrl(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")analyze()}}/>
-        <div style={{fontSize:"11px",color:K.t3,marginTop:"5px"}}>Leilão (CAIXA, Zuk, Mega) ou mercado (QuintoAndar, ZAP, VivaReal, OLX)</div>
+        <div style={{fontSize:"10px",color:K.t3,textTransform:"uppercase",letterSpacing:"1px",marginBottom:"6px"}}>🔗 Link do Imóvel *</div>
+        <input type="url" inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false} style={{...inp(),fontSize:isPhone?16:14,padding:isPhone?'14px 16px':'10px 14px',borderColor:url?K.teal:undefined}} placeholder="Cole o link do leilão ou portal aqui..." value={url} onChange={e=>setUrl(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")analyze()}}/>
+        <div style={{display:'flex',flexWrap:'wrap',gap:4,marginTop:8}}>
+          {[{label:'CAIXA',ico:'🏦'},{label:'Zuk',ico:'🔨'},{label:'Mega Leilões',ico:'⚖️'},{label:'TJ/TRT',ico:'⚖️'},{label:'QuintoAndar',ico:'🏠'},{label:'ZAP',ico:'🏠'},{label:'VivaReal',ico:'🏠'},{label:'OLX',ico:'🏠'}].map(p=>(
+            <span key={p.label} style={{fontSize:10,padding:'2px 8px',borderRadius:4,background:K.s2,border:`1px solid ${K.bd}`,color:K.t3,fontWeight:500}}>{p.ico} {p.label}</span>
+          ))}
+        </div>
 
       <div style={{marginTop:"12px"}}>
         <label style={{fontSize:"13px",color:K.t2,fontWeight:600,display:"block",marginBottom:"6px"}}>📎 Anexar arquivos (opcional)</label>
