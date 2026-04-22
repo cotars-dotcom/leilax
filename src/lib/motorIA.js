@@ -344,6 +344,7 @@ Retorne APENAS JSON válido (sem markdown):
   // Função interna de fetch com model paramétrico
   const fetchMercado = async (model) => {
     const res = await fetch('https://api.openai.com/v1/responses', {
+      signal: AbortSignal.timeout(45000),  // 45s timeout
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -629,6 +630,7 @@ Use apenas tags de texto: [CRITICO] [ATENCAO] [OK] [INFO]
 }`
 
   const res = await fetch('https://api.anthropic.com/v1/messages', {
+    signal: AbortSignal.timeout(45000),  // 45s timeout
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -1011,6 +1013,7 @@ Retorne SOMENTE este JSON (sem texto adicional):
         const geminiRes = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/${MODELOS_GEMINI[0]}:generateContent?key=${geminiKey}`,
           {
+            signal: AbortSignal.timeout(45000),  // 45s timeout
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             signal: AbortSignal.timeout(20000),
@@ -1047,6 +1050,7 @@ Retorne SOMENTE este JSON (sem texto adicional):
     let res
     try {
       res = await fetch('https://api.anthropic.com/v1/messages', {
+      signal: AbortSignal.timeout(45000),  // 45s timeout
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

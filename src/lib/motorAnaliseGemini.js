@@ -263,6 +263,7 @@ async function chamarGeminiModelo(prompt, geminiKey, modelo) {
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${geminiKey}`,
     {
+      signal: AbortSignal.timeout(45000),  // 45s timeout
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -395,6 +396,7 @@ Retorne APENAS o JSON, sem markdown, sem explicação.`
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${geminiKey}`,
     {
+      signal: AbortSignal.timeout(45000),  // 45s timeout
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -850,6 +852,7 @@ export async function analisarComGPT(url, openaiKey, parametros, onProgress) {
   
   progress('🧠 GPT-4o-mini processando...')
   const r = await fetch('https://api.openai.com/v1/chat/completions', {
+    signal: AbortSignal.timeout(45000),  // 45s timeout
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${openaiKey}` },
     body: JSON.stringify({
