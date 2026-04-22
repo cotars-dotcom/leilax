@@ -1901,7 +1901,7 @@ for (const s of SCORES) {
       {p.foto_principal&&(
         <div style={{width:'100%',maxHeight:200,borderRadius:12,overflow:'hidden',marginBottom:10,background:'#f0f0f0',willChange:'transform'}}>
           <img src={p.foto_principal} alt={p.titulo||'Foto'} referrerPolicy="no-referrer"
-            style={{width:'100%',height:'auto',maxHeight:320,objectFit:'cover',display:'block'}}
+            style={{width:'100%',height:200,objectFit:'cover',display:'block'}}
             onError={e=>{e.target.parentElement.style.display='none'}}/>
         </div>
       )}
@@ -1925,10 +1925,7 @@ for (const s of SCORES) {
           </span>
         ))}
       </div>
-      {toArr(p.alertas).length>0&&<div style={{background:`${K.red}10`,border:`1px solid ${K.red}30`,borderRadius:"8px",padding:"14px",marginBottom:"14px"}}>
-        <div style={{fontSize:"11px",color:K.red,fontWeight:"700",textTransform:"uppercase",letterSpacing:"1px",marginBottom:"8px"}}>🚨 Alertas Críticos</div>
-        {toArr(p.alertas).map((a,i)=><div key={i} style={{fontSize:"12.5px",color:K.tx,marginBottom:"4px"}}>• {normalizarTextoAlerta(a)}</div>)}
-      </div>}
+      {/* Alertas movidos para ResumoCard (sem duplicata) */}
       {/* Estratégia recomendada badge */}
       {/* Sprint 12: Info cards extras */}
       {(p.distribuicao_pavimentos || p.parcelamento_detalhes || p.processo_numero || p.coproprietarios) && (
