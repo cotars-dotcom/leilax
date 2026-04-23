@@ -783,10 +783,10 @@ function LanceAlertaBanner({ imovel }) {
       <span style={{fontSize:18}}>⚠️</span>
       <div style={{flex:1}}>
         <div style={{fontWeight:700,color:'#991B1B',fontSize:12}}>
-          Lance {pct}% acima do MAO (ROI 20%)
+          Lance {pct}% acima do limite (ROI 20%)
         </div>
         <div style={{fontSize:11,color:'#B91C1C',marginTop:2}}>
-          MAO flip: R$ {mao.toLocaleString('pt-BR')} · Lance atual: R$ {lance.toLocaleString('pt-BR')}
+          Lance máximo para flip: R$ {mao.toLocaleString('pt-BR')} · Lance atual: R$ {lance.toLocaleString('pt-BR')}
         </div>
       </div>
     </div>
@@ -948,7 +948,7 @@ function YieldAbaixoSelicBanner({ imovel }) {
     <div style={{background:'#FEF2F2',border:'1px solid #FECACA',borderRadius:8,
       padding:'8px 12px',marginBottom:10,fontSize:12,color:'#991B1B'}}>
       ⚠️ <strong>Yield bruto ({yld}% a.a.) abaixo da Selic ({selic}%)</strong> — {gap}pp de diferença.
-      Considere o risco de oportunidade vs renda fixa. O MAO de locação ({mao > 0 ? 'R$'+Math.round(mao).toLocaleString('pt-BR') : '—'}) já compensa isso para o lance certo.
+      Considere o risco de oportunidade vs renda fixa. O lance máximo para locação ({mao > 0 ? 'R$'+Math.round(mao).toLocaleString('pt-BR') : '—'}) já compensa isso para o lance certo.
     </div>
   )
 }

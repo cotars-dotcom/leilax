@@ -144,7 +144,7 @@ function PropCard({p,onNav,isPhone=false}) {
           <div style={{fontSize:"12px",fontWeight:"700",color:"#7C3AED"}}>{p.aluguel_mensal_estimado&&p.aluguel_mensal_estimado>0?`R$ ${Math.round(p.aluguel_mensal_estimado).toLocaleString('pt-BR')}/mês`:"—"}</div>
         </div>
         <div style={{background:K.s2,borderRadius:6,padding:"7px 9px"}}>
-          <div style={{fontSize:"8.5px",color:K.t3,marginBottom:1}}>MAO FLIP</div>
+          <div style={{fontSize:"8.5px",color:K.t3,marginBottom:1}}>LANCE MÁX.</div>
           <div style={{fontSize:"12px",fontWeight:"700",color:K.teal}}>{p.mao_flip&&p.mao_flip>0?`R$ ${Math.round(p.mao_flip).toLocaleString('pt-BR')}`:"—"}</div>
         </div>
       </div>

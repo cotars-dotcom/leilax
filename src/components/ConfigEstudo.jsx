@@ -137,10 +137,10 @@ export default function ConfigEstudo({ imovel }) {
         {/* Lance input */}
         <InputMoeda label="Lance do Estudo" value={lanceEstudo} onChange={setLanceEstudo} cor="#D97706" />
 
-        {/* MAO — Máximo Aceitável Oferta */}
+        {/* Lance máximo para ROI alvo */}
         <div style={{ flex: '0 0 auto', minWidth: 140 }}>
           <div style={{ fontSize: 9, color: acimaMAO ? '#DC2626' : '#059669', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.3px', marginBottom: 3, display: 'flex', alignItems: 'center', gap: 4 }}>
-            MAO p/ ROI
+            Lance Máx p/ ROI
             <input
               type="number" min={5} max={50} step={5} value={roiAlvo}
               onChange={e => setRoiAlvo(Number(e.target.value) || 20)}
@@ -149,7 +149,7 @@ export default function ConfigEstudo({ imovel }) {
           </div>
           <div
             onClick={() => mao > 0 && setLanceEstudo(mao)}
-            title="Clique para aplicar o MAO como lance"
+            title="Clique para aplicar como lance"
             style={{
               padding: '8px 12px', borderRadius: 8, cursor: mao > 0 ? 'pointer' : 'default',
               border: `2px solid ${acimaMAO ? '#DC2626' : '#059669'}30`,
@@ -161,20 +161,20 @@ export default function ConfigEstudo({ imovel }) {
           </div>
           {acimaMAO && (
             <div style={{ fontSize: 9, color: '#DC2626', marginTop: 2, fontWeight: 600 }}>
-              ⚠️ Lance excede MAO em {fmtC(lanceEstudo - mao)}
+              ⚠️ Excede o limite em {fmtC(lanceEstudo - mao)}
             </div>
           )}
         </div>
 
-        {/* MAO Locação */}
+        {/* Lance máximo para locação */}
         {maoLocacao > 0 && (
           <div style={{ flex: '0 0 auto', minWidth: 140 }}>
             <div style={{ fontSize: 9, color: acimaMAOLocacao ? '#B45309' : '#7C3AED', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.3px', marginBottom: 3 }}>
-              MAO p/ Locação {yieldAlvoLocacao}%
+              Lance Máx p/ Locação {yieldAlvoLocacao}%
             </div>
             <div
               onClick={() => maoLocacao > 0 && setLanceEstudo(maoLocacao)}
-              title="Clique para aplicar o MAO de locação como lance"
+              title="Clique para aplicar como lance"
               style={{
                 padding: '8px 12px', borderRadius: 8, cursor: 'pointer',
                 border: `2px solid ${acimaMAOLocacao ? '#B45309' : '#7C3AED'}30`,
@@ -186,12 +186,12 @@ export default function ConfigEstudo({ imovel }) {
             </div>
             {!acimaMAOLocacao && lanceEstudo > 0 && (
               <div style={{ fontSize: 9, color: '#7C3AED', marginTop: 2, fontWeight: 600 }}>
-                ✅ Lance dentro do MAO locação
+                ✅ Dentro do limite de locação
               </div>
             )}
             {acimaMAOLocacao && (
               <div style={{ fontSize: 9, color: '#B45309', marginTop: 2, fontWeight: 600 }}>
-                ⚠️ Excede MAO em {fmtC(lanceEstudo - maoLocacao)}
+                ⚠️ Excede o limite em {fmtC(lanceEstudo - maoLocacao)}
               </div>
             )}
           </div>
@@ -227,7 +227,7 @@ export default function ConfigEstudo({ imovel }) {
               !parseFloat(p.valor_minimo_2 || 0) && avaliacao > 0 && { label: '50% aval.', val: Math.round(avaliacao * 0.50), cor: '#7C3AED' },
               avaliacao > 0 && { label: '57%', val: Math.round(avaliacao * 0.57), cor: '#3B82F6' },
               avaliacao > 0 && { label: '65%', val: Math.round(avaliacao * 0.65), cor: '#D97706' },
-              mao > 0 && { label: 'MAO flip', val: mao, cor: '#059669' },
+              mao > 0 && { label: 'Lance Máx', val: mao, cor: '#059669' },
             ].filter(Boolean).map((b, i) => (
               <button key={i} onClick={() => setLanceEstudo(b.val)} style={{
                 padding: '3px 8px', borderRadius: 5, fontSize: 9, fontWeight: 600,

@@ -207,8 +207,8 @@ export default function CalculadoraROI({ imovel }) {
               <p style={{margin:'4px 0 0', fontSize:11,
                 color: lanceViavel ? C.emerald : RED}}>
                 {lanceViavel
-                  ? (eMercado ? '✓ Preço pedido dentro da margem' : '✓ Lance atual está dentro do MAO')
-                  : (eMercado ? '✗ Preço pedido supera a margem' : '✗ Lance atual supera o MAO')}
+                  ? (eMercado ? '✓ Preço pedido dentro da margem' : '✓ Lance dentro do limite para ROI alvo')
+                  : (eMercado ? '✗ Preço pedido supera a margem' : '✗ Lance supera o limite para ROI alvo')}
               </p>
               <div style={{fontSize:9, color:C.hint, marginTop:3}}>Inclui débitos, holding e reforma no cálculo</div>
             </div>

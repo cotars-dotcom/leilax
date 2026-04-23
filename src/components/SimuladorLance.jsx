@@ -108,7 +108,7 @@ export default function SimuladorLance({ p, isPhone = false }) {
             {[
               { lb: '1ª', val: lance1p },
               !eMercado && lance2p > 0 && { lb: '2ª', val: lance2p },
-              { lb: 'MAO', val: lanceMaxROI, destaque: true },
+              { lb: 'Lance Máx', val: lanceMaxROI, destaque: true },
             ].filter(Boolean).map((b, i) => (
               <button key={i} onClick={() => setLanceCustom(b.val)} style={{
                 padding: '6px 10px', borderRadius: 6, fontSize: 10, fontWeight: 700,
