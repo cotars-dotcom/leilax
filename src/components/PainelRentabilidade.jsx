@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { C, card } from '../appConstants.js'
 import { isMercadoDireto } from '../lib/detectarFonte.js'
-import { CUSTOS_LEILAO, CUSTOS_MERCADO, calcularFatorHomogeneizacao, IPTU_SOBRE_CONDO_RATIO, HOLDING_MESES_PADRAO, recomendacaoDeScore } from '../lib/constants.js'
+import { CUSTOS_LEILAO, CUSTOS_MERCADO, calcularFatorHomogeneizacao, IPTU_SOBRE_CONDO_RATIO, HOLDING_MESES_PADRAO, recomendacaoDeScore, calcularDadosFinanceiros } from '../lib/constants.js'
 import { useReforma } from '../hooks/useReforma.jsx'
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
@@ -34,42 +34,57 @@ function custoArrematacao(lance, eMercado = false, overrides = {}) {
   return { comissao, itbi, doc, adv, registro, total: comissao + itbi + doc + adv + registro }
 }
 
-// Calcular cenário FLIP
+// Calcular cenário FLIP — sprint 41d: delega para função canônica
 function calcFlip(lance, vmercado, reforma, juridico = 0, eMercado = false, overrides = {}, debitosArr = 0, imovelRef = null) {
+  const imovelParaCalc = {
+    ...imovelRef,
+    valor_mercado_estimado: vmercado,
+    custo_juridico_estimado: juridico,
+    responsabilidade_debitos: debitosArr > 0 ? 'arrematante' : (imovelRef?.responsabilidade_debitos || 'sub_rogado'),
+    debitos_total_estimado: debitosArr,
+  }
+  const df = calcularDadosFinanceiros(lance, imovelParaCalc, eMercado, { reforma })
+  // MAO aproximado para checagem de viabilidade (não o canônico de constants.js)
   const c = custoArrematacao(lance, eMercado, overrides)
-  // Fix Bug 5: incluir holding costs (condo + IPTU × meses padrão)
-  const condoMensal = parseFloat(imovelRef?.condominio_mensal || 0)
-  const iptuMensal  = parseFloat(imovelRef?.iptu_mensal || 0) || Math.round(condoMensal * (IPTU_SOBRE_CONDO_RATIO || 0.35))
-  const holding     = (HOLDING_MESES_PADRAO || 6) * (condoMensal + iptuMensal)
-  const custoTotal = lance + c.total + reforma + juridico + debitosArr + holding
-  const corretagem = vmercado * 0.06
-  const precoVendaLiq = vmercado - corretagem
-  const ganhoCapital = Math.max(0, precoVendaLiq - custoTotal)
-  // IRPF: calculado sem redução por tempo de posse (Lei 11.196/2005) — consulte contador
-  const irpf = vmercado <= 440000 ? 0 : ganhoCapital * 0.15
-  const lucro = precoVendaLiq - custoTotal - irpf
-  const roi   = custoTotal > 0 ? (lucro / custoTotal * 100) : 0
-  // Fix Bug 4: MAO correto via função centralizada (não circular)
   const pctCustos = c.total / Math.max(lance, 1)
   const mao = (vmercado * 0.80 - reforma - juridico - debitosArr) / (1 + pctCustos)
-  return { custoTotal, corretagem, irpf, lucro, roi, mao, viavel: roi >= 20 }
+  return {
+    custoTotal: df.investimentoTotal,
+    corretagem: Math.round(vmercado * 0.06),
+    irpf: df.irpf,
+    lucro: df.lucroFlip,
+    roi: df.roiFlip,
+    mao,
+    viavel: df.roiFlip >= 20,
+  }
 }
 
-// Calcular cenário LOCAÇÃO
-function calcLocacao(lance, aluguelMensal, reforma, vmercado, prazoMeses = 120, eMercado = false, overrides = {}) {
-  const c = custoArrematacao(lance, eMercado, overrides)
-  const investimento = lance + c.total + reforma
-  const vacancia     = aluguelMensal * 0.06 * 12  // 6% vacância ao ano
-  const irLocacao    = aluguelMensal > 2824 ? (aluguelMensal - 2824) * 0.275 * 12 : 0  // IR 27.5% PF acima de R$2.824/mês
-  const receita12m   = aluguelMensal * 12 - vacancia - (investimento * 0.005) - irLocacao // 0.5% manutenção + IR
-  const yieldBruto   = investimento > 0 ? (aluguelMensal * 12 / investimento * 100) : 0
-  const yieldLiq     = investimento > 0 ? (receita12m / investimento * 100) : 0
-  const payback      = receita12m > 0 ? Math.ceil(investimento / receita12m * 12) : 999
-  // Valorização: 3% a.a. fallback (tendência do bairro é passada via vmercado ajustado)
+// Calcular cenário LOCAÇÃO — sprint 41d: delega para função canônica
+// Bug antigo: investimento = lance + c.total + reforma (faltava holding + jurídico + débitos).
+// Para MG-007 isso inflava yield em ~30%.
+function calcLocacao(lance, aluguelMensal, reforma, vmercado, prazoMeses = 120, eMercado = false, overrides = {}, juridico = 0, debitosArr = 0, imovelRef = null) {
+  const imovelParaCalc = {
+    ...imovelRef,
+    valor_mercado_estimado: vmercado,
+    custo_juridico_estimado: juridico,
+    responsabilidade_debitos: debitosArr > 0 ? 'arrematante' : (imovelRef?.responsabilidade_debitos || 'sub_rogado'),
+    debitos_total_estimado: debitosArr,
+    aluguel_mensal_estimado: aluguelMensal,
+  }
+  const df = calcularDadosFinanceiros(lance, imovelParaCalc, eMercado, { reforma, aluguelMensal })
+  // Valorização patrimonial ao longo do prazo (não está em calcularDadosFinanceiros)
   const valAnual = 0.03
-  const vf           = vmercado * Math.pow(1 + valAnual, prazoMeses / 12)
-  const patrimonioFinal = vf * 0.94 // -6% corretagem na venda futura
-  return { investimento, receita12m, yieldBruto, yieldLiq, payback, patrimonioFinal, viavel: yieldLiq >= 5 }
+  const vf = vmercado * Math.pow(1 + valAnual, prazoMeses / 12)
+  const patrimonioFinal = vf * 0.94  // -6% corretagem futura
+  return {
+    investimento: df.investimentoTotal,
+    receita12m: df.receitaLiquida12m,
+    yieldBruto: df.yieldBruto,
+    yieldLiq: df.yieldLiquido,
+    payback: df.paybackMesesLiquido || 999,
+    patrimonioFinal,
+    viavel: df.yieldLiquido >= 5,
+  }
 }
 
 // ─── Sub-componente: Card de cenário de lance ─────────────────────────────────
@@ -252,10 +267,10 @@ export default function PainelRentabilidade({ imovel }) {
   const melhoresCenarios = cenarios.map(c => {
     const desc = ((avaliacao - c.lance) / avaliacao * 100)
     const _overrides = { comissao_leiloeiro_pct: imovel.comissao_leiloeiro_pct }
-    const f = calcFlip(c.lance, vmercado, reformaValor, 0, eMercado, _overrides, debitosArr, imovel)
+    const f = calcFlip(c.lance, vmercado, reformaValor, juridico, eMercado, _overrides, debitosArr, imovel)
     // Injetar vmercadoLiq diretamente no flip para evitar stale prop no CardLance
     f.vmercadoLiq = Math.round(vmercado * 0.94)
-    const l = calcLocacao(c.lance, aluguelAtual, reformaValor, vmercado, 120, eMercado, _overrides)
+    const l = calcLocacao(c.lance, aluguelAtual, reformaValor, vmercado, 120, eMercado, _overrides, juridico, debitosArr, imovel)
     const p = c.isMercado ? { prob: 1.0, label: '—', cor: GREEN } : probArrematacao(desc, c.leilao)
     return { ...c, desc, flip: f, loc: l, prob: p }
   })

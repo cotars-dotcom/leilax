@@ -9,6 +9,8 @@
  */
 
 import { C, K, fmtC } from '../appConstants.js'
+import { calcularDadosFinanceiros } from '../lib/constants.js'
+import { isMercadoDireto } from '../lib/detectarFonte.js'
 
 // Bairros BH com alta demanda Airbnb (turismo, eventos, negócios)
 const BAIRROS_AIRBNB = new Set([
@@ -40,14 +42,16 @@ export default function PainelYieldModalidades({ imovel, lanceEstudo, custoRefor
   const condo = parseFloat(imovel?.condominio_mensal || 0)
   const iptu = parseFloat(imovel?.iptu_mensal || 0) || Math.round(condo * 0.35)
   const mercado = parseFloat(imovel?.valor_mercado_estimado) || 0
-  const debitos = imovel?.responsabilidade_debitos === 'arrematante'
-    ? parseFloat(imovel?.debitos_total_estimado || 0) : 0
 
   if (!lance || !mercado) return null
 
-  const pctCustos = (5 + 3 + 5 + 2.5) / 100
-  const holdingTotal = 6 * (condo + iptu)
-  const investBase = lance * (1 + pctCustos) + (custoReformaAtual || 0) + holdingTotal + debitos
+  // Sprint 41d: usar função canônica — inclui jurídico e aplica IR no flip.
+  // Passar custoReformaAtual como override (vem do slider interativo do Detail).
+  const eMercado = isMercadoDireto(imovel.fonte_url, imovel.tipo_transacao)
+  const df = calcularDadosFinanceiros(lance, imovel, eMercado, {
+    reforma: custoReformaAtual != null ? custoReformaAtual : undefined,
+  })
+  const investBase = df.investimentoTotal
 
   if (investBase <= 0) return null
 
@@ -82,11 +86,11 @@ export default function PainelYieldModalidades({ imovel, lanceEstudo, custoRefor
     mercado > 0 && {
       id: 'flip',
       label: '🔄 Flip (Revenda)',
-      desc: 'Venda após reforma',
+      desc: 'Venda após reforma · ROI líquido c/ IR',
       receita: null, // retorno único
       cor: '#059669',
-      lucro: Math.round(mercado * 0.94 - investBase),
-      roi: Math.round(((mercado * 0.94 - investBase) / investBase) * 100 * 10) / 10,
+      lucro: df.lucroFlip,
+      roi: df.roiFlip,
     },
   ].filter(Boolean)
 

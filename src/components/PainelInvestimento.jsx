@@ -81,7 +81,10 @@ export default function PainelInvestimento({ imovel }) {
           <div style={{ fontSize: 28, fontWeight: 800, color: roiColor, lineHeight: 1 }}>
             {roi.roi > 0 ? '+' : ''}{roi.roi}%
           </div>
-          <div style={{ fontSize: 9, color: roiColor, fontWeight: 600, textTransform: 'uppercase' }}>ROI estimado</div>
+          <div style={{ fontSize: 9, color: roiColor, fontWeight: 600, textTransform: 'uppercase' }}>ROI líquido</div>
+          {roi.irpf > 0 && (
+            <div style={{ fontSize: 8, color: '#64748B', marginTop: 1 }}>já c/ IR 15%</div>
+          )}
         </div>
       </div>
 
