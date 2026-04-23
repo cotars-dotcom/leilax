@@ -11,6 +11,78 @@ export function recomendacaoDeScore(score) {
 }
 
 /**
+ * Gera justificativa acionável contextual da recomendação (sprint 41c).
+ * Substitui textos genéricos tipo "AGUARDAR" por orientação operacional:
+ * identifica o principal fator limitante e sugere condição concreta de viabilidade.
+ *
+ * @param {Object} p imóvel
+ * @returns {string|null} texto curto (≤140 chars) com ação clara, ou null
+ */
+export function justificativaAcionavel(p) {
+  if (!p) return null
+  const rec = p.recomendacao
+  const score = parseFloat(p.score_total) || 0
+  const mercado = parseFloat(p.valor_mercado_estimado) || 0
+  const debitos = p.responsabilidade_debitos === 'arrematante'
+    ? parseFloat(p.debitos_total_estimado || 0) : 0
+  const pctDeb = mercado > 0 ? (debitos / mercado) * 100 : 0
+  const maoFlip = parseFloat(p.mao_flip) || 0
+  const lance2 = parseFloat(p.valor_minimo_2) || 0
+  const lance1 = parseFloat(p.valor_minimo) || 0
+  const fmt = (v) => 'R$ ' + Math.round(v).toLocaleString('pt-BR')
+
+  if (rec === 'COMPRAR') {
+    if (lance2 > 0 && maoFlip > 0 && lance2 <= maoFlip) {
+      return `Lance na 2ª praça (${fmt(lance2)}) dentro do limite de flip — oportunidade clara.`
+    }
+    return `Score acima de ${SCORE_COMPRAR} — imóvel aprovado para lance.`
+  }
+
+  if (rec === 'AGUARDAR') {
+    // Encontrar o maior fator limitante
+    const scoresRuins = []
+    if (parseFloat(p.score_juridico) < 6.0) scoresRuins.push({ k: 'juridico', v: p.score_juridico })
+    if (parseFloat(p.score_desconto) < 6.0) scoresRuins.push({ k: 'desconto', v: p.score_desconto })
+    if (parseFloat(p.score_ocupacao) < 6.0) scoresRuins.push({ k: 'ocupacao', v: p.score_ocupacao })
+    if (parseFloat(p.score_liquidez) < 6.0) scoresRuins.push({ k: 'liquidez', v: p.score_liquidez })
+
+    // Débitos altos é o cenário mais comum de AGUARDAR
+    if (pctDeb >= 10 && debitos > 0) {
+      const maoAjustado = maoFlip > 0 ? Math.round(maoFlip * 0.95) : null
+      if (maoAjustado && lance1 > maoAjustado) {
+        return `Débitos = ${pctDeb.toFixed(0)}% do mercado. Oportunidade se lance ≤ ${fmt(maoAjustado)} ou débitos renegociados.`
+      }
+      return `Débitos = ${pctDeb.toFixed(0)}% do mercado pesam no jurídico. Monitorar redução via acordo ou 3ª praça.`
+    }
+
+    if (scoresRuins.length > 0) {
+      const pior = scoresRuins.sort((a, b) => a.v - b.v)[0]
+      const label = { juridico: 'jurídico', desconto: 'desconto', ocupacao: 'ocupação', liquidez: 'liquidez' }[pior.k]
+      return `Ponto fraco: ${label} (${pior.v}/10). Monitorar edital de 2ª praça ou queda adicional no lance mínimo.`
+    }
+
+    if (lance2 > 0 && maoFlip > 0 && lance2 > maoFlip) {
+      const gap = Math.round(((lance2 - maoFlip) / maoFlip) * 100)
+      return `2ª praça (${fmt(lance2)}) está ${gap}% acima do limite de flip. Aguardar 3ª praça ou evitar.`
+    }
+
+    return `Score ${score.toFixed(1)}/10 — próximo do corte. Revisar dados ou aguardar melhores condições.`
+  }
+
+  if (rec === 'EVITAR' || rec === 'INVIAVEL') {
+    if (pctDeb >= 25) {
+      return `Débitos excessivos (${pctDeb.toFixed(0)}% do mercado). Inviável sem renegociação prévia com credores.`
+    }
+    if (lance1 > 0 && mercado > 0 && lance1 > mercado * 0.95) {
+      return `Lance mínimo próximo ou acima do mercado. Sem margem para operação lucrativa.`
+    }
+    return `Score ${score.toFixed(1)}/10 abaixo do mínimo viável.`
+  }
+
+  return null
+}
+
+/**
  * AXIS — Constantes centralizadas
  * 
  * FONTE ÚNICA DE VERDADE para pesos, custos e modelos.

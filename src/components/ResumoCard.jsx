@@ -8,6 +8,7 @@
 import React, { useState } from "react"
 import { C, K, fmtC, recColor, normalizarTextoAlerta } from "../appConstants.js"
 import { isMercadoDireto } from "../lib/detectarFonte.js"
+import { justificativaAcionavel } from "../lib/constants.js"
 import ScoreRadar from "./ScoreRadar.jsx"
 
 function ScoreRingLocal({score, size=72}) {
@@ -136,8 +137,17 @@ export default function ResumoCard({ p, isAdmin, isMobile, onUpdateProp }) {
           <div style={{ fontSize: 12, color: K.t2, marginTop: 5, lineHeight: 1.5 }}>
             {veredictoTexto}
           </div>
+          {(() => {
+            const acao = justificativaAcionavel(p)
+            return acao ? (
+              <div style={{ fontSize: 11.5, color: rc, marginTop: 6, lineHeight: 1.5, fontWeight: 600,
+                background: `${rc}10`, padding: '6px 10px', borderRadius: 6, border: `1px solid ${rc}30` }}>
+                → {acao}
+              </div>
+            ) : null
+          })()}
           {p.justificativa && (
-            <div style={{ fontSize: 11, color: C.muted, marginTop: 4, fontStyle: "italic", lineHeight: 1.4 }}>
+            <div style={{ fontSize: 11, color: C.muted, marginTop: 6, fontStyle: "italic", lineHeight: 1.4 }}>
               "{p.justificativa.slice(0, 120)}{p.justificativa.length > 120 ? "..." : ""}"
             </div>
           )}

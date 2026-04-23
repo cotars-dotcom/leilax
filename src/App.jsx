@@ -1799,7 +1799,7 @@ export default function App() {
   // ALL hooks MUST be before any conditional return (React Rules of Hooks)
   const [view,setView]=useState("dashboard")
   const [vp,setVp]=useState({})
-  const CACHE_VERSION = 'v38'  // v38: motor_ia_usado, mao corrigido, forceScoreUpdate
+  const CACHE_VERSION = 'v39'  // v39: sprint41c — aluguel sem fatores duplicados + UX (desconto, MAO, justificativa)
   const [props,setProps]=useState([])
   const [loaded,setL]=useState(false)
   const [toast,setToast]=useState(null)

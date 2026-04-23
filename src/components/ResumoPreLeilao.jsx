@@ -145,11 +145,16 @@ export default function ResumoPreLeilao({ imovel, onUpdate, onGerarSintese }) {
         </div>
       </div>
 
-      {/* MAO rápidos */}
+      {/* Lance máximo por estratégia */}
+      <div style={{ padding: '6px 14px 4px 14px', background: '#0F172A', borderTop: '1px solid #1E293B' }}>
+        <div style={{ fontSize: 9, color: '#64748B', lineHeight: 1.4 }}>
+          Lance máximo que preserva a rentabilidade-alvo na estratégia. Acima dele, o retorno cai abaixo da meta.
+        </div>
+      </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1, background: '#1E293B' }}>
         {[
-          { label: 'MAO Flip (ROI 20%)',     valor: maoFlip, cor: '#059669', icon: '🔄' },
-          { label: 'MAO Locação (yield 6%)', valor: maoLoc,  cor: '#7C3AED', icon: '🏠' },
+          { label: 'LANCE MÁX. PARA FLIP (ROI 20%)',     valor: maoFlip, cor: '#059669', icon: '🔄' },
+          { label: 'LANCE MÁX. PARA LOCAÇÃO (yield 6%)', valor: maoLoc,  cor: '#7C3AED', icon: '🏠' },
         ].map(m => (
           <div key={m.label} style={{ padding: '10px 14px', background: '#0F172A' }}>
             <div style={{ fontSize: 9, color: '#64748B', fontWeight: 600, textTransform: 'uppercase' }}>
@@ -161,7 +166,7 @@ export default function ResumoPreLeilao({ imovel, onUpdate, onGerarSintese }) {
             {p.valor_minimo_2 && m.valor > 0 && (
               <div style={{ fontSize: 9, marginTop: 2,
                 color: parseFloat(p.valor_minimo_2) <= m.valor ? '#4ADE80' : '#F87171' }}>
-                {parseFloat(p.valor_minimo_2) <= m.valor ? '✅ 2ª praça dentro do MAO' : '⚠️ 2ª praça acima do MAO'}
+                {parseFloat(p.valor_minimo_2) <= m.valor ? '✅ 2ª praça dentro do limite' : '⚠️ 2ª praça acima do limite'}
               </div>
             )}
           </div>
