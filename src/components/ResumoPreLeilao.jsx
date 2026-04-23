@@ -116,7 +116,7 @@ export default function ResumoPreLeilao({ imovel, onUpdate, onGerarSintese }) {
   const estrategiaObj = ESTRATEGIAS.find(e => e.id === estrategiaDefinida)
 
   return (
-    <div style={{ ...K, marginBottom: 14, borderRadius: 12, overflow: 'hidden',
+    <div data-resumo-pre-leilao style={{ ...K, marginBottom: 14, borderRadius: 12, overflow: 'hidden',
       border: `2px solid ${urgente ? '#DC2626' : '#D97706'}`,
       background: urgente ? '#FEF2F210' : '#FFFBEB10' }}>
 

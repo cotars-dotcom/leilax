@@ -1680,6 +1680,59 @@ for (const s of SCORES) {
           }}>🔗 Compartilhar</button>}
         {isAdmin&&<button style={{...btn("d"),padding:"5px 12px",fontSize:"12px"}} onClick={()=>{if(confirm("Excluir?"))onDelete(p.id)}}>🗑</button>}
       </>}/>
+    {/* Banner crítico: lance_maximo_definido NULL com leilão próximo (sprint 41c) */}
+    {!isMercadoDireto(p.fonte_url, p.tipo_transacao) && !p.lance_maximo_definido && (() => {
+      // Escolher a data mais próxima (geralmente 2ª praça vem depois da 1ª)
+      const datas = [p.data_leilao, p.data_leilao_2].filter(Boolean)
+      if (datas.length === 0) return null
+      const hoje = new Date(); hoje.setHours(0,0,0,0)
+      const diasRestantes = datas.map(d => {
+        const [y,m,dd] = d.split('-').map(Number)
+        const dt = new Date(y, m-1, dd); dt.setHours(0,0,0,0)
+        return Math.round((dt - hoje) / 86400000)
+      }).filter(dias => dias >= 0)
+      if (diasRestantes.length === 0) return null
+      const menorDias = Math.min(...diasRestantes)
+      if (menorDias > 30) return null  // só alertar quando leilão está a ≤30 dias
+      const maoFlip = parseFloat(p.mao_flip) || 0
+      const urgente = menorDias <= 7
+      return (
+        <div style={{
+          margin:'0 28px', marginTop:12,
+          background: urgente ? '#FEE2E2' : '#FEF3C7',
+          border: `2px solid ${urgente ? '#DC2626' : '#F59E0B'}`,
+          borderRadius:10, padding:'12px 16px',
+          display:'flex', alignItems:'center', justifyContent:'space-between', gap:12, flexWrap:'wrap'
+        }}>
+          <div style={{flex:1, minWidth:280}}>
+            <div style={{fontWeight:800, fontSize:13.5, color: urgente ? '#991B1B' : '#92400E', letterSpacing:.2}}>
+              {urgente ? '🚨' : '⚠️'} LEILÃO EM {menorDias} {menorDias === 1 ? 'DIA' : 'DIAS'} — LANCE MÁXIMO NÃO DEFINIDO
+            </div>
+            <div style={{fontSize:12, color: urgente ? '#7F1D1D' : '#78350F', marginTop:4, lineHeight:1.5}}>
+              Você não registrou um teto de lance para este imóvel. Sem essa definição, o AXIS não consegue
+              alertar se um lance efetivo está dentro do envelope seguro.
+              {maoFlip > 0 && (
+                <> Sugestão de referência: <strong>R$ {maoFlip.toLocaleString('pt-BR')}</strong> (lance máximo calculado para ROI 20% em flip).</>
+              )}
+            </div>
+          </div>
+          <button
+            style={{
+              padding:'8px 14px', fontSize:12, fontWeight:700, cursor:'pointer',
+              background: urgente ? '#DC2626' : '#F59E0B',
+              color:'#FFF',
+              border:'none', borderRadius:8, flexShrink:0,
+            }}
+            onClick={() => {
+              // scroll para o painel ResumoPreLeilao — tem um [data-scroll-target] ou procura pelo texto
+              const el = document.querySelector('[data-resumo-pre-leilao]')
+                     || Array.from(document.querySelectorAll('*')).find(n => n.textContent?.includes('DECISÃO DE LANCE'))
+              if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+            }}
+          >Definir agora ↓</button>
+        </div>
+      )
+    })()}
     {/* Banner pós-leilão — aparece quando data passou e imóvel ainda está ativo */}
     {!isMercadoDireto(p.fonte_url, p.tipo_transacao) && p.data_leilao && (() => {
       const [y,m,d] = (p.data_leilao?.split('-') || ['2099','12','31']).map(Number)
