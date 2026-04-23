@@ -26,7 +26,7 @@ import ConfigEstudo from './ConfigEstudo.jsx'
 import ResumoCard from './ResumoCard.jsx'
 const PainelRentabilidade = lazy(() => import('./PainelRentabilidade.jsx'))
 import { isMercadoDireto } from '../lib/detectarFonte.js'
-import { calcularCustosAquisicao, MULT_CUSTO_RAPIDO, CUSTOS_LEILAO, CUSTOS_MERCADO, IPTU_SOBRE_CONDO_RATIO, HOLDING_MESES_PADRAO, calcularLanceMaximoParaROI, calcularSobrecapitalizacao, IRPF_ISENCAO_TETO } from '../lib/constants.js'
+import { calcularCustosAquisicao, MULT_CUSTO_RAPIDO, CUSTOS_LEILAO, CUSTOS_MERCADO, IPTU_SOBRE_CONDO_RATIO, HOLDING_MESES_PADRAO, calcularLanceMaximoParaROI, calcularSobrecapitalizacao, IRPF_ISENCAO_TETO, calcularDadosFinanceiros } from '../lib/constants.js'
 import { calcularConfidence } from '../lib/agenteConfidenceBadge.js'
 import CenariosReforma from './CenariosReforma.jsx'
 import { ReformaProvider, useReforma } from '../hooks/useReforma.jsx'
@@ -734,15 +734,14 @@ function RoiLiveBanner({ imovel }) {
   const mercado = parseFloat(imovel?.valor_mercado_estimado) || 0
   if (!lance || !mercado) return null
 
-  const tab = eMercado ? CUSTOS_MERCADO : CUSTOS_LEILAO
-  const pctTaxas = (tab.comissao_leiloeiro_pct + tab.itbi_pct + tab.advogado_pct + tab.documentacao_pct) / 100
-  const condo = parseFloat(imovel?.condominio_mensal || 0)
-  const iptu = parseFloat(imovel?.iptu_mensal || 0) || (condo > 0 ? Math.round(condo * IPTU_SOBRE_CONDO_RATIO) : 0)
-  const holding = HOLDING_MESES_PADRAO * (condo + iptu)
-  const debitos = imovel?.responsabilidade_debitos === 'arrematante' ? parseFloat(imovel?.debitos_total_estimado || 0) : 0
-  const investTotal = lance * (1 + pctTaxas) + custoReformaAtual + holding + debitos
-  const lucro = mercado * 0.94 - investTotal
-  const roi = investTotal > 0 ? (lucro / investTotal) * 100 : 0
+  // Sprint 41d: delega para calcularDadosFinanceiros.
+  // Antes calculava localmente: lance*(1+pctTaxas) + reforma + holding + débitos,
+  // pulando custo_juridico_estimado e IRPF. Resultado divergia de PainelInvestimento
+  // e dos exportadores para o mesmo lance/imóvel.
+  const df = calcularDadosFinanceiros(lance, imovel, eMercado, { reforma: custoReformaAtual })
+  const investTotal = df.investimentoTotal
+  const lucro = df.lucroFlip
+  const roi = df.roiFlip
   const roiColor = roi >= 20 ? '#065F46' : roi >= 10 ? '#D97706' : roi >= 0 ? '#92400E' : '#991B1B'
   const roiBg = roi >= 20 ? '#ECFDF5' : roi >= 10 ? '#FEF3C7' : roi >= 0 ? '#FFFBEB' : '#FEF2F2'
   const fmtV = v => `R$ ${Math.round(v).toLocaleString('pt-BR')}`
@@ -754,11 +753,13 @@ function RoiLiveBanner({ imovel }) {
       <div style={{fontSize:11,color:'#64748B'}}>
         <div style={{fontWeight:600,color:'#334155'}}>ROI ao vivo — {CENARIO_LABEL[cenarioSimplificado]||cenarioSimplificado}</div>
         <div>Lance {fmtV(lance)} · Reforma {fmtV(custoReformaAtual)} · Invest. {fmtV(investTotal)}</div>
-        <div style={{fontSize:9,color:'#94A3B8',marginTop:1}}>Líquido — inclui corretagem 6% + holding + débitos</div>
+        <div style={{fontSize:9,color:'#94A3B8',marginTop:1}}>
+          Líquido · inclui corretagem 6% + holding + débitos + jurídico{df.irpf > 0 ? ' + IR 15%' : ''}
+        </div>
       </div>
       <div style={{textAlign:'right'}}>
         <div style={{fontSize:22,fontWeight:800,color:roiColor,lineHeight:1}}>{roi >= 0 ? '+' : ''}{roi.toFixed(1)}%</div>
-        <div style={{fontSize:9,color:roiColor,fontWeight:600}}>ROI flip</div>
+        <div style={{fontSize:9,color:roiColor,fontWeight:600}}>ROI flip líquido</div>
         <div style={{fontSize:10,color:lucro>=0?'#065F46':'#991B1B',fontWeight:600}}>{fmtV(Math.abs(lucro))}</div>
       </div>
     </div>
