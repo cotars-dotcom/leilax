@@ -7,9 +7,12 @@ import { abrirHtmlNovaTela } from '../lib/abrirHtml.js'
  *   - Lance máximo definido + estratégia
  *   - Cenários de ROI
  *   - Alertas e débitos
+ * Sprint 41d: usa calcularDadosFinanceiros (constants.js) — unificado com
+ * ExportarResumoSimples e ExportarPDF para garantir mesmos números.
  */
 
-import { CUSTOS_LEILAO, HOLDING_MESES_PADRAO, IPTU_SOBRE_CONDO_RATIO } from '../lib/constants.js'
+import { calcularDadosFinanceiros } from '../lib/constants.js'
+import { isMercadoDireto } from '../lib/detectarFonte.js'
 
 const fmt = v => v ? `R$ ${Math.round(v).toLocaleString('pt-BR')}` : '—'
 const fmtPct = v => v != null ? `${Number(v).toFixed(1)}%` : '—'
@@ -17,20 +20,16 @@ const fmtData = d => d ? new Date(d + 'T12:00').toLocaleDateString('pt-BR') : '�
 
 function calcROI(lance, p) {
   if (!lance || !p.valor_mercado_estimado) return null
-  const mercado = parseFloat(p.valor_mercado_estimado)
-  const pct = (CUSTOS_LEILAO.comissao_leiloeiro_pct + CUSTOS_LEILAO.itbi_pct +
-               CUSTOS_LEILAO.advogado_pct + CUSTOS_LEILAO.documentacao_pct) / 100
-  const condo = parseFloat(p.condominio_mensal || 0)
-  const iptu  = parseFloat(p.iptu_mensal || 0) || Math.round(condo * IPTU_SOBRE_CONDO_RATIO)
-  const holding = HOLDING_MESES_PADRAO * (condo + iptu)
-  const debitos = p.responsabilidade_debitos === 'arrematante' ? parseFloat(p.debitos_total_estimado || 0) : 0
-  const reforma = parseFloat(p.custo_reforma_basica || 0)
-  const invest = lance * (1 + pct) + reforma + holding + debitos
-  const lucro  = mercado * 0.94 - invest
-  const roi    = invest > 0 ? (lucro / invest) * 100 : 0
-  const aluguel = parseFloat(p.aluguel_mensal_estimado || 0)
-  const yld = aluguel > 0 && invest > 0 ? (aluguel * 12 / invest) * 100 : 0
-  return { invest: Math.round(invest), lucro: Math.round(lucro), roi: +roi.toFixed(1), yld: +yld.toFixed(1) }
+  const eMercado = isMercadoDireto(p.fonte_url, p.tipo_transacao)
+  const df = calcularDadosFinanceiros(lance, p, eMercado)
+  // Manter mesmo formato de retorno (invest/lucro/roi/yld) para não quebrar
+  // o template abaixo que consome esses campos.
+  return {
+    invest: df.investimentoTotal,
+    lucro: df.lucroFlip,
+    roi: df.roiFlip,
+    yld: df.yieldBruto,
+  }
 }
 
 function gerarHTML(p) {
@@ -224,12 +223,14 @@ function gerarHTML(p) {
           <div style="font-size:10pt;font-weight:800;color:#F1F5F9">${fmt(roiDecisao.invest)}</div>
         </div>
         <div>
-          <div class="lbl-dark" style="color:#64748B">ROI flip</div>
+          <div class="lbl-dark" style="color:#64748B">ROI flip líquido</div>
           <div style="font-size:12pt;font-weight:900;color:${corROI(roiDecisao.roi)}">${roiDecisao.roi > 0 ? '+' : ''}${roiDecisao.roi}%</div>
+          <div style="font-size:6pt;color:#64748B">já c/ IR 15%</div>
         </div>
         <div>
           <div class="lbl-dark" style="color:#64748B">Yield loc.</div>
           <div style="font-size:12pt;font-weight:900;color:#A78BFA">${roiDecisao.yld > 0 ? roiDecisao.yld + '% a.a.' : '—'}</div>
+          <div style="font-size:6pt;color:#64748B">bruto</div>
         </div>
       </div>
       <div style="margin-top:6px;font-size:7.5pt;color:${parseFloat(p.mao_flip||0) > 0 && lanceDefinido <= parseFloat(p.mao_flip) ? '#4ADE80' : '#F87171'}">

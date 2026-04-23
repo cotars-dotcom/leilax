@@ -306,8 +306,15 @@ export function calcularCustoTotal(precoBase, isMercado, reforma = 0, holdingMes
 
 // ─── SPRINT 11: Breakdown Financeiro e ROI ─────────────────────────
 
-/** Calcula breakdown completo dos custos de aquisição */
-export function calcularBreakdownFinanceiro(lance, imovel = {}, eMercado = false) {
+/** Calcula breakdown completo dos custos de aquisição.
+ *  @param {number} lance
+ *  @param {Object} imovel
+ *  @param {boolean} eMercado
+ *  @param {Object} [overrides] - sobrescritas opcionais: { reforma, aluguelMensal }
+ *                                Útil para exportadores que quieren um cenário "com reforma X"
+ *                                diferente do custo_reforma_estimado do banco.
+ */
+export function calcularBreakdownFinanceiro(lance, imovel = {}, eMercado = false, overrides = {}) {
   const custos = eMercado ? CUSTOS_MERCADO : CUSTOS_LEILAO
   const comissaoPct = (imovel.comissao_leiloeiro_pct || custos.comissao_leiloeiro_pct || 5) / 100
   const itbiPct = (imovel.itbi_pct || custos.itbi_pct || 3) / 100
@@ -318,7 +325,11 @@ export function calcularBreakdownFinanceiro(lance, imovel = {}, eMercado = false
   const itbi = lance * itbiPct
   const doc = lance * docPct + (custos.registro_fixo ?? 0)
   const advogado = lance * advPct
-  const reforma = parseFloat(imovel.custo_reforma_estimado || imovel.custo_reforma_calculado || 0)
+  // Reforma: override explícito > estimado do banco > calculado > básica > 0.
+  // custo_reforma_basica é fallback (exportadores antigos passavam essa chave).
+  const reforma = overrides.reforma != null
+    ? parseFloat(overrides.reforma)
+    : parseFloat(imovel.custo_reforma_estimado || imovel.custo_reforma_calculado || imovel.custo_reforma_basica || 0)
   const condoMensal = parseFloat(imovel.condominio_mensal || 0)
   const iptuMensal = parseFloat(imovel.iptu_mensal || 0) || (condoMensal > 0 ? Math.round(condoMensal * IPTU_SOBRE_CONDO_RATIO) : 0)
   const holdingMeses = HOLDING_MESES_PADRAO
@@ -347,7 +358,78 @@ export function calcularBreakdownFinanceiro(lance, imovel = {}, eMercado = false
     custoJuridico: Math.round(custoJuridico),
     totalCustos: Math.round(totalCustos),
     investimentoTotal: Math.round(investimentoTotal),
-    pctCustosSobreLance: ((totalCustos / lance) * 100).toFixed(1),
+    pctCustosSobreLance: ((totalCustos / Math.max(lance, 1)) * 100).toFixed(1),
+  }
+}
+
+/** Calcula ROI/yield consolidado para exportadores (sprint 41d).
+ *  Wrapper sobre calcularBreakdownFinanceiro + calcularROI que retorna tudo
+ *  que os 3 exportadores (ResumoSimples, DecisaoPDF, PDF principal) precisam.
+ *  Garante mesmos números em todos os relatórios.
+ *
+ *  Sprint 41d: alinha com PainelRentabilidade — inclui IR sobre ganho capital
+ *  (15% acima do teto de isenção de R$440k) e yield líquido (após vacância 6%,
+ *  IR 27.5% sobre aluguel acima de R$2.824/mês e manutenção 0.5%).
+ *
+ *  Retorna AMBOS bruto e líquido para que cada consumidor escolha.
+ */
+export function calcularDadosFinanceiros(lance, imovel = {}, eMercado = false, overrides = {}) {
+  const bd = calcularBreakdownFinanceiro(lance, imovel, eMercado, overrides)
+  const mercado = parseFloat(imovel.valor_mercado_estimado || 0)
+  const aluguel = overrides.aluguelMensal != null
+    ? parseFloat(overrides.aluguelMensal)
+    : parseFloat(imovel.aluguel_mensal_estimado || 0)
+  const invest = bd.investimentoTotal
+
+  // === FLIP ===
+  // Venda líquida: -6% corretagem padrão
+  const CORRETAGEM_VENDA = 0.06
+  const vendaLiquida = mercado * (1 - CORRETAGEM_VENDA)
+  // ROI bruto: antes de IRPF
+  const lucroFlipBruto = invest > 0 ? vendaLiquida - invest : 0
+  const roiFlipBruto = invest > 0 ? (lucroFlipBruto / invest) * 100 : 0
+  // IRPF sobre ganho capital (Lei 11.196/2005):
+  //   - isenção se imóvel <= IRPF_ISENCAO_TETO (R$440k) — só vale 1 vez a cada 5 anos, CPF pessoal
+  //   - caso contrário, 15% sobre ganho capital
+  // Seguindo PainelRentabilidade: não aplica redução por tempo de posse (consulte contador).
+  const ganhoCapital = Math.max(0, lucroFlipBruto)
+  const potencialIsencao = mercado <= (IRPF_ISENCAO_TETO || 440000)
+  const irpf = potencialIsencao ? 0 : ganhoCapital * 0.15
+  const lucroFlip = lucroFlipBruto - irpf
+  const roiFlip = invest > 0 ? (lucroFlip / invest) * 100 : 0
+
+  // === LOCAÇÃO ===
+  const yieldBruto = aluguel > 0 && invest > 0 ? (aluguel * 12 / invest) * 100 : 0
+  // Yield líquido alinhado com calcLocacao do PainelRentabilidade:
+  //   -6% vacância/ano, -IR 27.5% PF sobre aluguel acima de R$2.824/mês, -0.5% manutenção/ano
+  const IR_ALUGUEL_TETO_MENSAL = 2824
+  const vacancia = aluguel * 0.06 * 12
+  const irLocacaoAnual = aluguel > IR_ALUGUEL_TETO_MENSAL
+    ? (aluguel - IR_ALUGUEL_TETO_MENSAL) * 0.275 * 12 : 0
+  const manutencaoAnual = invest * 0.005
+  const receitaLiquida12m = aluguel * 12 - vacancia - irLocacaoAnual - manutencaoAnual
+  const yieldLiquido = aluguel > 0 && invest > 0
+    ? (receitaLiquida12m / invest) * 100 : 0
+
+  return {
+    lance,
+    investimentoTotal: invest,
+    vendaLiquida: Math.round(vendaLiquida),
+    // Flip — bruto e líquido (com IR)
+    lucroFlipBruto: Math.round(lucroFlipBruto),
+    roiFlipBruto: +roiFlipBruto.toFixed(1),
+    irpf: Math.round(irpf),
+    lucroFlip: Math.round(lucroFlip),
+    roiFlip: +roiFlip.toFixed(1),
+    potencialIsencaoIRPF: potencialIsencao,
+    // Locação — bruto e líquido (com vacância, IR, manutenção)
+    aluguelMensal: Math.round(aluguel),
+    yieldBruto: +yieldBruto.toFixed(1),
+    yieldLiquido: +yieldLiquido.toFixed(1),
+    receitaLiquida12m: Math.round(receitaLiquida12m),
+    paybackMeses: aluguel > 0 ? Math.round(invest / aluguel) : null,
+    paybackMesesLiquido: receitaLiquida12m > 0 ? Math.ceil(invest / receitaLiquida12m * 12) : null,
+    breakdown: bd,  // exportar breakdown detalhado para relatórios que precisem
   }
 }
 

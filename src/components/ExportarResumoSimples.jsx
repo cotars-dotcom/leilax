@@ -2,11 +2,15 @@
  * AXIS IP — Relatório Didático v2
  * Linguagem acessível para qualquer pessoa entender se deve ou não comprar.
  * Estrutura: Veredicto → Imóvel → Números → Riscos → Próximos passos
+ *
+ * Sprint 41d: usa calcularDadosFinanceiros (constants.js) — unificado com
+ * ExportarDecisaoPDF e ExportarPDF para garantir mesmos números em todos
+ * os relatórios.
  */
 
 import { abrirHtmlNovaTela } from '../lib/abrirHtml.js'
 import { isMercadoDireto } from '../lib/detectarFonte.js'
-import { CUSTOS_LEILAO, HOLDING_MESES_PADRAO, IPTU_SOBRE_CONDO_RATIO } from '../lib/constants.js'
+import { calcularDadosFinanceiros } from '../lib/constants.js'
 
 const fmt   = v  => v != null && v !== '' ? `R$ ${Math.round(Number(v)).toLocaleString('pt-BR')}` : '—'
 const fmtPct= v  => v != null ? `${Number(v).toFixed(1)}%` : '—'
@@ -15,29 +19,21 @@ const toArr = v  => Array.isArray(v) ? v : (v && typeof v === 'string' ? v.split
 
 function calcularInvestimento(lance, p) {
   if (!lance || !p.valor_mercado_estimado) return null
-  const l   = parseFloat(lance)
-  const mk  = parseFloat(p.valor_mercado_estimado)
-  const pct = ((CUSTOS_LEILAO?.comissao_leiloeiro_pct || 5) +
-               (CUSTOS_LEILAO?.itbi_pct || 3) +
-               (CUSTOS_LEILAO?.advogado_pct || 5) +
-               (CUSTOS_LEILAO?.documentacao_pct || 2.5)) / 100
-  const condo   = parseFloat(p.condominio_mensal || 0)
-  const iptu    = parseFloat(p.iptu_mensal || 0) || Math.round(condo * (IPTU_SOBRE_CONDO_RATIO || 0.35))
-  const holding = (HOLDING_MESES_PADRAO || 6) * (condo + iptu)
-  const debitos = p.responsabilidade_debitos === 'arrematante' ? parseFloat(p.debitos_total_estimado || 0) : 0
-  const reforma = parseFloat(p.custo_reforma_basica || 0)
-  const juridico= parseFloat(p.custo_juridico_estimado || 0)
-  const taxas   = Math.round(l * pct)
-  const invest  = l + taxas + reforma + holding + debitos + juridico
-  const aluguel = parseFloat(p.aluguel_mensal_estimado || 0)
-  const lucroVenda  = Math.round(mk * 0.94 - invest)
-  const roiFlip     = invest > 0 ? ((lucroVenda / invest) * 100) : 0
-  const yieldAnual  = aluguel > 0 && invest > 0 ? ((aluguel * 12 / invest) * 100) : 0
+  const eMercado = isMercadoDireto(p.fonte_url, p.tipo_transacao)
+  const df = calcularDadosFinanceiros(lance, p, eMercado)
+  const bd = df.breakdown
   return {
-    lance: l, taxas, reforma, holding, debitos, juridico,
-    invest: Math.round(invest), lucroVenda,
-    roiFlip: +roiFlip.toFixed(1), yieldAnual: +yieldAnual.toFixed(1),
-    aluguelMensal: aluguel,
+    lance: df.lance,
+    taxas: bd.totalCustos,
+    reforma: bd.reforma,
+    holding: bd.holding,
+    debitos: bd.debitosArrematante,
+    juridico: bd.custoJuridico,
+    invest: df.investimentoTotal,
+    lucroVenda: df.lucroFlip,
+    roiFlip: df.roiFlip,
+    yieldAnual: df.yieldBruto,
+    aluguelMensal: df.aluguelMensal,
   }
 }
 
@@ -311,10 +307,12 @@ ${cenarios.length > 0 ? `
         <div style="background:#fff;border-radius:8px;padding:8px;text-align:center">
           <div style="font-size:17px;font-weight:900;color:${roiDecisao.roiFlip >= 15 ? '#059669' : '#D97706'}">${roiDecisao.roiFlip > 0 ? '+' : ''}${roiDecisao.roiFlip}%</div>
           <div style="font-size:10px;color:#64748B;text-transform:uppercase">Lucro na venda</div>
+          <div style="font-size:8px;color:#94A3B8">líquido, c/ IR 15%</div>
         </div>
         <div style="background:#fff;border-radius:8px;padding:8px;text-align:center">
           <div style="font-size:17px;font-weight:900;color:#7C3AED">${roiDecisao.yieldAnual > 0 ? roiDecisao.yieldAnual + '%' : '—'}</div>
           <div style="font-size:10px;color:#64748B;text-transform:uppercase">Retorno/ano</div>
+          <div style="font-size:8px;color:#94A3B8">bruto</div>
         </div>
         <div style="background:#fff;border-radius:8px;padding:8px;text-align:center">
           <div style="font-size:17px;font-weight:900;color:#0F172A">${fmt(roiDecisao.invest)}</div>
