@@ -23,8 +23,8 @@ const ROW_GROUPS = [
     rows: [
       { label: 'Lance Mínimo', fn: p => fmtC(p.valor_minimo || p.preco_pedido), destaque: true },
       { label: 'Valor de Mercado', fn: p => fmtC(p.valor_mercado_estimado) },
-      { label: 'MAO Flip (ROI 20%)', fn: p => fmtC(p.mao_flip), cor: p => p.mao_flip > 0 ? '#059669' : '#94A3B8' },
-      { label: 'MAO Locação (yield 6%)', fn: p => fmtC(p.mao_locacao), cor: p => p.mao_locacao > 0 ? '#7C3AED' : '#94A3B8' },
+      { label: 'Lance máx. flip (ROI 20%)', fn: p => fmtC(p.mao_flip), cor: p => p.mao_flip > 0 ? '#059669' : '#94A3B8' },
+      { label: 'Lance máx. locação (yield 6%)', fn: p => fmtC(p.mao_locacao), cor: p => p.mao_locacao > 0 ? '#7C3AED' : '#94A3B8' },
       { label: 'Aluguel Est./mês', fn: p => fmtC(p.aluguel_mensal_estimado) },
       { label: 'Yield Bruto', fn: p => p.yield_bruto_pct ? `${p.yield_bruto_pct}% a.a.` : '—' },
       { label: 'Condo + IPTU/mês', fn: p => {
