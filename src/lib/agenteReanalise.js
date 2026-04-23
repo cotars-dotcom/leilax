@@ -123,10 +123,16 @@ CALIBRAÇÃO DOS SCORES (escala 0-10 — OBRIGATÓRIO seguir):
 - Mercado: classe Luxo BH→8.5, Alto→7.0, Médio→5.5, Popular→4.0
 REGRA: Nenhum score individual pode ser alterado em mais de 1.5 pontos vs o valor atual sem justificativa explícita.
 
-Se mao_flip ou mao_locacao estiverem nulos, calcule:
-- mao_flip = (valor_mercado_estimado × 0.80) - (custo_reforma_estimado + valor_minimo × 0.10)
-- mao_locacao = aluguel_mensal_estimado × 120 × 0.90
-Lance acima do mao_flip → [CRITICO] nos alertas.
+Se mao_flip ou mao_locacao estiverem nulos, deixe como null — o sistema recalcula em
+pós-processamento usando a função canônica calcularLanceMaximoParaROI que inclui:
+- reforma (custo_reforma_estimado)
+- débitos a cargo do arrematante (se responsabilidade_debitos === 'arrematante')
+- holding (6 meses × condomínio + IPTU)
+- jurídico (custo_juridico_estimado)
+- custos variáveis (comissão 5% + ITBI 3% + advogado 5% + docs 2,5% = 15,5%)
+- corretagem de venda 6%
+NÃO use a aproximação antiga (VM × 0,80 − reforma) — está deprecada.
+Lance acima do mao_flip calculado → [CRITICO] nos alertas.
 
 COMPARÁVEIS: NÃO retorne comparáveis neste JSON de reanálise — eles são gerenciados separadamente.
 Se o prompt pedir comparáveis, ignore — essa reanálise só valida scores e síntese.
@@ -279,6 +285,21 @@ Retorne APENAS JSON com os campos atualizados:
     mao_flip: delta.mao_flip || imovelAtual.mao_flip || null,
     mao_locacao: delta.mao_locacao || imovelAtual.mao_locacao || null,
     _modelo_usado: modeloUsado,
+  }
+
+  // Sprint 41d: fallback canônico se mao_flip continuar null após reanálise.
+  // Motor da IA pode retornar null mesmo para imóveis com todos os dados — nesse caso
+  // usar calcularLanceMaximoParaROI de constants.js (inclui débitos+holding+jurídico).
+  if (!analiseAtualizada.mao_flip && analiseAtualizada.valor_mercado_estimado) {
+    const { calcularLanceMaximoParaROI } = await import('./constants.js')
+    const maoFlipCalc = calcularLanceMaximoParaROI(20, analiseAtualizada, {
+      mercadoBruto: parseFloat(analiseAtualizada.valor_mercado_estimado),
+      custoReforma: parseFloat(analiseAtualizada.custo_reforma_estimado || analiseAtualizada.custo_reforma_basica || 0),
+    })
+    if (maoFlipCalc > 0) analiseAtualizada.mao_flip = maoFlipCalc
+  }
+  if (!analiseAtualizada.mao_locacao && analiseAtualizada.aluguel_mensal_estimado) {
+    analiseAtualizada.mao_locacao = Math.round(analiseAtualizada.aluguel_mensal_estimado * 120 * 0.90)
   }
 
   // Recalcular score total com os pesos corretos (fonte: constants.js)

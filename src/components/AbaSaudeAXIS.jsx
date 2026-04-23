@@ -57,7 +57,7 @@ export default function AbaSaudeAXIS({ isPhone = false, onNav = null }) {
   useEffect(() => { verificar() }, [])
 
   const handleBatchEnrich = async () => {
-    if (!confirm(`Enriquecer ${imoveis.length} imóvel(is) com agentes F5? (mercado, MAO, aluguel, confidence)`)) return
+    if (!confirm(`Enriquecer ${imoveis.length} imóvel(is) com agentes F5? (mercado, lance máximo, aluguel, confidence)`)) return
     setEnrichProgress({ total: imoveis.length, atual: 0, log: [] })
     try {
       const { enriquecerImovel } = await import('../lib/agenteOrquestrador.js')
@@ -188,7 +188,7 @@ export default function AbaSaudeAXIS({ isPhone = false, onNav = null }) {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
               <thead>
                 <tr style={{ background: '#F1F5F9' }}>
-                  {['Código', 'Bairro', 'Rec.', 'Score', 'Conf.', 'Lance', 'MAO Flip', 'MAO Loc.', 'Leilão', 'Status'].map(h => (
+                  {['Código', 'Bairro', 'Rec.', 'Score', 'Conf.', 'Lance', 'L.Máx Flip', 'L.Máx Loc.', 'Leilão', 'Status'].map(h => (
                     <th key={h} style={{ padding: '6px 8px', textAlign: 'left', fontWeight: 700,
                       color: '#64748B', fontSize: 10, borderBottom: '1px solid #E2E8F0' }}>{h}</th>
                   ))}

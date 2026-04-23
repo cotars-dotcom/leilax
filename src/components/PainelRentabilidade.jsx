@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { C, card } from '../appConstants.js'
 import { isMercadoDireto } from '../lib/detectarFonte.js'
-import { CUSTOS_LEILAO, CUSTOS_MERCADO, calcularFatorHomogeneizacao, IPTU_SOBRE_CONDO_RATIO, HOLDING_MESES_PADRAO, recomendacaoDeScore, calcularDadosFinanceiros } from '../lib/constants.js'
+import { CUSTOS_LEILAO, CUSTOS_MERCADO, calcularFatorHomogeneizacao, calcularDadosFinanceiros } from '../lib/constants.js'
 import { useReforma } from '../hooks/useReforma.jsx'
 
 // ─── helpers ─────────────────────────────────────────────────────────────────

@@ -1234,7 +1234,7 @@ export default function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze
 
   const handleEnriquecer = async () => {
     if (!isAdmin) return
-    if (!confirm('Rodar todos os agentes (mercado, reforma, aluguel, Datajud, MAO, confidence) e salvar no banco?')) return
+    if (!confirm('Rodar todos os agentes (mercado, reforma, aluguel, Datajud, lance máximo, confidence) e salvar no banco?')) return
     setEnriquecendo(true); setEnrichLog(null)
     try {
       const { enriquecerImovel } = await import('../lib/agenteOrquestrador.js')
@@ -1265,7 +1265,8 @@ export default function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze
       const { chamarGeminiCascata, parseJSONResposta } = await import('../lib/constants.js')
       const prompt = `Você é analista de leilões judiciais imobiliários em BH/MG.
 Gere uma síntese executiva de 3-4 linhas sobre este imóvel, focando na decisão de investimento.
-Seja direto e quantitativo. Mencione: recomendação, desconto sobre mercado, MAO e estratégia ideal.
+Seja direto e quantitativo. Mencione: recomendação, desconto sobre mercado, lance máximo para ROI 20% (flip), e estratégia ideal.
+NÃO use a sigla MAO — use "lance máximo" ou "teto de lance" para melhor clareza.
 
 Dados: ${JSON.stringify({
   codigo: p.codigo_axis, bairro: p.bairro, cidade: p.cidade,

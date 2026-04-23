@@ -152,7 +152,7 @@ export default function PainelLeilao({ imovel, isAdmin }) {
                     ))}
                   </div>
                   <div style={{marginTop:6,fontSize:10,color:C.hint}}>
-                    MAO flip: {fmt(c.mao)} · {c.viavel ? '✓ Lance viável' : '⚠ Acima do MAO'}
+                    Lance máx. flip: {fmt(c.mao)} · {c.viavel ? '✓ Lance viável' : '⚠ Acima do limite'}
                   </div>
                 </div>
               ))}

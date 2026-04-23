@@ -5,7 +5,7 @@
 
 import { useState } from 'react'
 import { C, K, fmtC } from '../appConstants.js'
-import { CUSTOS_LEILAO, HOLDING_MESES_PADRAO, IPTU_SOBRE_CONDO_RATIO } from '../lib/constants.js'
+import { calcularDadosFinanceiros } from '../lib/constants.js'
 import { salvarCamposImovel } from '../lib/supabase.js'
 
 const cor = n => n >= 20 ? '#059669' : n >= 10 ? '#D97706' : '#DC2626'
