@@ -259,8 +259,8 @@ ${(p.fotos?.length > 1) ? `<div style="display:flex;gap:6px;overflow-x:auto;marg
       <div class="card-t">📈 Retorno</div>
       ${[
         ['Yield bruto', p.yield_bruto_pct ? p.yield_bruto_pct + '% a.a.' : null],
-        ['MAO Flip', fmt(p.mao_flip)],
-        ['MAO Locação', fmt(p.mao_locacao)],
+        ['Lance máx. flip (ROI 20%)', fmt(p.mao_flip)],
+        ['Lance máx. locação (yield 6%)', fmt(p.mao_locacao)],
         ['Retorno revenda', p.retorno_venda_pct ? '+' + p.retorno_venda_pct + '%' : null],
         ['Estrutura', p.estrutura_recomendada],
         ['Estratégia', p.estrategia_recomendada === 'aguardar_2a_praca' ? '⏳ Aguardar 2ª praça' : p.estrategia_recomendada],
@@ -411,12 +411,12 @@ ${(() => {
     '<div style="font-size:13px;font-weight:800;color:#F59E0B;margin-bottom:12px">⏳ DECISÃO DE LANCE — ' + partes.join(' · ') + '</div>' +
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">' +
     '<div style="background:#1E293B;padding:10px;border-radius:7px">' +
-    '<div style="font-size:9px;color:#94A3B8">MAO FLIP (ROI 20%)</div>' +
+    '<div style="font-size:9px;color:#94A3B8">LANCE MÁX. FLIP (ROI 20%)</div>' +
     '<div style="font-size:20px;font-weight:800;color:#4ADE80">' + fmt(maoFlip) + '</div>' +
-    (p.valor_minimo_2 ? '<div style="font-size:10px;color:' + (maoV2ok?'#4ADE80':'#F87171') + '">' + (maoV2ok?'✅ 2a praca dentro':'⚠️ 2a praca acima') + ' do MAO</div>' : '') +
+    (p.valor_minimo_2 ? '<div style="font-size:10px;color:' + (maoV2ok?'#4ADE80':'#F87171') + '">' + (maoV2ok?'✅ 2a praca dentro':'⚠️ 2a praca acima') + ' do limite</div>' : '') +
     '</div>' +
     '<div style="background:#1E293B;padding:10px;border-radius:7px">' +
-    '<div style="font-size:9px;color:#94A3B8">MAO LOCAÇÃO (yield 6%)</div>' +
+    '<div style="font-size:9px;color:#94A3B8">LANCE MÁX. LOCAÇÃO (yield 6%)</div>' +
     '<div style="font-size:20px;font-weight:800;color:#A78BFA">' + fmt(maoLoc) + '</div>' +
     '</div></div>' +
     (cenarios2.length > 0 ? '<div style="font-size:10px;color:#94A3B8;margin-bottom:8px">CENÁRIOS 2a PRAÇA</div>' +

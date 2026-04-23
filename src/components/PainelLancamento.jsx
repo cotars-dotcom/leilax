@@ -101,7 +101,7 @@ function CardCenario({ label, sublabel, lance, cenario, isDestaque, avaliacao })
           <div style={{ fontSize: 11, marginTop: 3 }}>
             {cenario.viavel
               ? <span style={{ color: C.emerald, fontWeight: 600 }}>✓ Viável</span>
-              : <span style={{ color: '#E5484D', fontWeight: 600 }}>✗ Acima MAO</span>}
+              : <span style={{ color: '#E5484D', fontWeight: 600 }}>✗ Acima do limite</span>}
           </div>
         </div>
       </div>
@@ -117,7 +117,7 @@ function CardCenario({ label, sublabel, lance, cenario, isDestaque, avaliacao })
             ['Lucro líquido', fmt(cenario.lucro), cenario.lucro > 0 ? C.emerald : '#E5484D'],
             ['IRPF (15%)', fmt(cenario.irpf), C.muted],
             ['Corretagem', fmt(cenario.corretagem), C.muted],
-            ['MAO flip', fmt(cenario.mao_flip), C.teal],
+            ['Lance máx. flip', fmt(cenario.mao_flip), C.teal],
             ['Margem segurança', fmt(cenario.mao_flip - lance), cenario.mao_flip > lance ? C.emerald : '#E5484D'],
           ].map(([lbl, val, c]) => (
             <div key={lbl}>
@@ -309,7 +309,7 @@ export default function PainelLancamento({ imovel }) {
       {/* Resumo dos lances máximos */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 14 }}>
         {[
-          { label: 'MAO flip', sublabel: 'Lance máximo (quebrar-even)', val: lanceMaxViavel, c: C.teal },
+          { label: 'Lance máx. viável', sublabel: 'Quebra-even (ROI 20%)', val: lanceMaxViavel, c: C.teal },
           { label: `ROI ≥ ${roiAlvo}%`, sublabel: 'Lance para atingir meta', val: lanceMaxROIAlvo, c: C.navy },
           { label: `Margem ${margemSeg}%`, sublabel: 'Com colchão de segurança', val: lanceMaxMargem, c: C.emerald },
         ].map(({ label, sublabel, val, c }) => (

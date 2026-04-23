@@ -272,8 +272,8 @@ export async function gerarPDFProfissional(p, onProgress = () => {}) {
   const eY = y - 5
   doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(...C.navy); doc.text('Cenarios de Saida', 135, eY)
   tbl({ startY: eY + 3, head: [['Cenário', 'Limite recomendado', 'Lance atual', 'Status']], body: [
-    ...(maoFlip > 0 ? [['MAO Flip (ROI 20%)', fmt(maoFlip), fmt(lance), lance <= maoFlip ? '✅ Dentro' : '⚠️ Acima por ' + fmt(lance - maoFlip)]] : []),
-    ...(maoLoc > 0 ? [['MAO Locação (yield 6%)', fmt(maoLoc), fmt(lance), lance <= maoLoc ? '✅ Dentro' : '⚠️ Acima']] : []),
+    ...(maoFlip > 0 ? [['Lance máx. flip (ROI 20%)', fmt(maoFlip), fmt(lance), lance <= maoFlip ? '✅ Dentro' : '⚠️ Acima por ' + fmt(lance - maoFlip)]] : []),
+    ...(maoLoc > 0 ? [['Lance máx. locação (yield 6%)', fmt(maoLoc), fmt(lance), lance <= maoLoc ? '✅ Dentro' : '⚠️ Acima']] : []),
     ['Investimento total', fmt(bd.investimentoTotal), fmt(bd2p.investimentoTotal), ''],
     ['Otimista (+15%)', fmt(roi.cenarios?.otimista?.valor), `${roi.cenarios?.otimista?.roi > 0 ? '+' : ''}${roi.cenarios?.otimista?.roi}%`],
     ['Realista', fmt(roi.cenarios?.realista?.valor), `${roi.cenarios?.realista?.roi > 0 ? '+' : ''}${roi.cenarios?.realista?.roi}%`],

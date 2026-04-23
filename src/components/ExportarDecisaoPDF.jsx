@@ -197,11 +197,11 @@ function gerarHTML(p) {
       <div class="val-sm" style="color:#059669">${fmt(p.valor_mercado_estimado)}</div>
     </div>
     <div class="card" style="text-align:center">
-      <div class="lbl">MAO Flip (ROI 20%)</div>
+      <div class="lbl">Lance máx. flip (ROI 20%)</div>
       <div class="val-sm" style="color:#059669">${fmt(p.mao_flip)}</div>
     </div>
     <div class="card" style="text-align:center">
-      <div class="lbl">MAO Locação (6% a.a.)</div>
+      <div class="lbl">Lance máx. locação (6% a.a.)</div>
       <div class="val-sm" style="color:#7C3AED">${fmt(p.mao_locacao)}</div>
     </div>
   </div>
@@ -234,7 +234,7 @@ function gerarHTML(p) {
         </div>
       </div>
       <div style="margin-top:6px;font-size:7.5pt;color:${parseFloat(p.mao_flip||0) > 0 && lanceDefinido <= parseFloat(p.mao_flip) ? '#4ADE80' : '#F87171'}">
-        ${parseFloat(p.mao_flip||0) > 0 && lanceDefinido <= parseFloat(p.mao_flip) ? '✅ Dentro do MAO flip — operação viável' : '⚠️ Acima do MAO flip — avaliar risco'}
+        ${parseFloat(p.mao_flip||0) > 0 && lanceDefinido <= parseFloat(p.mao_flip) ? '✅ Dentro do limite — operação viável' : '⚠️ Acima do limite — avaliar risco'}
       </div>
     </div>` : ''}
   </div>` : `
@@ -261,7 +261,7 @@ function gerarHTML(p) {
   ${parseFloat(p.debitos_total_estimado || 0) > 0 ? `
   <div class="alerta">
     ⚠️ <strong>Débitos a cargo do arrematante:</strong> ${fmt(p.debitos_total_estimado)}
-    (condomínio: ${fmt(p.debitos_condominio)} · IPTU: ${fmt(p.debitos_iptu)}) — já incorporados no MAO e nos cenários acima.
+    (condomínio: ${fmt(p.debitos_condominio)} · IPTU: ${fmt(p.debitos_iptu)}) — já incorporados no lance máximo e nos cenários acima.
   </div>` : `
   <div class="ok-box">✅ Débitos de condomínio/IPTU: responsabilidade do vendedor (conforme edital).</div>`}
 

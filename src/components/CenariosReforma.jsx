@@ -380,7 +380,7 @@ export default function CenariosReforma({ imovel, isAdmin }) {
           <table style={{width:'100%', borderCollapse:'collapse', fontSize:11}}>
             <thead>
               <tr style={{background:C.surface}}>
-                {['Escopo','Custo reforma','Total','Valor venda','Lucro','ROI','MAO p/ ROI 20%','Yield loc.'].map(h => (
+                {['Escopo','Custo reforma','Total','Valor venda','Lucro','ROI','Lance Máx. ROI 20%','Yield loc.'].map(h => (
                   <th key={h} style={{padding:'7px 10px', textAlign: h === 'Escopo' ? 'left' : 'right',
                     fontWeight:600, color:C.muted, fontSize:10, borderBottom:`1px solid ${C.borderW}`}}>{h}</th>
                 ))}
@@ -405,7 +405,7 @@ export default function CenariosReforma({ imovel, isAdmin }) {
                   <td style={{padding:'7px 10px', textAlign:'right', color:C.text}}>{fmt(c.valorPosReforma)}</td>
                   <td style={{padding:'7px 10px', textAlign:'right', color:c.lucro > 0 ? C.emerald : '#A32D2D', fontWeight:600}}>{fmt(c.lucro)}</td>
                   <td style={{padding:'7px 10px', textAlign:'right', color:c.roi >= 30 ? C.emerald : c.roi >= 20 ? C.mustard : '#A32D2D', fontWeight:600}}>{pct(c.roi)}</td>
-                  <td style={{padding:'7px 10px', textAlign:'right', color: c.deltaLanceVsMAO <= 0 ? C.emerald : '#A32D2D', fontWeight:600}} title={c.deltaLanceVsMAO > 0 ? `Lance excede MAO em ${fmt(c.deltaLanceVsMAO)}` : `Margem de ${fmt(-c.deltaLanceVsMAO)}`}>
+                  <td style={{padding:'7px 10px', textAlign:'right', color: c.deltaLanceVsMAO <= 0 ? C.emerald : '#A32D2D', fontWeight:600}} title={c.deltaLanceVsMAO > 0 ? `Lance excede o limite em ${fmt(c.deltaLanceVsMAO)}` : `Margem de ${fmt(-c.deltaLanceVsMAO)}`}>
                     {fmt(c.mao20)}
                   </td>
                   <td style={{padding:'7px 10px', textAlign:'right', color:c.yieldBruto >= 6 ? C.emerald : C.muted}}>{pct(c.yieldBruto)}</td>
@@ -415,7 +415,7 @@ export default function CenariosReforma({ imovel, isAdmin }) {
             </tbody>
           </table>
           <div style={{fontSize:9, color:C.hint, marginTop:4, padding:'0 10px'}}>
-            Clique em um cenário para selecionar · SINAPI-MG 2026 · MAO = lance máximo para ROI ≥ 20% · 🟢 lance ≤ MAO, 🔴 lance excede MAO
+            Clique em um cenário para selecionar · SINAPI-MG 2026 · Lance máximo = teto que preserva ROI ≥ 20% · 🟢 lance dentro do limite, 🔴 lance excede
           </div>
         </div>
       )}

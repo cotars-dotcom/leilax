@@ -680,7 +680,7 @@ function AbaArremates({ imovel }) {
 
           {dados.mao_sugerido > 0 && (
             <div style={{...card(), padding:12, marginBottom:12, background:`${C.emerald}08`, border:`1px solid ${C.emerald}20`}}>
-              <div style={{fontSize:11, fontWeight:600, color:C.emerald}}>MAO sugerido baseado em arremates reais</div>
+              <div style={{fontSize:11, fontWeight:600, color:C.emerald}}>Lance máximo sugerido (baseado em arremates reais)</div>
               <div style={{fontSize:18, fontWeight:800, color:C.emerald}}>{fmt(dados.mao_sugerido)}</div>
               <div style={{fontSize:10, color:C.muted}}>{dados.mao_base}</div>
             </div>
