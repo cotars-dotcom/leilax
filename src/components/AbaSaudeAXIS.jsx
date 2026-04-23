@@ -263,7 +263,7 @@ export default function AbaSaudeAXIS({ isPhone = false, onNav = null }) {
           if (dias2 !== null && dias2 >= 0 && dias2 <= 7)
             alertas.push({ tipo: 'urgente', msg: `⏰ ${im.codigo_axis}: 2ª praça em ${dias2 === 0 ? 'HOJE' : dias2 + ' dias'} — ${fmt(im.valor_minimo_2)}` })
           if (im.mao_flip && im.valor_minimo && im.valor_minimo > im.mao_flip)
-            alertas.push({ tipo: 'aviso', msg: `⚠️ ${im.codigo_axis}: lance (${fmt(im.valor_minimo)}) acima do MAO flip (${fmt(im.mao_flip)})` })
+            alertas.push({ tipo: 'aviso', msg: `⚠️ ${im.codigo_axis}: lance (${fmt(im.valor_minimo)}) acima do limite p/ flip (${fmt(im.mao_flip)})` })
         })
         if (!alertas.length) return null
         return (

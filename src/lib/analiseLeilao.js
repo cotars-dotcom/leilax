@@ -128,7 +128,7 @@ export async function gerarAnalise(imovel) {
   // 6. Alertas e estratégia
   const alertas = []
   if (c1.roi < 20) alertas.push('[CRITICO] ROI abaixo de 20% no 1º leilão — verificar viabilidade')
-  if (!c1.viavel) alertas.push('[CRITICO] Lance atual acima do MAO — risco de prejuízo')
+  if (!c1.viavel) alertas.push('[CRITICO] Lance atual acima do limite máximo — risco de prejuízo')
   if (reformaVal > avaliacao * 0.05) alertas.push('[ATENCAO] Reforma acima do teto — risco de sobrecapitalização')
   if (prazoLib > 6) alertas.push(`[ATENCAO] Prazo de liberação estimado: ${prazoLib} meses — capital imobilizado`)
 
@@ -195,10 +195,10 @@ export async function gerarAnalise(imovel) {
     estrategia,
     lance_maximo_1: c1.mao,
     lance_maximo_2: c2e.mao,
-    sintese: `Desconto de ${(100 - lancePrin/vMercado*100).toFixed(1)}% sobre mercado. ROI ${c1.roi}% no 1º leilão${c2e.roi > c1.roi ? ` ou ${c2e.roi}% no 2º (esperado)` : ''}. ${c1.viavel ? 'Lance atual dentro do MAO.' : 'Lance acima do MAO — atenção.'} ${estrategia === 'aguardar_2' ? 'Recomendado aguardar 2º leilão.' : 'Recomendado participar do 1º leilão.'}`,
+    sintese: `Desconto de ${(100 - lancePrin/vMercado*100).toFixed(1)}% sobre mercado. ROI ${c1.roi}% no 1º leilão${c2e.roi > c1.roi ? ` ou ${c2e.roi}% no 2º (esperado)` : ''}. ${c1.viavel ? 'Lance dentro do limite máximo.' : 'Lance acima do limite máximo — atenção.'} ${estrategia === 'aguardar_2' ? 'Recomendado aguardar 2º leilão.' : 'Recomendado participar do 1º leilão.'}`,
     alertas_criticos: alertas,
     recomendacoes: [
-      `Lance máximo 1º leilão: R$ ${c1.mao.toLocaleString('pt-BR')} (MAO flip 20% margem)`,
+      `Lance máximo 1º leilão: R$ ${c1.mao.toLocaleString('pt-BR')} (margem 20% ROI)`,
       `Lance esperado 2º leilão: R$ ${Math.round(lance2Esp).toLocaleString('pt-BR')} — ROI ${c2e.roi}%`,
       `Reforma mínima segura: R$ ${Math.round(reformaMin).toLocaleString('pt-BR')} (3% avaliação)`,
       prazoLib > 0 ? `Provisionar desocupação: ${prazoLib} meses de capital imobilizado` : 'Imóvel desocupado — menor risco operacional'

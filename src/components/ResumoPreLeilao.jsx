@@ -346,7 +346,7 @@ export default function ResumoPreLeilao({ imovel, onUpdate, onGerarSintese }) {
                   )}
                   <span style={{ marginLeft: 10, fontSize: 9,
                     color: abaixoFlip ? '#4ADE80' : abaixoLoc ? '#A78BFA' : '#F87171' }}>
-                    {abaixoFlip ? '✅ dentro do MAO flip' : abaixoLoc ? '🟣 dentro do MAO locação' : '🔴 acima do MAO'}
+                    {abaixoFlip ? '✅ dentro do limite p/ flip' : abaixoLoc ? '🟣 dentro do limite p/ locação' : '🔴 acima do limite'}
                   </span>
                 </div>
               )

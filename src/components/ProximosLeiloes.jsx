@@ -186,7 +186,7 @@ export default function ProximosLeiloes({ imoveis, onNav }) {
                       background: maoOk2 ? '#ECFDF5' : '#FEF2F2',
                       border: `1px solid ${maoOk2 ? '#6EE7B7' : '#FCA5A5'}`,
                       color: maoOk2 ? '#065F46' : '#991B1B', fontWeight: 600 }}>
-                      {maoOk2 ? '✅ 2ª praça dentro do MAO' : '⚠️ 2ª praça acima do MAO'}
+                      {maoOk2 ? '✅ 2ª praça dentro do limite' : '⚠️ 2ª praça acima do limite'}
                     </div>
                   )}
                 </div>

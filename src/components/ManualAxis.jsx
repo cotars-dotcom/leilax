@@ -157,8 +157,8 @@ const DIR = [
     txt:'Foco em apartamentos 2–4 quartos com 1+ suíte e 2+ vagas em bairros consolidados de BH. Evitar terrenos e imóveis comerciais sem análise específica.' },
   { n:2, e:'🎯', t:'Score mínimo para ação',
     txt:'Score ≥ 7.0: avaliar compra. Score ≥ 8.0: sinal de compra imediata. Score < 6.0: evitar, salvo situação excepcional documentada pelo grupo.' },
-  { n:3, e:'💡', t:'Margem de segurança (MAO)',
-    txt:'Nunca pagar acima do MAO. Garante margem mínima de 20% mesmo no cenário mais pessimista — custo zero de reforma e valor de mercado estável.' },
+  { n:3, e:'💡', t:'Margem de segurança (lance máximo)',
+    txt:'Nunca pagar acima do lance máximo (MAO). Garante margem mínima de 20% mesmo no cenário mais pessimista — custo zero de reforma e valor de mercado estável.' },
   { n:4, e:'🔨', t:'Reforma dentro do teto',
     txt:'Máximo: 5% do valor do imóvel para Classe Popular/Médio, 6% para Alto, 7% para Luxo. Acima disso: risco real de sobrecapitalização.' },
   { n:5, e:'⚖️', t:'Verificação jurídica obrigatória',
@@ -539,11 +539,11 @@ export default function ManualAxis({ isMobile }) {
           )}
 
           <Box>
-            <div style={{ fontSize:12, fontWeight:700, color:P.navy, marginBottom:8 }}>Calculando o MAO</div>
+            <div style={{ fontSize:12, fontWeight:700, color:P.navy, marginBottom:8 }}>Calculando o Lance Máximo (MAO)</div>
             <SvgMAO/>
             <div style={{ marginTop:8, fontSize:11, color:P.gray, lineHeight:1.6 }}>
-              O MAO é calculado automaticamente pelo motor AXIS para cada imóvel.
-              Lance acima do MAO = ROI abaixo de 20% antes de custos adicionais.
+              O lance máximo é calculado automaticamente pelo motor AXIS para cada imóvel.
+              Lance acima deste limite = ROI abaixo de 20% antes de custos adicionais.
             </div>
           </Box>
         </div>

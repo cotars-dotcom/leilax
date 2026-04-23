@@ -413,7 +413,7 @@ if (atual.comparaveis?.length > 2) {
       payload.lance_viavel = false
       if (payload.recomendacao === 'COMPRAR') {
         payload.recomendacao = 'AGUARDAR'
-        payload.motivo_recomendacao = 'Lance acima do MAO — aguardar 2ª praça'
+        payload.motivo_recomendacao = 'Lance acima do limite máximo — aguardar 2ª praça'
       }
     } else if (lance > 0 && maoFlip > 0) {
       payload.lance_viavel = true

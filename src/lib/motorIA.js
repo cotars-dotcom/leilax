@@ -514,7 +514,7 @@ INSTRUÇÕES:
    NÃO use (VM × 0.80) — essa aproximação ignora custos fixos e gera MAO incorreto
    Validação: se lance_atual <= mao_flip → operação viável para flip com ROI ≥ 20%
    Calcule mao_locacao = aluguel_mensal_estimado × 120 × 0.90
-   Se valor_minimo > mao_flip → adicione [CRITICO] Lance acima do MAO nos alertas
+   Se valor_minimo > mao_flip → adicione [CRITICO] Lance acima do limite máximo (ROI < 20%) nos alertas
 4. score_total já reflete o juridico e ocupacao via pesos — não aplique penalizações adicionais
 5. Seja conservador nas estimativas de retorno
 6. Indique estrutura de aquisição ideal (CPF, Condomínio, PJ, Procuração)
