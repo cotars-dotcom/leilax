@@ -966,18 +966,26 @@ export function validarECorrigirAnalise(analise) {
     analise.score_ocupacao = Math.max(analise.score_ocupacao || 5.0, 7.5)
   }
 
-  // 6b. Penalidade score_juridico por débitos propter rem elevados (sugestão DeepSeek/Critical Analysis)
+  // 6b. Penalidade progressiva no score_juridico por débitos propter rem (sprint 41c).
+  // Escala substitui os dois caps binários (>15% e >20%) por gradiente contínuo:
+  //   10–15% → cap 6.5 (risco moderado)
+  //   15–20% → cap 5.5 (risco alto)
+  //   20–30% → cap 4.5 (risco muito alto)
+  //      >30% → cap 3.5 (inviabiliza a maioria das operações)
+  // O sistema anterior tratava 16% e 35% igual (cap 5.5), perdendo sinal importante.
   const _debitosTotal = parseFloat(analise.debitos_total_estimado || 0)
   const _mercadoRef = parseFloat(analise.valor_mercado_estimado || 0)
-  if (_debitosTotal > 0 && _mercadoRef > 0) {
+  if (_debitosTotal > 0 && _mercadoRef > 0 && analise.responsabilidade_debitos === 'arrematante') {
     const _pctDeb = _debitosTotal / _mercadoRef
     const _sjAtual = parseFloat(analise.score_juridico || 5)
-    if (_pctDeb > 0.20 && _sjAtual > 4.0) {
-      analise.score_juridico = Math.min(_sjAtual, 4.0)
-      avisos.push(`AJUSTE: débitos propter rem ${(_pctDeb*100).toFixed(1)}% do mercado → score_juridico cap 4.0`)
-    } else if (_pctDeb > 0.15 && _sjAtual > 5.5) {
-      analise.score_juridico = Math.min(_sjAtual, 5.5)
-      avisos.push(`AJUSTE: débitos propter rem ${(_pctDeb*100).toFixed(1)}% do mercado → score_juridico cap 5.5`)
+    let _capDeb = null
+    if      (_pctDeb > 0.30) _capDeb = 3.5
+    else if (_pctDeb > 0.20) _capDeb = 4.5
+    else if (_pctDeb > 0.15) _capDeb = 5.5
+    else if (_pctDeb > 0.10) _capDeb = 6.5
+    if (_capDeb !== null && _sjAtual > _capDeb) {
+      analise.score_juridico = _capDeb
+      avisos.push(`AJUSTE: débitos propter rem ${(_pctDeb*100).toFixed(1)}% do mercado → score_juridico cap ${_capDeb}`)
     }
   }
 

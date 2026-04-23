@@ -214,8 +214,15 @@ export default function ResumoCard({ p, isAdmin, isMobile, onUpdateProp }) {
         {maoLoc > 0 && <KpiRow label="Lance máx. para alugar (6% a.a.)" valor={fmtC(maoLoc)} cor="#7C3AED"
           sub={lance2p > 0 && lance2p <= maoLoc ? "✅ 2ª praça dentro do limite" : null} />}
         
-        {aluguel > 0 && <KpiRow label="Aluguel estimado" valor={`${fmtC(aluguel)}/mês`} cor="#7C3AED"
-          sub={`${parseFloat(p.yield_bruto_pct || 0).toFixed(1)}% a.a. bruto`} />}
+        {aluguel > 0 && (() => {
+          const yImovel = parseFloat(p.yield_bruto_pct || 0)
+          const yBairro = parseFloat(p._dados_bairro_axis?.yieldBruto || 0)
+          const divergeMuito = yBairro > 0 && Math.abs(yImovel - yBairro) > 1.0
+          const sub = yBairro > 0
+            ? `${yImovel.toFixed(1)}% a.a. bruto · benchmark ${p._dados_bairro_axis?.label || 'bairro'}: ${yBairro.toFixed(1)}%${divergeMuito ? ' ⚠️' : ''}`
+            : `${yImovel.toFixed(1)}% a.a. bruto`
+          return <KpiRow label="Aluguel estimado" valor={`${fmtC(aluguel)}/mês`} cor="#7C3AED" sub={sub} />
+        })()}
         
         {debitos > 0 && <KpiRow label="Débitos (você paga)" valor={fmtC(debitos)} cor="#DC2626"
           sub="Condomínio + IPTU em atraso" />}
