@@ -114,11 +114,23 @@ CALCULE obrigatoriamente (com homogeneização por atributos):
   Preencha o campo fator_homogenizacao com o valor calculado
 - valor_mercado_estimado = preco_m2_mercado × area_m2 (resultado COM homogeneização)
 - valor_mercado_homogenizado = mesmo que valor_mercado_estimado quando há fator aplicado
-- aluguel_mensal_estimado: se bairro tem dados → usar aluguel_m2 × area_m2 (conforme elevador)
-  Se sem dados → preco_m2_mercado × area_m2 × yield_bruto / 100 / 12
-  yields: Popular=7.5%, Médio=6.5%, Alto=5.3%, Luxo=4.5%
+- aluguel_mensal_estimado: REGRA IDÊNTICA DE HOMOGENEIZAÇÃO — fatores são PENALIDADE por ausência, não bônus por presença.
+  O aluguel_tipico do bairro (aluguel_2q_tipico/aluguel_3q_tipico) JÁ embute o padrão de atributos da classe.
+  Fórmula: aluguel_mensal = aluguel_tipico × ajuste_area × fator_atributos
+    ajuste_area = (area_real / area_ref) ^ 0.65  (area_ref: 60m² p/2q, 80m² p/3q+)
+    fator_atributos:
+      Bairro Alto/Luxo (IPEAD 3 ou 4):
+        sem elevador → × 0.85 ; sem piscina → × 0.97 ; sem lazer → × 0.95
+        COM elevador/piscina/lazer → × 1.00 (já embutido, NÃO somar bônus)
+      Bairro Médio (IPEAD 2):
+        sem elevador → × 0.85 ; piscina/lazer se TEM → × 1.03-1.05 (bônus legítimo)
+      Bairro Popular (IPEAD 1):
+        elevador se TEM → × 1.10 ; piscina se TEM → × 1.03
+  Se sem dados do bairro → preco_m2_mercado × area_m2 × yield_bruto / 100 / 12
+  yields de referência: Popular=7.5%, Médio=6.5%, Alto=5.3%, Luxo=4.5%
+  VALIDAÇÃO: se yield_bruto_pct resultante diverge mais de 1pp do yield do bairro → aluguel errado, revisar.
   ⚠️ Mercado BH subiu +13% em 2025 — usar dados atualizados, não históricos
-  Não use o aluguel_3q_tipico diretamente — ajuste pela área privativa real
+  Não use aluguel_3q_tipico diretamente — ajuste pela área privativa real
 - mao_flip: Lance máximo para ROI 20% — NÃO usar a aproximação VM×0.88
   Fórmula correta: (valor_mercado × 0.94 / 1.20 - custos_fixos) / (1 + 0.155)
   custos_fixos = reforma + debitos_arrematante + custo_juridico + holding_6m

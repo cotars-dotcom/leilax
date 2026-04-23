@@ -157,6 +157,18 @@ REGRA PRÁTICA:
   - NUNCA multiplicar por (1 + fator) sobre a média — a média JÁ inclui o atributo
 VALIDAÇÃO: se valor/m² estimado > preco_anuncio_m2 do bairro → VOCÊ ESTÁ ERRADO, revise para baixo
 
+ATENÇÃO — ALUGUEL (MESMA REGRA APLICADA):
+A mesma lógica de homogeneização vale para aluguel_mensal_estimado.
+O aluguel_tipico do bairro (aluguel_2q_tipico, aluguel_3q_tipico) JÁ reflete o
+padrão de atributos esperado para aquela classe socioeconômica.
+REGRA PRÁTICA PARA ALUGUEL:
+  - Bairro Alto/Luxo (IPEAD 3 ou 4): elevador+piscina+lazer PADRÃO → se imóvel tem, NÃO somar bônus
+    (aluguel_tipico já inclui); se NÃO tem elevador, aplicar -15%; sem piscina, -3%; sem lazer, -5%
+  - Bairro Médio (IPEAD 2): só elevador é padrão → se NÃO tem elevador, -15%; piscina/lazer se TEM, +3-5%
+  - Bairro Popular (IPEAD 1): nada é padrão → elevador se TEM, +10%; piscina se TEM, +3%
+AJUSTE POR ÁREA: aluguel cresce com elasticidade 0.65 em relação à área de referência (60m² p/2q, 80m² p/3q+).
+NUNCA produzir yield_bruto_pct muito acima do yield típico do bairro — se divergir >1pp, revisar aluguel.
+
 --- PASSIVOS (IPTU, CONDOMÍNIO) ---
 Regra por modalidade (CRÍTICO):
 LEILÃO JUDICIAL (CPC/2015):
@@ -774,6 +786,29 @@ export function validarECorrigirAnalise(analise) {
     analise.mao_locacao = Math.round(analise.aluguel_mensal_estimado * 120 * 0.90)
   }
 
+  // 0a. VALIDAR valor_mercado_estimado ANTES de qualquer cálculo dependente (sprint 41c).
+  //     Ordem importa: se o cap rebaixar o valor_mercado, todos os descontos abaixo precisam
+  //     ser calculados com o valor corrigido — não com o inflado que veio da IA.
+  if (analise.valor_mercado_estimado && dadosBairroCalib?.precoAnuncioM2) {
+    const areaUsada_ = analise.area_usada_calculo_m2 || analise.area_privativa_m2 || analise.area_m2 || 0
+    const tetoMercado = areaUsada_ * dadosBairroCalib.precoAnuncioM2 * 1.10  // 10% acima do anúncio máximo
+    if (parseFloat(analise.valor_mercado_estimado) > tetoMercado && tetoMercado > 0) {
+      const valorOriginal = analise.valor_mercado_estimado
+      analise.valor_mercado_estimado = Math.round(tetoMercado)
+      avisos.push(`CALIBRADO: valor_mercado era R$${Math.round(valorOriginal).toLocaleString('pt-BR')} (acima do teto do bairro R$${Math.round(tetoMercado).toLocaleString('pt-BR')}). Provavelmente homogeneização incorreta — fatores já incluídos na média do bairro.`)
+      // Se o cap foi aplicado significativamente (>5% de redução), alertar que scores da IA
+      // podem estar inflados pois foram calculados sobre o valor original.
+      if ((valorOriginal - analise.valor_mercado_estimado) / valorOriginal > 0.05) {
+        avisos.push(`ATENÇÃO: score_desconto/score_mercado vindos da IA podem estar superestimados (foram calculados com valor_mercado inflado). Reanalisar para recalibrar.`)
+      }
+    }
+    // 0b. FLOOR: se valor_mercado < 85% do anúncio, provavelmente subestimado
+    const pisoMercado = areaUsada_ * dadosBairroCalib.precoAnuncioM2 * 0.85
+    if (parseFloat(analise.valor_mercado_estimado) < pisoMercado && pisoMercado > 0) {
+      avisos.push(`ATENÇÃO: valor_mercado R$${Math.round(analise.valor_mercado_estimado).toLocaleString('pt-BR')} está abaixo de 85% do anúncio do bairro (R$${Math.round(pisoMercado).toLocaleString('pt-BR')}). Verificar comparáveis.`)
+    }
+  }
+
   // Corrigir desconto_percentual: deve ser (avaliacao - lance) / avaliacao
   // O Gemini às vezes calcula desconto_sobre_mercado (preco/m²) confundindo com desconto_percentual
   if (analise.valor_minimo > 0 && analise.valor_avaliacao > 0) {
@@ -783,7 +818,7 @@ export function validarECorrigirAnalise(analise) {
       analise.desconto_percentual = correto
     }
   }
-  // Calcular desconto_sobre_mercado_pct (vs valor de mercado estimado)
+  // Calcular desconto_sobre_mercado_pct (vs valor de mercado estimado — já cappado acima)
   if (analise.valor_minimo > 0 && analise.valor_mercado_estimado > 0) {
     analise.desconto_sobre_mercado_pct = parseFloat(
       ((analise.valor_mercado_estimado - analise.valor_minimo) / analise.valor_mercado_estimado * 100).toFixed(1)
@@ -795,18 +830,6 @@ export function validarECorrigirAnalise(analise) {
     analise.desconto_sobre_mercado_pct_calculado = parseFloat(
       ((analise.valor_mercado_estimado - precoPedido) / analise.valor_mercado_estimado * 100).toFixed(1)
     )
-  }
-
-  // 0a. Validar valor_mercado_estimado contra banda do banco de bairros
-  // Se o valor calculado pelo agente for > 20% acima do preco_anuncio_m2 do bairro, cap automático
-  if (analise.valor_mercado_estimado && dadosBairroCalib?.precoAnuncioM2) {
-    const areaUsada_ = analise.area_usada_calculo_m2 || analise.area_privativa_m2 || analise.area_m2 || 0
-    const tetoMercado = areaUsada_ * dadosBairroCalib.precoAnuncioM2 * 1.10  // 10% acima do anúncio máximo
-    if (parseFloat(analise.valor_mercado_estimado) > tetoMercado && tetoMercado > 0) {
-      const valorOriginal = analise.valor_mercado_estimado
-      analise.valor_mercado_estimado = Math.round(tetoMercado)
-      avisos.push(`CALIBRADO: valor_mercado era R$${Math.round(valorOriginal).toLocaleString('pt-BR')} (acima do teto do bairro R$${Math.round(tetoMercado).toLocaleString('pt-BR')}). Provavelmente homogeneização incorreta — fatores já incluídos na média do bairro.`)
-    }
   }
 
   // 0. Normalizar scores que vieram em escala 0-100 para 0-10
