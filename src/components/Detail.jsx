@@ -26,7 +26,7 @@ import ConfigEstudo from './ConfigEstudo.jsx'
 import ResumoCard from './ResumoCard.jsx'
 const PainelRentabilidade = lazy(() => import('./PainelRentabilidade.jsx'))
 import { isMercadoDireto } from '../lib/detectarFonte.js'
-import { calcularCustosAquisicao, MULT_CUSTO_RAPIDO, CUSTOS_LEILAO, CUSTOS_MERCADO, IPTU_SOBRE_CONDO_RATIO, HOLDING_MESES_PADRAO, calcularLanceMaximoParaROI, calcularSobrecapitalizacao, IRPF_ISENCAO_TETO, calcularDadosFinanceiros } from '../lib/constants.js'
+import { calcularCustosAquisicao, MULT_CUSTO_RAPIDO, CUSTOS_LEILAO, CUSTOS_MERCADO, IPTU_SOBRE_CONDO_RATIO, HOLDING_MESES_PADRAO, calcularLanceMaximoParaROI, calcularSobrecapitalizacao, IRPF_ISENCAO_TETO, calcularDadosFinanceiros, SELIC_ANUAL_PCT } from '../lib/constants.js'
 import { calcularConfidence } from '../lib/agenteConfidenceBadge.js'
 import CenariosReforma from './CenariosReforma.jsx'
 import { ReformaProvider, useReforma } from '../hooks/useReforma.jsx'
@@ -907,7 +907,7 @@ function AlertasInfoAccordion({ imovel }) {
     return !isMercadoDireto(imovel?.fonte_url, imovel?.tipo_transacao) && av > 0 && mk > 0 && av > mk * 1.20
   })()
   const temIRPF = parseFloat(imovel?.valor_mercado_estimado) > 0 &&
-    parseFloat(imovel?.valor_mercado_estimado) <= 440000 &&
+    parseFloat(imovel?.valor_mercado_estimado) <= IRPF_ISENCAO_TETO &&
     !isMercadoDireto(imovel?.fonte_url, imovel?.tipo_transacao)
   const temConf = imovel?.confidence_score != null && imovel.confidence_score < 60
   const temSobrecap = false // calculado internamente — só mostrar se relevante
@@ -939,7 +939,7 @@ function AlertasInfoAccordion({ imovel }) {
 
 // Banner: yield de locação abaixo da Selic (risco de oportunidade)
 function YieldAbaixoSelicBanner({ imovel }) {
-  const selic = 14.75 // Selic abr/2026 (Copom 18/03/2026)
+  const selic = SELIC_ANUAL_PCT
   const yld = parseFloat(imovel?.yield_bruto_pct) || 0
   const aluguel = parseFloat(imovel?.aluguel_mensal_estimado) || 0
   const mao = parseFloat(imovel?.mao_locacao) || 0
@@ -1061,7 +1061,7 @@ function IsencaoIRPFBanner({ imovel }) {
       <div style={{flex:1}}>
         <span style={{fontWeight:700,color:'#065F46',fontSize:11}}>Potencial isenção de IRPF</span>
         <span style={{fontSize:10,color:'#047857',marginLeft:6}}>
-          Valor de mercado ≤ R$ 440.000 — Lei 9.250/95 pode isentar o ganho de capital
+          Valor de mercado ≤ R$ {IRPF_ISENCAO_TETO.toLocaleString('pt-BR')} — Lei 9.250/95 pode isentar o ganho de capital
         </span>
       </div>
       <span style={{fontSize:9,color:'#059669',opacity:0.7}}>Consulte contador</span>

@@ -4,7 +4,7 @@ import { isMercadoDireto } from '../lib/detectarFonte.js'
 import {
   CUSTOS_LEILAO, CUSTOS_MERCADO, calcularFatorHomogeneizacao,
   IPTU_SOBRE_CONDO_RATIO, HOLDING_MESES_PADRAO, calcularLanceMaximoParaROI,
-  normalizarClasseIPEAD, areaUsada,
+  normalizarClasseIPEAD, areaUsada, IRPF_ISENCAO_TETO,
 } from '../lib/constants.js'
 import { useReforma } from '../hooks/useReforma.jsx'
 
@@ -55,9 +55,9 @@ export default function CalculadoraROI({ imovel }) {
   const precoM2Mercado = parseFloat(imovel.preco_m2_mercado) || 0
   const ajustadoAcimaDaMed = precoM2Mercado > 0 && (vmercadoAjustado / areaImovel) > precoM2Mercado * 1.10
 
-  // IRPF: isento até R$440k (imóvel único PF)
+  // IRPF: isento até IRPF_ISENCAO_TETO (imóvel único PF)
   const ganhoCapital = Math.max(0, vmercado - custoTotal)
-  const irpfGanho = vmercado <= 440000 ? 0 : ganhoCapital * 0.15
+  const irpfGanho = vmercado <= IRPF_ISENCAO_TETO ? 0 : ganhoCapital * 0.15
   const corretagemVenda = vmercado * 0.06
   const lucroFlip    = vmercado - custoTotal - irpfGanho - corretagemVenda
   const roiFlip      = custoTotal > 0 ? (lucroFlip / custoTotal) * 100 : 0
@@ -177,7 +177,7 @@ export default function CalculadoraROI({ imovel }) {
           {/* Detalhamento deduções */}
           {[
             ['Corretagem de venda (6%)', fmt(corretagemVenda)],
-            vmercado > 440000 && irpfGanho > 0 ? ['IRPF 15% g.c.', fmt(irpfGanho)] : null,
+            vmercado > IRPF_ISENCAO_TETO && irpfGanho > 0 ? ['IRPF 15% g.c.', fmt(irpfGanho)] : null,
           ].filter(Boolean).map(([k,v]) => (
             <div key={k} style={{ display:'flex', justifyContent:'space-between',
               padding:'3px 0', borderBottom:`1px solid ${C.borderW}`, fontSize:11 }}>

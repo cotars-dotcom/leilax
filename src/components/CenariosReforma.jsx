@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { C, K, fmtC, btn, card } from '../appConstants.js'
 import { useReforma } from '../hooks/useReforma.jsx'
 import { isMercadoDireto } from '../lib/detectarFonte.js'
-import { CUSTOS_LEILAO, CUSTOS_MERCADO, calcularFatorHomogeneizacao } from '../lib/constants.js'
+import { CUSTOS_LEILAO, CUSTOS_MERCADO, calcularFatorHomogeneizacao, IRPF_ISENCAO_TETO } from '../lib/constants.js'
 import {
   ESCOPOS,
   CUSTO_M2_SINAPI,
@@ -95,7 +95,7 @@ export default function CenariosReforma({ imovel, isAdmin }) {
       const corretagem = valorVendaReal * 0.06
       const vendaLiq = valorVendaReal - corretagem
       const ganhoBruto = Math.max(0, vendaLiq - custoTotal)
-      const irpf = valorVendaReal <= 440000 ? 0 : ganhoBruto * 0.15
+      const irpf = valorVendaReal <= IRPF_ISENCAO_TETO ? 0 : ganhoBruto * 0.15
       const lucro = vendaLiq - custoTotal - irpf
       const roi = custoTotal > 0 ? (lucro / custoTotal) * 100 : 0
 
@@ -316,7 +316,7 @@ export default function CenariosReforma({ imovel, isAdmin }) {
           {[
             ['Valor pós-reforma', fmt(sel.valorPosReforma)],
             ['Valorização', `+${sel.valororiacao}%`],
-            [sel.valorPosReforma <= 440000 ? 'IRPF (isento)' : 'IRPF 15%', fmt(sel.irpf), sel.valorPosReforma > 440000 && sel.irpf > 0 ? 'irpf' : 'ok'],
+            [sel.valorPosReforma <= IRPF_ISENCAO_TETO ? 'IRPF (isento)' : 'IRPF 15%', fmt(sel.irpf), sel.valorPosReforma > IRPF_ISENCAO_TETO && sel.irpf > 0 ? 'irpf' : 'ok'],
             ['Corretagem 6%', fmt(sel.corretagem)],
             ['Lucro líquido', fmt(sel.lucro), 'lucro'],
             ['ROI', pct(sel.roi), 'roi'],

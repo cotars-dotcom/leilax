@@ -10,7 +10,7 @@
 
 import { abrirHtmlNovaTela } from '../lib/abrirHtml.js'
 import { isMercadoDireto } from '../lib/detectarFonte.js'
-import { calcularDadosFinanceiros } from '../lib/constants.js'
+import { calcularDadosFinanceiros, SELIC_ANUAL_PCT } from '../lib/constants.js'
 
 const fmt   = v  => v != null && v !== '' ? `R$ ${Math.round(Number(v)).toLocaleString('pt-BR')}` : '—'
 const fmtPct= v  => v != null ? `${Number(v).toFixed(1)}%` : '—'
@@ -250,7 +250,7 @@ tr:last-child td { border-bottom:none; }
   ${parseFloat(p.aluguel_mensal_estimado||0) > 0 ? `
   <div style="background:#F5F3FF;border-left:3px solid #7C3AED;border-radius:0 8px 8px 0;padding:10px 14px;font-size:13px;color:#4C1D95;margin-bottom:14px">
     🏠 <strong>Aluguel estimado: ${fmt(p.aluguel_mensal_estimado)}/mês</strong> (${fmtPct(p.yield_bruto_pct)} ao ano sobre o valor de mercado).
-    <span style="color:#7C3AED">A Selic hoje rende 14,75% a.a. — compare esse retorno antes de decidir.</span>
+    <span style="color:#7C3AED">A Selic hoje rende ${String(SELIC_ANUAL_PCT).replace('.',',')}% a.a. — compare esse retorno antes de decidir.</span>
   </div>` : ''}
 
   ${parseFloat(p.debitos_total_estimado||0) > 0 ? `

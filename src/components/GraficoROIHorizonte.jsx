@@ -12,11 +12,11 @@
  * com valorização + vacância + aluguel mensal — não cabe na função canônica).
  */
 
-import { calcularDadosFinanceiros, IRPF_ISENCAO_TETO } from '../lib/constants.js'
+import { calcularDadosFinanceiros, IRPF_ISENCAO_TETO, SELIC_ANUAL_PCT, IR_ALUGUEL_TETO_MENSAL, IR_ALUGUEL_PCT, VACANCIA_ANUAL_PCT } from '../lib/constants.js'
 import { isMercadoDireto } from '../lib/detectarFonte.js'
 
 const ANOS = [1, 2, 3, 5]
-const SELIC_ANUAL = 14.75  // % — taxa Selic abr/2026 (Copom 18/03/2026)
+const SELIC_ANUAL = SELIC_ANUAL_PCT  // taxa Selic — atualizar em constants.js
 
 function projetarROI(p, lanceEstudo, custoReformaAtual, holdingMeses = 6) {
   const lance = lanceEstudo || parseFloat(p.valor_minimo || p.preco_pedido) || 0
@@ -32,7 +32,7 @@ function projetarROI(p, lanceEstudo, custoReformaAtual, holdingMeses = 6) {
 
   // Valorização anual do bairro (de metricas_bairros via tendencia_12m)
   const tendencia = parseFloat(p._metricasBairro?.tendencia_12m || p.tendencia_12m || 4.5) / 100
-  const vacancia = parseFloat(p._metricasBairro?.vacancia_pct || 8) / 100
+  const vacancia = parseFloat(p._metricasBairro?.vacancia_pct || VACANCIA_ANUAL_PCT * 100) / 100
   const corretagem = 0.06
   const potencialIsencaoIRPF = mercado <= IRPF_ISENCAO_TETO
   const aplicaIR = valor => !potencialIsencaoIRPF && valor > 0
@@ -48,10 +48,9 @@ function projetarROI(p, lanceEstudo, custoReformaAtual, holdingMeses = 6) {
     const roiFlip = (lucroFlip / investBase) * 100
 
     // Locação: renda acumulada + valorização + venda no final.
-    // IR 27.5% sobre aluguel mensal > R$2.824 (alinhado com calcularDadosFinanceiros).
-    const IR_ALUGUEL_TETO_MENSAL = 2824
+    // IR sobre aluguel mensal acima do teto (alinhado com calcularDadosFinanceiros).
     const irAluguelAnual = aluguel > IR_ALUGUEL_TETO_MENSAL
-      ? (aluguel - IR_ALUGUEL_TETO_MENSAL) * 0.275 * 12 : 0
+      ? (aluguel - IR_ALUGUEL_TETO_MENSAL) * IR_ALUGUEL_PCT * 12 : 0
     const aluguelAnualLiq = aluguel * 12 * (1 - vacancia) - irAluguelAnual
     const rendaAcum = aluguelAnualLiq * anos
     const valorFinalLoc = mercado * Math.pow(1 + tendencia, anos)

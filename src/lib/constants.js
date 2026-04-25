@@ -146,6 +146,24 @@ export const MULT_CUSTO_RAPIDO = {
   leilao:  0.155,
 }
 
+// ─── TAXA SELIC ATUAL (benchmark de renda fixa para comparações) ─
+// Atualizada manualmente a cada reunião do Copom.
+// Última atualização: 18/03/2026 — corte de 15.00% para 14.75%.
+// Próxima reunião: 06-07/05/2026.
+export const SELIC_ANUAL_PCT = 14.75
+export const SELIC_ULTIMA_REUNIAO_COPOM = '2026-03-18'
+
+// ─── IR SOBRE ALUGUEL — PF, faixa de isenção mensal ──────────────
+// Tabela progressiva 2026: até R$2.824/mês isento; acima: 7,5%–27,5%.
+// Usamos 27,5% (faixa máxima) como aproximação conservadora — exato depende
+// de outros rendimentos do contribuinte na declaração anual.
+export const IR_ALUGUEL_TETO_MENSAL = 2824
+export const IR_ALUGUEL_PCT = 0.275
+
+// ─── Premissas operacionais para projeção de locação ─────────────
+export const VACANCIA_ANUAL_PCT = 0.06   // 6% — média BH 2024-2025 metricas_bairros
+export const MANUTENCAO_ANUAL_PCT = 0.005  // 0.5% sobre investimento — média de obras de manutenção
+
 // ─── MODELOS IA — CASCATA ────────────────────────────────────────
 export const MODELOS_GEMINI = [
   'gemini-2.5-flash',
@@ -400,13 +418,12 @@ export function calcularDadosFinanceiros(lance, imovel = {}, eMercado = false, o
 
   // === LOCAÇÃO ===
   const yieldBruto = aluguel > 0 && invest > 0 ? (aluguel * 12 / invest) * 100 : 0
-  // Yield líquido alinhado com calcLocacao do PainelRentabilidade:
-  //   -6% vacância/ano, -IR 27.5% PF sobre aluguel acima de R$2.824/mês, -0.5% manutenção/ano
-  const IR_ALUGUEL_TETO_MENSAL = 2824
-  const vacancia = aluguel * 0.06 * 12
+  // Yield líquido — premissas centralizadas em constantes do módulo:
+  //   vacância anual, IR sobre aluguel acima do teto isento, manutenção anual.
+  const vacancia = aluguel * VACANCIA_ANUAL_PCT * 12
   const irLocacaoAnual = aluguel > IR_ALUGUEL_TETO_MENSAL
-    ? (aluguel - IR_ALUGUEL_TETO_MENSAL) * 0.275 * 12 : 0
-  const manutencaoAnual = invest * 0.005
+    ? (aluguel - IR_ALUGUEL_TETO_MENSAL) * IR_ALUGUEL_PCT * 12 : 0
+  const manutencaoAnual = invest * MANUTENCAO_ANUAL_PCT
   const receitaLiquida12m = aluguel * 12 - vacancia - irLocacaoAnual - manutencaoAnual
   const yieldLiquido = aluguel > 0 && invest > 0
     ? (receitaLiquida12m / invest) * 100 : 0

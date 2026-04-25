@@ -7,7 +7,7 @@ import { useState, useMemo } from 'react'
 import { C, K, fmtC, card } from '../appConstants.js'
 import { useReforma } from '../hooks/useReforma.jsx'
 
-import { CUSTOS_LEILAO , calcularLanceMaximoParaROI, calcularDadosFinanceiros } from '../lib/constants.js'
+import { CUSTOS_LEILAO , calcularLanceMaximoParaROI, calcularDadosFinanceiros, IRPF_ISENCAO_TETO } from '../lib/constants.js'
 
 const fmt  = v => v != null && v > 0 ? `R$ ${Math.round(v).toLocaleString('pt-BR')}` : '—'
 const pct  = v => v != null ? `${parseFloat(v).toFixed(1)}%` : '—'
@@ -22,7 +22,7 @@ const TX = {
   reg:      CUSTOS_LEILAO.registro_fixo,
   corretagem_venda: 0.06,
   irpf_pct: CUSTOS_LEILAO.irpf_ganho_capital_pct / 100,
-  isencao_irpf: 440000,
+  isencao_irpf: IRPF_ISENCAO_TETO,
 }
 
 function calcularCenario(lance, vmercado, reforma, juridico = 0, debitosArr = 0, imovel = {}) {
