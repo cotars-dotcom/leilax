@@ -768,9 +768,27 @@ export function calcularScore(analise, parametros) {
 
 // -- Validação pós-análise (guardrails) --
 
-export function validarECorrigirAnalise(analise) {
+export async function validarECorrigirAnalise(analise, dadosBairroCalibParam = null) {
   const erros = []
   const avisos = []
+
+  // Sprint 41d hotfix: dadosBairroCalib estava sendo referenciado como variável GLOBAL
+  // mas só existia no escopo de outra função. Resultado: cap de teto/floor de mercado
+  // SILENCIOSAMENTE DESATIVADO desde a sprint 41c.
+  // Fix: aceitar como parâmetro opcional. Se não vier, busca do banco automaticamente.
+  let dadosBairroCalib = dadosBairroCalibParam
+  if (!dadosBairroCalib && analise.bairro) {
+    try {
+      const { getBairroDadosOnline } = await import('./agenteValorMercado.js')
+      dadosBairroCalib = await getBairroDadosOnline(analise.bairro)
+    } catch(e) { /* silencioso — fallback para sem cap */ }
+    if (!dadosBairroCalib) {
+      try {
+        const { getBairroDados } = await import('../data/metricas_bairros_bh.js')
+        dadosBairroCalib = getBairroDados(analise.bairro)
+      } catch(e) { /* silencioso */ }
+    }
+  }
 
   // Fallback MAO: garantir sempre preenchido mesmo se IA não calculou.
   // Sprint 41c: usar função canônica de constants.js que INCLUI débitos do arrematante,
@@ -1822,7 +1840,8 @@ Regras: true = claramente visível. false = claramente ausente (ex: prédio baix
 
   // Validação pós-análise: corrigir área, preço/m², alertas contraditórios
   progress('🔍 Validando dados da análise...')
-  const analiseValidada = validarECorrigirAnalise(analise)
+  // Sprint 41d hotfix: passar dadosBairroCalib que está em escopo aqui (linha 1546)
+  const analiseValidada = await validarECorrigirAnalise(analise, dadosBairroCalib)
 
   // Calcular custo de reforma usando a base estruturada
   try {

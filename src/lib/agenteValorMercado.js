@@ -110,24 +110,40 @@ export function inferirClasseIPEAD(preco_m2) {
  */
 export async function getBairroDadosOnline(nomeBairro, cidade = 'Belo Horizonte') {
   if (!nomeBairro) return null
-  const vm = await buscarValorMercado(nomeBairro, cidade)
-  if (!vm || vm.fonte !== 'banco_interno') return null
-  
+  // Sprint 41d hotfix: buscar TODOS os campos do banco, incluindo fatores calibrados.
+  // Antes: getBairroDadosOnline retornava fatorElevador: 0.85 hardcoded mesmo se o
+  // banco tivesse valor calibrado para o bairro. Mesma negligência para piscina/lazer.
+  let data = null
+  try {
+    const res = await supabase
+      .from('metricas_bairros')
+      .select('*')
+      .ilike('bairro', nomeBairro.trim())
+      .limit(1)
+      .single()
+    data = res.data
+  } catch { data = null }
+
+  if (!data) return null
+
   // Normalizar para o formato esperado pelo motorIA
-  const classeNum = vm.classe_ipead?.replace(/\D/g, '') || '2'
+  const classeNum = data.classe_ipead?.replace(/\D/g, '') || '2'
   return {
-    label: vm.bairro,
-    zona: null,
+    label: data.bairro,
+    zona: data.zona || null,
     classeIpead: parseInt(classeNum) || 2,
-    classeIpeadLabel: vm.classe_label?.replace('Classe \d - ', '') || 'Médio',
-    precoContratoM2: vm.preco_contrato_m2,
-    precoAnuncioM2: vm.preco_anuncio_m2,
-    yieldBruto: vm.yield_bruto,
-    tendencia12m: vm.tendencia_12m,
-    fatorElevador: 0.85,
-    liquidez: vm.liquidez_label,
-    tempoVendaDias: null,  // vem do join separado
+    classeIpeadLabel: data.classe_ipead_label?.replace(/Classe \d - /, '') || 'Médio',
+    precoContratoM2: parseFloat(data.preco_contrato_m2) || null,
+    precoAnuncioM2: parseFloat(data.preco_anuncio_m2) || null,
+    yieldBruto: parseFloat(data.yield_bruto) || null,
+    tendencia12m: parseFloat(data.tendencia_12m) || null,
+    // Fatores de homogeneização — agora lidos do banco (antes hardcoded 0.85)
+    fatorElevador: parseFloat(data.fator_elevador) || 0.85,
+    fatorPiscina:  parseFloat(data.fator_piscina)  || 0.97,
+    fatorLazer:    parseFloat(data.fator_lazer)    || 0.95,
+    liquidez: data.liquidez_label || null,
+    tempoVendaDias: data.tempo_venda_dias || null,
     _fonte: 'supabase',
-    _atualizado_em: vm.atualizado_em,
+    _atualizado_em: data.atualizado_em,
   }
 }

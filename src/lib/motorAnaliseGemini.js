@@ -725,8 +725,8 @@ export async function analisarComGemini(url, geminiKey, parametros, onProgress, 
     }
   } catch(e) { /* reforma sem cálculo SINAPI */ }
 
-  // PASSO 7: Validar e corrigir (zero custo)
-  const analiseValidada = validarECorrigirAnalise(analise)
+  // PASSO 7: Validar e corrigir (zero custo) — agora async (sprint 41d)
+  const analiseValidada = await validarECorrigirAnalise(analise)
 
   // PASSO 8: Calcular score final com pesos do banco
   const scoreTotal = calcularScore(analiseValidada, parametros)

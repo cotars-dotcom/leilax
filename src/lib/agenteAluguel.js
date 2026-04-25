@@ -111,11 +111,16 @@ export async function estimarAluguel(bairro, area_m2, quartos = 2, atributos = {
 
 /**
  * Calcula yield bruto e líquido
+ * @param {number} aluguelMensal
+ * @param {number} valorImovel
+ * @param {number} ocupacao - taxa de ocupação anual (0.94 = 6% vacância, alinhado com VACANCIA_ANUAL_PCT)
  */
-export function calcularYield(aluguelMensal, valorImovel, vacanciaAnos = 0.9) {
+export function calcularYield(aluguelMensal, valorImovel, ocupacao = 0.94) {
   if (!aluguelMensal || !valorImovel) return null
   const yieldBruto = (aluguelMensal * 12 / valorImovel) * 100
-  const yieldLiquido = yieldBruto * vacanciaAnos * 0.85  // 85% líquido após gestão/manutenção
+  // Sprint 41d: ocupação 0.94 (6% vacância) alinhado com VACANCIA_ANUAL_PCT em constants.js.
+  // Antes: 0.9 (10% vacância) — divergia da função canônica calcularDadosFinanceiros.
+  const yieldLiquido = yieldBruto * ocupacao * 0.85  // 85% líquido após gestão/manutenção
   return {
     yield_bruto_pct: parseFloat(yieldBruto.toFixed(2)),
     yield_liquido_pct: parseFloat(yieldLiquido.toFixed(2)),

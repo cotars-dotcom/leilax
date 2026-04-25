@@ -78,10 +78,15 @@ export async function calcularReformaSINAPI(area_m2, classeIpead = 'Classe 2 - M
 }
 
 /**
- * Fallback quando banco não tem itens: usa pontos operacionais × área
+ * Fallback quando banco não tem itens: usa pontos operacionais × área.
+ * Sprint 41d: retorna valores ACUMULADOS para alinhar com o caminho principal
+ * (banco_itens_reforma) e evitar que CenariosReforma/orquestrador exibam
+ * valores inconsistentes. Antes: cada cenário era independente, mas o caminho
+ * principal salva acumulados.
  */
 function calcularFallback(area_m2, classeIpead) {
   // Pontos operacionais AXIS calibrados BH 2026 (Prompt 2)
+  // Esses valores REPRESENTAM cada cenário independente (não acumulado).
   const PONTOS = {
     'Classe 1 - Popular': { basica: 700,  media: 1200, completa: 2000 },
     'Classe 2 - Médio':   { basica: 900,  media: 1550, completa: 2800 },
@@ -90,17 +95,24 @@ function calcularFallback(area_m2, classeIpead) {
     default:              { basica: 900,  media: 1550, completa: 2800 },
   }
   const p = PONTOS[classeIpead] || PONTOS.default
+  // Calcular totais por cenário (independentes)
+  const tBasica = Math.round(p.basica * area_m2)
+  const tMediaInd = Math.round(p.media * area_m2)
+  const tCompletaInd = Math.round(p.completa * area_m2)
+  // Acumulados (mesmo padrão do retorno do banco_itens_reforma)
+  const mediaAcum = tBasica + tMediaInd
+  const completaAcum = mediaAcum + tCompletaInd
   return {
     fonte: 'fallback_pontos_operacionais',
     area_m2,
     classeIpead,
     cenarios: {
-      basica:   { total: Math.round(p.basica * area_m2),   r_m2: p.basica },
-      media:    { total: Math.round(p.media * area_m2),    r_m2: p.media },
-      completa: { total: Math.round(p.completa * area_m2), r_m2: p.completa },
+      basica:   { total: tBasica,        r_m2: p.basica },
+      media:    { total: mediaAcum,      r_m2: Math.round(mediaAcum / area_m2) },
+      completa: { total: completaAcum,   r_m2: Math.round(completaAcum / area_m2) },
     },
     total_itens: 0,
-    nota: 'Pontos operacionais BH 2026 — banco de itens indisponível',
+    nota: 'Pontos operacionais BH 2026 — banco de itens indisponível. Valores acumulados por cenário.',
   }
 }
 

@@ -12,6 +12,7 @@ import { calcularReformaSINAPI } from './agenteReformaSINAPI.js'
 import { estimarAluguel, calcularYield } from './agenteAluguel.js'
 import { consultarProcesso } from './agenteDatajud.js'
 import { calcularConfidence } from './agenteConfidenceBadge.js'
+import { consultarCEP, validarEndereco, geocodificarEndereco } from './agenteEndereco.js'
 import { calcularLanceMaximoParaROI, CUSTOS_LEILAO } from './constants.js'
 import { calcularCustoJuridico } from '../data/riscos_juridicos.js'
 
@@ -20,17 +21,46 @@ import { calcularCustoJuridico } from '../data/riscos_juridicos.js'
  * Cada agente é opcional — falha silenciosa com log.
  * 
  * @param {Object} imovel — Objeto do banco (campos básicos preenchidos)
- * @param {Object} opts — { forcarReforma, forcarMercado, forcarJuridico }
+ * @param {Object} opts — { forcarReforma, forcarMercado, forcarJuridico, forcarEndereco }
  */
 export async function enriquecerImovel(imovel, opts = {}) {
   const p = imovel
   const updates = {}
   const log = []
 
-  // ── 1. VALOR DE MERCADO ─────────────────────────────────────────────────────
-  if (opts.forcarMercado !== false && p.bairro) {
+  // ── 0. ENDEREÇO / CEP / GEOCODING ─────────────────────────────────────────
+  // Sprint 41d: agenteEndereco era código morto — não era chamado por ninguém.
+  // Agora plugado no pipeline. Roda só se temos CEP e (lat/lng) ainda não foi geocodada.
+  if (opts.forcarEndereco !== false && p.cep && (!p.lat || !p.lng)) {
     try {
-      const vm = await buscarValorMercado(p.bairro, p.cidade)
+      const cepData = await consultarCEP(p.cep)
+      if (cepData) {
+        if (!p.bairro && cepData.bairro) updates.bairro = cepData.bairro
+        if (!p.cidade && cepData.cidade) updates.cidade = cepData.cidade
+        if (cepData.lat && cepData.lng) {
+          updates.lat = cepData.lat
+          updates.lng = cepData.lng
+        }
+        log.push(`✅ CEP: ${cepData.bairro}, ${cepData.cidade}${cepData.lat ? ` (${cepData.lat.toFixed(4)}, ${cepData.lng.toFixed(4)})` : ''}`)
+        // Se CEP não tem coordenadas mas temos endereço, tentar Nominatim
+        if ((!cepData.lat || !cepData.lng) && p.endereco) {
+          const geo = await geocodificarEndereco(p.endereco, cepData.cidade, cepData.estado)
+          if (geo?.lat) {
+            updates.lat = geo.lat
+            updates.lng = geo.lng
+            log.push(`✅ Geocoding: ${geo.lat.toFixed(4)}, ${geo.lng.toFixed(4)} (${geo.fonte})`)
+          }
+        }
+      }
+    } catch(e) { log.push(`⚠️ Endereço falhou: ${e.message}`) }
+  }
+
+  // ── 1. VALOR DE MERCADO ─────────────────────────────────────────────────────
+  // Usa bairro atualizado pelo passo 0 se disponível
+  const bairroEfetivo = updates.bairro || p.bairro
+  if (opts.forcarMercado !== false && bairroEfetivo) {
+    try {
+      const vm = await buscarValorMercado(bairroEfetivo, updates.cidade || p.cidade)
       if (vm?.preco_contrato_m2) {
         const area = parseFloat(p.area_usada_calculo_m2 || p.area_privativa_m2 || p.area_m2) || 0
         updates.valor_mercado_estimado = Math.round(vm.preco_contrato_m2 * area)
@@ -108,25 +138,49 @@ export async function enriquecerImovel(imovel, opts = {}) {
     }
   } catch(e) { log.push(`⚠️ Custo jurídico falhou: ${e.message}`) }
 
-  // ── 5. MAO ──────────────────────────────────────────────────────────────────
+  // ── 5. LANCE MÁXIMO ─────────────────────────────────────────────────────────
   const vmFinal = parseFloat(updates.valor_mercado_estimado || p.valor_mercado_estimado) || 0
   const reformaMedia = parseFloat(updates.custo_reforma_media || p.custo_reforma_media) || 0
   if (vmFinal > 0 && p.valor_minimo) {
     try {
       const pEnriquecido = { ...p, ...updates }
-      updates.mao_flip    = calcularLanceMaximoParaROI(20, pEnriquecido, { eMercado: false, custoReforma: reformaMedia, mercadoBruto: vmFinal })
-      updates.mao_locacao = calcularLanceMaximoParaROI(6,  pEnriquecido, { eMercado: false, custoReforma: 0, mercadoBruto: vmFinal })
+      // Lance máx. flip = teto que preserva ROI ≥ 20% (custos + reforma + débitos + jurídico já incluídos)
+      updates.mao_flip = calcularLanceMaximoParaROI(20, pEnriquecido, {
+        eMercado: false, custoReforma: reformaMedia, mercadoBruto: vmFinal,
+      })
+      // Sprint 41d hotfix: mao_locacao usa fórmula de YIELD, não de ROI.
+      // Antes: calcularLanceMaximoParaROI(6, ...) — chamava com 6 como roiAlvo,
+      // resultando em lance máximo absurdamente alto (até maior que o valor de mercado).
+      // Correto: lance máximo = (aluguel × 12 / yield_alvo) − custos_fixos
+      const aluguel = parseFloat(updates.aluguel_mensal_estimado || p.aluguel_mensal_estimado) || 0
+      if (aluguel > 0) {
+        const yieldAlvo = 0.06  // 6% a.a. típico BH
+        const condoMensal = parseFloat(p.condominio_mensal || 0)
+        const iptuMensal = parseFloat(p.iptu_mensal || 0) || (condoMensal > 0 ? Math.round(condoMensal * 0.35) : 0)
+        const holding = 6 * (condoMensal + iptuMensal)
+        const debitosArr = pEnriquecido.responsabilidade_debitos === 'arrematante'
+          ? parseFloat(pEnriquecido.debitos_total_estimado || 0) : 0
+        const juridico = parseFloat(updates.custo_juridico_estimado || p.custo_juridico_estimado || 0)
+        const custosFixos = reformaMedia + holding + debitosArr + juridico
+        // Custos variáveis sobre lance: 15.5% leilão (comissão + ITBI + adv + doc)
+        const pctCustos = 0.155
+        const targetInvest = aluguel * 12 / yieldAlvo  // investimento total para atingir yield alvo
+        const lanceMaxLoc = (targetInvest - custosFixos) / (1 + pctCustos)
+        updates.mao_locacao = Math.max(0, Math.round(lanceMaxLoc))
+      } else {
+        updates.mao_locacao = null
+      }
       // Verificar se MAO está protegido (campos_travados)
       const travados = Array.isArray(imovel.campos_travados) ? imovel.campos_travados : []
       const maoProtegido = travados.includes('mao_flip')
       if (maoProtegido) {
-        log.push(`ℹ️ MAO calculado (bloqueado): flip R$${updates.mao_flip?.toLocaleString('pt-BR')} / locação R$${updates.mao_locacao?.toLocaleString('pt-BR')} — campos protegidos, valor do banco mantido`)
+        log.push(`ℹ️ Lance máx. calculado (bloqueado): flip R$${updates.mao_flip?.toLocaleString('pt-BR')} / locação R$${updates.mao_locacao?.toLocaleString('pt-BR')} — campos protegidos, valor do banco mantido`)
         delete updates.mao_flip
         delete updates.mao_locacao
       } else {
-        log.push(`✅ MAO flip: R$${updates.mao_flip?.toLocaleString('pt-BR')} / locação: R$${updates.mao_locacao?.toLocaleString('pt-BR')}`)
+        log.push(`✅ Lance máx.: flip R$${updates.mao_flip?.toLocaleString('pt-BR')} / locação R$${updates.mao_locacao?.toLocaleString('pt-BR')}`)
       }
-    } catch(e) { log.push(`⚠️ MAO falhou: ${e.message}`) }
+    } catch(e) { log.push(`⚠️ Lance máx. falhou: ${e.message}`) }
   }
 
   // ── 6. CONFIDENCE ──────────────────────────────────────────────────────────
