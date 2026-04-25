@@ -31,23 +31,25 @@ export async function enriquecerImovel(imovel, opts = {}) {
   // ── 0. ENDEREÇO / CEP / GEOCODING ─────────────────────────────────────────
   // Sprint 41d: agenteEndereco era código morto — não era chamado por ninguém.
   // Agora plugado no pipeline. Roda só se temos CEP e (lat/lng) ainda não foi geocodada.
-  if (opts.forcarEndereco !== false && p.cep && (!p.lat || !p.lng)) {
+  if (opts.forcarEndereco !== false && p.cep && (!p.coordenadas_lat || !p.coordenadas_lng)) {
     try {
       const cepData = await consultarCEP(p.cep)
       if (cepData) {
         if (!p.bairro && cepData.bairro) updates.bairro = cepData.bairro
         if (!p.cidade && cepData.cidade) updates.cidade = cepData.cidade
         if (cepData.lat && cepData.lng) {
-          updates.lat = cepData.lat
-          updates.lng = cepData.lng
+          updates.coordenadas_lat = cepData.lat
+          updates.coordenadas_lng = cepData.lng
+          updates.endereco_validado = true
         }
         log.push(`✅ CEP: ${cepData.bairro}, ${cepData.cidade}${cepData.lat ? ` (${cepData.lat.toFixed(4)}, ${cepData.lng.toFixed(4)})` : ''}`)
         // Se CEP não tem coordenadas mas temos endereço, tentar Nominatim
         if ((!cepData.lat || !cepData.lng) && p.endereco) {
           const geo = await geocodificarEndereco(p.endereco, cepData.cidade, cepData.estado)
           if (geo?.lat) {
-            updates.lat = geo.lat
-            updates.lng = geo.lng
+            updates.coordenadas_lat = geo.lat
+            updates.coordenadas_lng = geo.lng
+            updates.endereco_validado = true
             log.push(`✅ Geocoding: ${geo.lat.toFixed(4)}, ${geo.lng.toFixed(4)} (${geo.fonte})`)
           }
         }

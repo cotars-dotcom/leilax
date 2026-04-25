@@ -11,7 +11,6 @@ const AbaJuridicaAgente = lazy(() => import('./AbaJuridicaAgente.jsx'))
 import { buscarArrematesSimilares, carregarCacheArremates } from '../lib/buscaArrematesGPT.js'
 import PainelLancamento from './PainelLancamento.jsx'
 import PainelInvestimento from './PainelInvestimento.jsx'
-import AtributosPredio from './AtributosPredio.jsx'
 import ScoreRadar from './ScoreRadar.jsx'
 const TimelineMatricula = lazy(() => import('./TimelineMatricula.jsx'))
 const GraficoROIHorizonte = lazy(() => import('./GraficoROIHorizonte.jsx'))
@@ -1967,6 +1966,9 @@ for (const s of SCORES) {
 
         {/* ConfigEstudo: slider de lance e reforma — sincroniza toda a aba */}
         <ConfigEstudo imovel={p} />
+
+        {/* ROI ao vivo: atualiza conforme o slider muda lance/reforma */}
+        <RoiLiveBanner imovel={p} />
 
         {/* Painel Investimento: breakdown financeiro completo */}
         <PainelInvestimento imovel={p} />
