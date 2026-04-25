@@ -102,7 +102,11 @@ export async function enriquecerImovel(imovel, opts = {}) {
         const vm = parseFloat(updates.valor_mercado_estimado || p.valor_mercado_estimado) || 0
         if (vm > 0) {
           const y = calcularYield(aluguel.aluguel_mensal, vm)
-          if (y) updates.yield_bruto_pct = y.yield_bruto_pct
+          if (y) {
+            updates.yield_bruto_pct = y.yield_bruto_pct
+            // Sprint 41d: também salvar líquido (antes só guardávamos bruto)
+            if (y.yield_liquido_pct != null) updates.yield_liquido_pct = y.yield_liquido_pct
+          }
         }
         log.push(`✅ Aluguel: R$${aluguel.aluguel_mensal.toLocaleString('pt-BR')}/mês`)
       }

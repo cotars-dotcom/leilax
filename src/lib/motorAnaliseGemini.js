@@ -284,7 +284,6 @@ async function chamarGeminiModelo(prompt, geminiKey, modelo) {
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${geminiKey}`,
     {
-      signal: AbortSignal.timeout(45000),  // 45s timeout
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -294,6 +293,8 @@ async function chamarGeminiModelo(prompt, geminiKey, modelo) {
           maxOutputTokens: 8192,
         }
       }),
+      // Sprint 41d: era 'signal' duplicado (45s e 60s). JS pegava só o último (60s).
+      // Mantendo 60s explicitamente.
       signal: AbortSignal.timeout(60000)
     }
   )
