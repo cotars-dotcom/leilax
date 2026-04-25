@@ -10,6 +10,7 @@ import { supabase, getImoveis, deleteImovel, persistApiKeys, verificarImovelDupl
 import { detectarTipoTransacao, isMercadoDireto } from "./lib/detectarFonte.js"
 const LazyTarefas = lazy(() => import('./pages/Tarefas.jsx'))
 const LazySharedViewer = lazy(() => import('./components/SharedViewer.jsx'))
+import AgentHealthBadge from "./components/AgentHealthBadge.jsx"
 // motorIA carregado dinamicamente no momento do uso para reduzir bundle inicial
 // trelloService carregado dinamicamente para reduzir bundle inicial
 import { LayoutDashboard, TrendingUp, Package, ShieldCheck, FileText, BarChart3, Settings, Search, Bell, AlertTriangle, ArrowUpRight, Plus, MessageSquare, Scale, CheckSquare, LogOut } from "lucide-react"
@@ -2067,6 +2068,11 @@ export default function App() {
   </nav>
   {/* Sidebar footer */}
   <div style={{padding:'10px 10px',borderTop:'1px solid rgba(255,255,255,0.07)',display:'flex',flexDirection:'column',gap:4}}>
+    {isAdmin && (
+      <div style={{padding:'6px 4px 8px',display:'flex',justifyContent:'flex-start'}}>
+        <AgentHealthBadge expansivel />
+      </div>
+    )}
     <button onClick={()=>trello?setShowTrelloModal(true):setShowTrello(true)} style={{
       width:'100%',display:'flex',alignItems:'center',gap:10,
       padding:'8px 12px',borderRadius:8,border:'none',cursor:'pointer',
