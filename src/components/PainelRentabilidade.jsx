@@ -188,6 +188,9 @@ export default function PainelRentabilidade({ imovel }) {
   const lance1   = precoBase
   const debitosArr = imovel.responsabilidade_debitos === 'arrematante'
     ? parseFloat(imovel.debitos_total_estimado || 0) : 0
+  // Sprint 41d hotfix: juridico precisa estar em escopo para uso em calcFlip/calcLocacao abaixo.
+  // Sem isso o componente quebra com ReferenceError.
+  const juridico = parseFloat(imovel.custo_juridico_estimado || 0)
 
   // Lances dos cenários
   const lance2piso  = Math.round(avaliacao * 0.35)
