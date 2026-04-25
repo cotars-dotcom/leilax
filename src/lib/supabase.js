@@ -749,6 +749,8 @@ const DOC_COLS = new Set([
   'score_viabilidade','resumo_executivo','pontos_positivos','alertas_criticos',
   'responsabilidade_debitos','ocupacao_confirmada','prazo_liberacao_meses',
   'recomendacao_juridica','metricas_viabilidade','reclassificado','impacto_score',
+  // Sprint 41d-Bx: OCR pode retornar schema parcial — flag para UI sinalizar
+  'ocr_ausentes',
 ])
 
 export async function salvarDocumentoJuridico(doc) {

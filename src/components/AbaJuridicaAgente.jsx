@@ -523,6 +523,9 @@ export default function AbaJuridicaAgente({ imovel, isAdmin, onReclassificado })
       await salvarDocumentoJuridico({
         imovel_id: imovel.id, nome: res.nome, tipo: res.tipo || 'outro',
         tamanho_bytes: 0,
+        // Sprint 41d-Bx: status reflete schema completo vs parcial
+        status: res.analise._schema_incompleto ? 'analisado_parcial' : 'analisado',
+        ocr_ausentes: res.analise._schema_incompleto ? (res.analise._ausentes || []) : null,
         analise_ia: res.analise.parecer || res.analise.parecer_resumido || res.analise.parecer_final || '',
         riscos_encontrados: res.analise.riscos_identificados || [],
         score_juridico_sugerido: res.analise.score_juridico_sugerido || null,

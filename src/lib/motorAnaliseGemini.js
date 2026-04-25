@@ -17,6 +17,7 @@ import { MODELOS_GEMINI } from './constants.js'
 import { detectarRegiao, getMercado } from '../data/mercado_regional.js'
 import { calcularCustoReforma, detectarClasseMercado } from '../data/custos_reforma.js'
 import { isMercadoDireto } from './detectarFonte.js'
+import { withCircuitBreaker, executarCascata } from './circuitBreaker.js'
 
 // ─── PROMPT GEMINI COMPACTO ──────────────────────────────────────────────────
 function buildPromptGemini(campos, textoScrapeado, contextoMercado, imovelContexto = null, jurimetria = [], metricasBairro = null, eMercadoDireto = false) {
@@ -281,39 +282,42 @@ async function chamarGeminiComProxy(prompt, geminiKey, modelo) {
 }
 
 async function chamarGeminiModelo(prompt, geminiKey, modelo) {
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${geminiKey}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.1,
-          maxOutputTokens: 8192,
-        }
-      }),
-      // Sprint 41d: era 'signal' duplicado (45s e 60s). JS pegava só o último (60s).
-      // Mantendo 60s explicitamente.
-      signal: AbortSignal.timeout(60000)
+  // Sprint 41d-Bx: usa circuit breaker. Timeout coordenado de 15s (TIMEOUTS.gemini)
+  // em vez de 60s — se Gemini está lento, queimar 15s e cair para fallback é
+  // muito melhor que esperar 60s e estourar o budget Vercel.
+  return await withCircuitBreaker('gemini', async (signal) => {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${geminiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.1,
+            maxOutputTokens: 8192,
+          }
+        }),
+        signal
+      }
+    )
+    if (!res.ok) {
+      const body = await res.text()
+      console.error('[AXIS Gemini]', modelo, 'HTTP', res.status, body.substring(0, 300))
+      const errMsg = body.substring(0, 200)
+      if (res.status === 404) throw new Error(`Modelo ${modelo} não encontrado (404)`)
+      if (res.status === 401 || res.status === 403) throw new Error(`Chave Gemini inválida (${res.status})`)
+      if (res.status === 429) throw new Error(`Quota Gemini excedida (429) — aguarde 1 min`)
+      throw new Error(`Gemini ${res.status}: ${errMsg}`)
     }
-  )
-  if (!res.ok) {
-    const body = await res.text()
-    console.error('[AXIS Gemini]', modelo, 'HTTP', res.status, body.substring(0, 300))
-    const errMsg = body.substring(0, 200)
-    if (res.status === 404) throw new Error(`Modelo ${modelo} não encontrado (404)`)
-    if (res.status === 401 || res.status === 403) throw new Error(`Chave Gemini inválida (${res.status})`)
-    if (res.status === 429) throw new Error(`Quota Gemini excedida (429) — aguarde 1 min`)
-    throw new Error(`Gemini ${res.status}: ${errMsg}`)
-  }
-  const data = await res.json()
-  const txt = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
-  if (!txt || txt.length < 10) throw new Error('Gemini retornou resposta vazia')
-  const clean = txt.replace(/```json|```/g, '').trim()
-  const jsonMatch = clean.match(/\{[\s\S]*\}/)
-  if (!jsonMatch) throw new Error('Gemini não retornou JSON válido')
-  return JSON.parse(jsonMatch[0])
+    const data = await res.json()
+    const txt = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    if (!txt || txt.length < 10) throw new Error('Gemini retornou resposta vazia')
+    const clean = txt.replace(/```json|```/g, '').trim()
+    const jsonMatch = clean.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) throw new Error('Gemini não retornou JSON válido')
+    return JSON.parse(jsonMatch[0])
+  })
 }
 
 // Cascata de modelos Gemini com retry limitado + backoff exponencial
@@ -799,22 +803,25 @@ export async function analisarComDeepSeek(url, deepseekKey, parametros, onProgre
       console.warn('[AXIS] DeepSeek proxy falhou, fallback direto:', proxyErr.message?.substring(0, 80))
       // Fallback: chamada direta
       if (!deepseekKey) throw proxyErr
-      const r = await fetch('https://api.deepseek.com/chat/completions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${deepseekKey}` },
-        body: JSON.stringify({
-          model: 'deepseek-chat',
-          messages: [{ role: 'user', content: prompt }],
-          max_tokens: 4096,
-          temperature: 0.1
-        }),
-        signal: AbortSignal.timeout(90000)
+      // Sprint 41d-Bx: circuit breaker — timeout 12s em vez de 90s
+      const data = await withCircuitBreaker('deepseek', async (signal) => {
+        const r = await fetch('https://api.deepseek.com/chat/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${deepseekKey}` },
+          body: JSON.stringify({
+            model: 'deepseek-chat',
+            messages: [{ role: 'user', content: prompt }],
+            max_tokens: 4096,
+            temperature: 0.1
+          }),
+          signal
+        })
+        if (!r.ok) {
+          const body = await r.text().catch(() => '')
+          throw new Error(`DeepSeek ${r.status}: ${body.substring(0, 100)}`)
+        }
+        return await r.json()
       })
-      if (!r.ok) {
-        const body = await r.text().catch(() => '')
-        throw new Error(`DeepSeek ${r.status}: ${body.substring(0, 100)}`)
-      }
-      const data = await r.json()
       txt = data.choices?.[0]?.message?.content || ''
     }
     const clean = txt.replace(/```json|```/g, '').trim()
@@ -823,6 +830,7 @@ export async function analisarComDeepSeek(url, deepseekKey, parametros, onProgre
     
     let analise = null
     try { analise = JSON.parse(match[0]) } catch(e) { console.warn('[AXIS] JSON.parse falhou:', e.message); analise = null }
+    if (!analise) throw new Error('DeepSeek JSON inválido — não foi possível parsear')
     analise._modelo_usado = 'deepseek-v3'
     analise.fonte_url = url
     // Mercado direto: setar preco_pedido e tipo_transacao
@@ -873,30 +881,34 @@ export async function analisarComGPT(url, openaiKey, parametros, onProgress) {
   const prompt = buildPromptGemini(camposBasicos, textoScrapeado, null, null, null, null, _eMercado)
   
   progress('🧠 GPT-4o-mini processando...')
-  const r = await fetch('https://api.openai.com/v1/chat/completions', {
-    signal: AbortSignal.timeout(45000),  // 45s timeout
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${openaiKey}` },
-    body: JSON.stringify({
-      model: 'gpt-4o-mini',
-      messages: [{ role: 'user', content: prompt }],
-      max_tokens: 4096,
-      temperature: 0.1,
-    }),
-    signal: AbortSignal.timeout(90000)
+  // Sprint 41d-Bx: circuit breaker. Era 2x AbortSignal duplicado (45s e 90s).
+  const data = await withCircuitBreaker('gpt', async (signal) => {
+    const r = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${openaiKey}` },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 4096,
+        temperature: 0.1,
+      }),
+      signal
+    })
+    if (!r.ok) {
+      const body = await r.text().catch(() => '')
+      throw new Error(`GPT ${r.status}: ${body.substring(0, 100)}`)
+    }
+    return await r.json()
   })
-  if (!r.ok) {
-    const body = await r.text().catch(() => '')
-    throw new Error(`GPT ${r.status}: ${body.substring(0, 100)}`)
-  }
-  const data = await r.json()
   const txt = data.choices?.[0]?.message?.content || ''
   const clean = txt.replace(/```json|```/g, '').trim()
   const match = clean.match(/\{[\s\S]*\}/)
   if (!match) throw new Error('GPT JSON inválido')
-  
+
   let analise = null
   try { analise = JSON.parse(match[0]) } catch(e) { console.warn('[AXIS] JSON.parse falhou:', e.message); analise = null }
+  // Sprint 41d-Bx: se o parse falhar, não setar prop em null (TypeError)
+  if (!analise) throw new Error('GPT JSON inválido — não foi possível parsear')
   analise._modelo_usado = 'gpt-4o-mini'
   analise.fonte_url = url
   

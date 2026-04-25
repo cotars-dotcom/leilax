@@ -242,23 +242,16 @@ Retornar no JSON: escopo_reforma, custo_reforma_estimado, alerta_sobrecap
 export async function pesquisarMercadoGPT(url, cidade, tipo, openaiKey, quartos = null, area_m2 = null) {
   if (!openaiKey) return null
 
-  // Cache de mercado 72h — evitar chamar ChatGPT para mesma URL
-  const cacheKey = `mkt_${(url||'').replace(/[^a-zA-Z0-9]/g,'_').slice(0,120)}`
-  try {
-    const { supabase } = await import('./supabase')
-    const { data: cached } = await supabase
-      .from('cache_mercado')
-      .select('dados, atualizado_em')
-      .eq('chave', cacheKey)
-      .maybeSingle()
-    if (cached?.atualizado_em) {
-      const horas = (Date.now() - new Date(cached.atualizado_em)) / 3_600_000
-      if (horas < 72) {
-        console.debug('[AXIS Cache] Mercado em cache para:', cacheKey)
-        return cached.dados
-      }
-    }
-  } catch(e) { console.warn('[AXIS motorIA] Cache mercado read:', e.message) }
+  // Sprint 41d-Bx: cache versionado. Antes era TTL via timestamp + 'cache_mercado'
+  // sem schema_version, então mudanças no formato de `dados` corrompiam silenciosamente.
+  const { buildCacheKey, lerCache, gravarCache, validarMercado, CACHE_TTL } = await import('./cacheVersionado.js')
+  const sufixoChave = (url||'').replace(/[^a-zA-Z0-9]/g,'_').slice(0,120)
+  const cacheKey = buildCacheKey('mercado_geral', sufixoChave)
+  const cached = await lerCache(cacheKey, 'mercado_geral', validarMercado)
+  if (cached) {
+    console.debug('[AXIS Cache] Mercado em cache válido para:', cacheKey)
+    return cached
+  }
 
   const prompt = `Você é um especialista em mercado imobiliário brasileiro.
 Sempre responda em português com acentos corretos (ã, ç, é, ê, ó, ô, í, ú, à).
@@ -429,18 +422,12 @@ Retorne APENAS JSON válido (sem markdown):
     } catch(e) { console.warn('[AXIS motorIA] Log uso GPT:', e.message) }
     // Salvar no cache com TTL variável por bairro
     try {
-      const { supabase } = await import('./supabase')
       const bairroCache = resultado?.bairro || ''
       const bairrosNobres = ['Savassi','Lourdes','Belvedere','Serra','Funcionários',
         'Buritis','Gutierrez','Mangabeiras','Santo Antônio','Jardim América']
-      const ttlHoras = bairrosNobres.includes(bairroCache) ? 168 : 72
-      const expiraEm = new Date(Date.now() + ttlHoras * 3600 * 1000).toISOString()
-      await supabase.from('cache_mercado').upsert({
-        chave: cacheKey,
-        dados: resultado,
-        atualizado_em: new Date().toISOString(),
-        expira_em: expiraEm
-      }, { onConflict: 'chave' })
+      // Sprint 41d-Bx: TTL diferenciado mas via helper versionado
+      const ttlMs = bairrosNobres.includes(bairroCache) ? CACHE_TTL.mercado_premium : CACHE_TTL.mercado_geral
+      await gravarCache(cacheKey, resultado, { ttlMs })
     } catch(e) { console.warn('[AXIS Cache] Falha ao salvar cache:', e.message) }
     return resultado
   } catch (e) {

@@ -1354,6 +1354,8 @@ function Lista({props,onNav,onDelete,trello,onUpdateProp}) {
           if (!texto || texto.length < 100) continue
           const analise = await analisarTextoJuridicoGemini(texto, doc.nome || doc.tipo, imovel, gKey || cKey)
           if (analise) {
+            // Sprint 41d-Bx: sinalizar quando OCR retornou schema incompleto
+            const status = analise._schema_incompleto ? 'analisado_parcial' : 'analisado'
             await salvarDocumentoJuridico({
               id: doc.id, imovel_id: imovel.id, tipo: doc.tipo,
               conteudo_texto: texto.substring(0, 5000),
@@ -1364,8 +1366,9 @@ function Lista({props,onNav,onDelete,trello,onUpdateProp}) {
               recomendacao_juridica: analise.recomendacao_juridica,
               pontos_positivos: analise.pontos_positivos || [],
               alertas_criticos: analise.alertas_criticos || [],
-              processado: true, status: 'analisado',
+              processado: true, status,
               analisado_em: new Date().toISOString(),
+              ocr_ausentes: analise._schema_incompleto ? (analise._ausentes || []) : null,
             }).catch(() => {})
             docsTotal++
           }
@@ -1800,7 +1803,7 @@ export default function App() {
   // ALL hooks MUST be before any conditional return (React Rules of Hooks)
   const [view,setView]=useState("dashboard")
   const [vp,setVp]=useState({})
-  const CACHE_VERSION = 'v41'  // v41: sprint41d completo — bug fixes + auditoria agentes + nova aba Financeiro
+  const CACHE_VERSION = 'v42'  // v42: sprint41d-Bx — circuit breaker + cache versionado + schema OCR
   const [props,setProps]=useState([])
   const [loaded,setL]=useState(false)
   const [toast,setToast]=useState(null)

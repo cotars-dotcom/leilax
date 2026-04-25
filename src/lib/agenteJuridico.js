@@ -275,14 +275,20 @@ Retorne APENAS JSON:
     {"url": "URL completa do PDF", "tipo": "edital|matricula|processo|certidao|outro", "nome": "nome descritivo"}
   ]
 }`
-      const { chamarGeminiCascata, parseJSONResposta } = await import('./constants.js')
+      const { chamarGeminiCascata, parseJSONResposta, SCHEMA_LINKS_DOCUMENTOS } = await import('./constants.js')
       const { texto: geminiTxt } = await chamarGeminiCascata(prompt, geminiKey, {
         maxTokens: 1024, timeout: 30000
       })
-      const match = geminiTxt.replace(/```json|```/g,'').trim().match(/\{[\s\S]*\}/)
-      if (match) {
-        const result = JSON.parse(match[0])
+      // Sprint 41d-Bx: parse + schema validation com fallback parcial
+      try {
+        const result = parseJSONResposta(geminiTxt, { schema: SCHEMA_LINKS_DOCUMENTOS })
         linksEncontrados = result.documentos || []
+      } catch (eSchema) {
+        // Schema incompleto mas tem `documentos`? Aceita parcial
+        if (eSchema.code === 'SCHEMA_INCOMPLETO' && Array.isArray(eSchema.parsed?.documentos)) {
+          linksEncontrados = eSchema.parsed.documentos
+        }
+        // else: linksEncontrados fica vazio, sem fingir que tinha algo
       }
     } catch(e) { console.warn('[AXIS Gemini links]', e.message) }
   }
@@ -404,16 +410,24 @@ Analise juridicamente este documento e retorne APENAS JSON válido (sem markdown
 }`
 
   try {
-    const { chamarGeminiCascata, parseJSONResposta, CLAUDE_HAIKU, ANTHROPIC_VERSION } = await import('./constants.js')
+    const { chamarGeminiCascata, parseJSONResposta, SCHEMA_OCR_DOCUMENTO, CLAUDE_HAIKU, ANTHROPIC_VERSION } = await import('./constants.js')
     const { texto } = await chamarGeminiCascata(prompt, geminiKey, { maxTokens: 2048, timeout: 45000 })
-    return parseJSONResposta(texto)
+    // Sprint 41d-Bx: validar schema antes de retornar — evita gravar OCR
+    // incompleto no banco (campos null em TimelineMatricula etc).
+    return parseJSONResposta(texto, { schema: SCHEMA_OCR_DOCUMENTO })
   } catch(e) {
     console.warn('[AXIS jurídico] Gemini análise:', e.message)
+    // Se o erro é SCHEMA_INCOMPLETO, expor para o orquestrador decidir
+    // (pode aceitar parcial em casos onde Texto está OK mas algum campo falta).
+    if (e.code === 'SCHEMA_INCOMPLETO' && e.parsed?.tipo_documento) {
+      console.warn('[AXIS jurídico] Schema incompleto mas com tipo_documento — retornando parcial:', e.ausentes)
+      return { ...e.parsed, _schema_incompleto: true, _ausentes: e.ausentes }
+    }
     // Fallback: tentar com Claude se disponível
     const claudeKey = typeof localStorage !== 'undefined' ? localStorage.getItem('axis-api-key') : null
     if (claudeKey && !geminiKey?.startsWith('sk-ant')) {
       try {
-        const { CLAUDE_HAIKU: _haiku, ANTHROPIC_VERSION: _av, parseJSONResposta: _parse } = await import('./constants.js')
+        const { CLAUDE_HAIKU: _haiku, ANTHROPIC_VERSION: _av, parseJSONResposta: _parse, SCHEMA_OCR_DOCUMENTO: _schema } = await import('./constants.js')
         const r2 = await fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
           headers: { 'Content-Type':'application/json','x-api-key':claudeKey,'anthropic-version':_av },
@@ -426,7 +440,15 @@ Analise juridicamente este documento e retorne APENAS JSON válido (sem markdown
         if (r2.ok) {
           const d2 = await r2.json()
           const txt2 = d2.content?.[0]?.text || ''
-          return _parse(txt2)
+          // Sprint 41d-Bx: também valida schema, mas em fallback aceita parcial
+          try {
+            return _parse(txt2, { schema: _schema })
+          } catch (eSchema) {
+            if (eSchema.code === 'SCHEMA_INCOMPLETO' && eSchema.parsed?.tipo_documento) {
+              return { ...eSchema.parsed, _schema_incompleto: true, _ausentes: eSchema.ausentes }
+            }
+            throw eSchema
+          }
         }
       } catch(e2) { console.warn('[AXIS jurídico] Claude fallback:', e2.message) }
     }
@@ -448,7 +470,7 @@ Se for matrícula, extraia também timeline_atos (array de atos registrais com d
 Retorne APENAS JSON com: tipo_documento, resumo, riscos_identificados (array com risco_id/descricao/gravidade/impacto_score), pontos_positivos, alertas_criticos, score_juridico_sugerido, score_juridico_delta, recomendacao_juridica, praca, parcelamento_aceito, parcelamento_detalhes, coproprietarios, area_construida_m2, elevador, nome_condominio, timeline_atos, parecer.`
 
   try {
-    const { MODELOS_GEMINI_PRO, parseJSONResposta } = await import('./constants.js')
+    const { MODELOS_GEMINI_PRO, parseJSONResposta, SCHEMA_OCR_DOCUMENTO } = await import('./constants.js')
     let resultado = null
     for (const modelo of MODELOS_GEMINI_PRO) {
       try {
@@ -470,7 +492,18 @@ Retorne APENAS JSON com: tipo_documento, resumo, riscos_identificados (array com
         if (r.ok) {
           const data = await r.json()
           const txt = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
-          resultado = parseJSONResposta(txt)
+          // Sprint 41d-Bx: validar schema. Se OCR retornar JSON sem
+          // tipo_documento ou resumo, é dado lixo — não grava no banco.
+          try {
+            resultado = parseJSONResposta(txt, { schema: SCHEMA_OCR_DOCUMENTO })
+          } catch (eSchema) {
+            if (eSchema.code === 'SCHEMA_INCOMPLETO' && eSchema.parsed?.tipo_documento) {
+              // Aceita parcial se ao menos identificou o tipo de documento
+              resultado = { ...eSchema.parsed, _schema_incompleto: true, _ausentes: eSchema.ausentes }
+            } else {
+              throw eSchema  // Tenta próximo modelo
+            }
+          }
           resultado._modelo = modelo
           break
         }

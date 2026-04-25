@@ -287,11 +287,79 @@ export async function chamarGeminiCascata(prompt, geminiKey, opts = {}) {
 }
 
 // ─── HELPER: parse JSON de resposta IA ───────────────────────────
-export function parseJSONResposta(texto) {
+/**
+ * Faz parse seguro de JSON retornado por LLM.
+ *
+ * Sprint 41d-Bx: aceita validador opcional `schema` que checa campos obrigatórios.
+ * Se o validador falhar, lança erro com lista de campos ausentes — evita gravar
+ * registros parcialmente preenchidos no banco (causa de bugs silenciosos no
+ * agente jurídico v2 quando OCR retorna JSON com campos faltando).
+ *
+ * @param {string} texto — resposta crua do LLM
+ * @param {Object} opts — { schema?: { obrigatorios: string[], descricao?: string } }
+ * @returns {Object} JSON parseado e validado
+ * @throws Error se JSON inválido ou campos obrigatórios ausentes
+ */
+export function parseJSONResposta(texto, opts = {}) {
   const clean = texto.replace(/```json|```/g, '').trim()
   const match = clean.match(/\{[\s\S]*\}/)
   if (!match) throw new Error('JSON não encontrado na resposta')
-  return JSON.parse(match[0])
+  let parsed
+  try {
+    parsed = JSON.parse(match[0])
+  } catch (e) {
+    throw new Error(`JSON malformado: ${e.message.substring(0, 100)}`)
+  }
+  // Validação de schema opcional
+  if (opts.schema?.obrigatorios) {
+    const ausentes = []
+    for (const campo of opts.schema.obrigatorios) {
+      const valor = parsed[campo]
+      // Considerado ausente: undefined, null, string vazia, array vazio
+      if (valor === undefined || valor === null || valor === '' ||
+          (Array.isArray(valor) && valor.length === 0 && opts.schema.aceitarArrayVazio !== true)) {
+        ausentes.push(campo)
+      }
+    }
+    if (ausentes.length > 0) {
+      const desc = opts.schema.descricao || 'JSON'
+      const err = new Error(`Schema ${desc} incompleto. Faltando: ${ausentes.join(', ')}`)
+      err.code = 'SCHEMA_INCOMPLETO'
+      err.ausentes = ausentes
+      err.parsed = parsed  // disponibiliza para fallback parcial
+      throw err
+    }
+  }
+  return parsed
+}
+
+// ─── SCHEMAS DOS OUTPUTS DE OCR ──────────────────────────────────────────
+// Definem campos OBRIGATÓRIOS — se o LLM omitir, parseJSONResposta lança erro
+// SCHEMA_INCOMPLETO em vez de gravar lixo no banco.
+
+export const SCHEMA_OCR_DOCUMENTO = {
+  descricao: 'OCR Documento Jurídico',
+  obrigatorios: ['tipo_documento', 'resumo'],
+  aceitarArrayVazio: true,  // riscos_identificados pode vir [] legitimamente (doc sem riscos)
+}
+
+export const SCHEMA_OCR_MATRICULA = {
+  descricao: 'OCR Matrícula',
+  obrigatorios: ['tipo_documento', 'resumo'],
+  aceitarArrayVazio: true,
+}
+
+export const SCHEMA_ANALISE_IMOVEL = {
+  descricao: 'Análise de Imóvel (motorIA)',
+  // Campos minimamente necessários para uma análise ser exibida ao usuário.
+  // valor_minimo e bairro são essenciais — sem eles a análise não tem sentido.
+  obrigatorios: ['valor_minimo', 'bairro'],
+}
+
+export const SCHEMA_LINKS_DOCUMENTOS = {
+  descricao: 'Links de documentos extraídos',
+  obrigatorios: ['documentos'],
+  aceitarArrayVazio: true,  // página pode legitimamente não ter docs
 }
 
 // ─── IRPF GANHO DE CAPITAL — ISENÇÃO ────────────────────────────────────────
