@@ -95,13 +95,15 @@ export async function salvarPDFNoStorage(blob, imovelId, nomeArquivo, contentTyp
 export async function analisarDocumentoCompleto(texto, nomeArq, imovel, geminiKey, claudeKey) {
   if (!texto || texto.length < 50) return null
 
-  // Fallback: tentar env var se chave não foi passada diretamente
+  // Fallback: env var ou RPC carregar_keys_seguro
+  const { getApiKeys: _getApiKeysDoc } = await import('./supabase.js')
+  const _serverKeys = (!geminiKey || !claudeKey) ? await _getApiKeysDoc() : null
   const gKey = geminiKey
     || (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GEMINI_API_KEY)
-    || (typeof localStorage !== 'undefined' && localStorage.getItem('axis-gemini-key'))
+    || _serverKeys?.gemini
     || ''
   const cKey = claudeKey
-    || (typeof localStorage !== 'undefined' && localStorage.getItem('axis-api-key'))
+    || _serverKeys?.claude
     || ''
   
   const prompt = `Você é especialista em direito imobiliário e leilões judiciais no Brasil (Minas Gerais).
@@ -187,7 +189,8 @@ Retorne APENAS JSON válido com esta estrutura EXATA:
   }
 
   // Fallback DeepSeek (barato e eficaz para análise de texto)
-  const deepseekKey = typeof localStorage !== 'undefined' ? localStorage.getItem('axis-deepseek-key') : null
+  const { getApiKey: _getApiKeyDS } = await import('./supabase.js')
+  const deepseekKey = await _getApiKeyDS('deepseek')
   if (deepseekKey) {
     try {
       const r = await fetch('https://api.deepseek.com/chat/completions', {
@@ -361,17 +364,15 @@ function analisarDocumentoPorRegex(texto, nomeArq) {
 
 // ─── PIPELINE COMPLETO: URL → Storage → Análise → Banco ───────────────────
 export async function processarDocumentoCompleto({ url, nome, tipo, imovel, geminiKey, claudeKey, openaiKey, onProgress }) {
-  // Fallback: env vars e localStorage se chaves não passadas
+  // Fallback: env vars ou RPC carregar_keys_seguro
+  const { getApiKeys: _getApiKeysProc } = await import('./supabase.js')
+  const _srvKeys = (!geminiKey || !claudeKey || !openaiKey) ? await _getApiKeysProc() : null
   geminiKey = geminiKey
     || (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GEMINI_API_KEY)
-    || (typeof localStorage !== 'undefined' && localStorage.getItem('axis-gemini-key'))
+    || _srvKeys?.gemini
     || ''
-  claudeKey = claudeKey
-    || (typeof localStorage !== 'undefined' && localStorage.getItem('axis-api-key'))
-    || ''
-  openaiKey = openaiKey
-    || (typeof localStorage !== 'undefined' && localStorage.getItem('axis-openai-key'))
-    || ''
+  claudeKey = claudeKey || _srvKeys?.claude || ''
+  openaiKey = openaiKey || _srvKeys?.openai || ''
 
   onProgress?.(`🔍 Iniciando processamento de ${nome}...`)
   

@@ -1098,7 +1098,8 @@ Retorne SOMENTE este JSON (sem texto adicional):
 }`
 
     // Se chave Gemini disponível, usar Gemini Flash (mais barato que Haiku)
-    const geminiKey = typeof localStorage !== 'undefined' ? localStorage.getItem('axis-gemini-key') : null
+    const { getApiKey: _getApiKeyFotos } = await import('./supabase.js')
+    const geminiKey = await _getApiKeyFotos('gemini')
     if (geminiKey) {
       try {
         const geminiRes = await fetch(
@@ -1286,26 +1287,14 @@ export async function analisarImovelCompleto(url, claudeKey, openaiKey, parametr
   // ─── CASCATA DE CUSTO ZERO ─────────────────────────────────────────────────
   // Tier 1: Gemini Flash (~$0.002) — 99% mais barato que Claude Sonnet
   const forceClassic = opcoes.forceClassic === true  // opcoes.forceClassic=true força Claude Sonnet diretamente
-  // Tentar sync de chaves do banco se localStorage vazio
-  let geminiKey = typeof localStorage !== 'undefined' ? localStorage.getItem('axis-gemini-key') : null
-  let deepseekKey = typeof localStorage !== 'undefined' ? localStorage.getItem('axis-deepseek-key') : null
-  if (!geminiKey || !deepseekKey) {
-    try {
-      const { loadApiKeys, supabase: sb } = await import('./supabase.js')
-      const { data: { user } } = await sb.auth.getUser()
-      if (user) {
-        const keys = await loadApiKeys(user.id)
-        if (!geminiKey && keys.geminiKey) {
-          geminiKey = keys.geminiKey
-          if (typeof localStorage !== 'undefined') localStorage.setItem('axis-gemini-key', geminiKey)
-        }
-        if (!deepseekKey && keys.deepseekKey) {
-          deepseekKey = keys.deepseekKey
-          if (typeof localStorage !== 'undefined') localStorage.setItem('axis-deepseek-key', deepseekKey)
-        }
-      }
-    } catch(e) { console.warn('[AXIS motorIA] sync chaves:', e.message) }
-  }
+  // Sprint 43: chaves vivem no servidor — RPC carregar_keys_seguro via getApiKeys()
+  let geminiKey = null, deepseekKey = null
+  try {
+    const { getApiKeys } = await import('./supabase.js')
+    const keys = await getApiKeys()
+    geminiKey = keys?.gemini || null
+    deepseekKey = keys?.deepseek || null
+  } catch(e) { console.warn('[AXIS motorIA] sync chaves:', e.message) }
   // Validate key format
   if (geminiKey && geminiKey.length < 20) { console.warn('[AXIS] Gemini key muito curta'); geminiKey = null }
   if (deepseekKey && deepseekKey.length < 20) { console.warn('[AXIS] DeepSeek key muito curta'); deepseekKey = null }
@@ -1638,7 +1627,8 @@ DADOS DE BAIRRO (parcial):
   let fotosResult = { fotos: [], foto_principal: null }
   try {
     const { buscarFotosImovel } = await import('./buscadorFotos.js')
-    const gemKey = typeof localStorage !== 'undefined' ? localStorage.getItem('axis-gemini-key') : null
+    const { getApiKey: _getApiKeyBuscaFotos } = await import('./supabase.js')
+    const gemKey = await _getApiKeyBuscaFotos('gemini')
     fotosResult = await buscarFotosImovel({ fonte_url: url }, gemKey, (msg) => progress(`📷 ${msg}`))
     if (!fotosResult.fotos?.length && claudeKey) {
       // Fallback para Haiku se buscador não encontrou nada
@@ -1651,7 +1641,8 @@ DADOS DE BAIRRO (parcial):
 
   // ── ANÁLISE DE FOTOS VIA GEMINI VISION — detectar atributos visuais ──
   if (fotosResult.fotos?.length > 0) {
-    const gemKeyVision = typeof localStorage !== 'undefined' ? localStorage.getItem('axis-gemini-key') : null
+    const { getApiKey: _getApiKeyVision } = await import('./supabase.js')
+    const gemKeyVision = await _getApiKeyVision('gemini')
     if (gemKeyVision) {
       try {
         progress('🔍 Analisando fotos do imóvel (Gemini Vision)...')

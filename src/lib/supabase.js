@@ -62,6 +62,7 @@ export async function signIn(email, password) {
 export async function signOut() {
   const { error } = await supabase.auth.signOut()
   if (error) throw error
+  try { clearKeyCache() } catch {}
 }
 
 export async function getSession() {
@@ -555,25 +556,87 @@ export async function saveObservacao(obs) {
 }
 
 // == APP SETTINGS (API KEYS) ==
+// Sprint 43 — chaves vivem no servidor (RPC carregar_keys_seguro).
+// Cache singleton em memória durante a sessão; nunca tocar localStorage.
 
-export async function loadApiKeys(userId) {
+let _apiKeysCache = null
+let _apiKeysPromise = null
+const LEGACY_KEY_STORAGE = ['axis-api-key','axis-openai-key','axis-gemini-key','axis-deepseek-key','axis-trello-key']
+
+async function _fetchKeysViaRpc() {
   try {
-    const { data } = await supabase
-      .from('app_settings')
-      .select('valor')
-      .eq('chave', `api_keys_${userId}`)
-      .single()
-    if (data?.valor) {
-      const keys = JSON.parse(data.valor)
-      return {
-        claudeKey: keys.claude || '',
-        openaiKey: keys.openai || '',
-        geminiKey: keys.gemini || '',
-        deepseekKey: keys.deepseek || ''
-      }
+    const { data, error } = await supabase.rpc('carregar_keys_seguro')
+    if (error) { console.warn('[AXIS] carregar_keys_seguro:', error.message); return null }
+    if (!data) return null
+    if (Array.isArray(data?.localstorage_keys_a_limpar)) {
+      try {
+        data.localstorage_keys_a_limpar.forEach(k => { try { localStorage.removeItem(k) } catch {} })
+      } catch {}
+    } else if (data?.limpar_localstorage) {
+      try { LEGACY_KEY_STORAGE.forEach(k => { try { localStorage.removeItem(k) } catch {} }) } catch {}
     }
-  } catch(e) { console.warn('[AXIS supabase] Load API keys:', e.message) }
-  return { claudeKey: '', openaiKey: '', geminiKey: '', deepseekKey: '' }
+    const k = data?.keys || {}
+    return {
+      claude:   k.claude   ?? k.claudeKey   ?? '',
+      openai:   k.openai   ?? k.openaiKey   ?? '',
+      gemini:   k.gemini   ?? k.geminiKey   ?? '',
+      deepseek: k.deepseek ?? k.deepseekKey ?? '',
+      trello:   k.trello   ?? k.trelloKey   ?? '',
+    }
+  } catch(e) {
+    console.warn('[AXIS] carregar_keys_seguro exception:', e.message)
+    return null
+  }
+}
+
+/**
+ * Retorna o objeto completo de chaves do usuário corrente (RPC + cache).
+ * Provider names: 'claude' | 'openai' | 'gemini' | 'deepseek' | 'trello'.
+ */
+export async function getApiKeys() {
+  if (_apiKeysCache) return _apiKeysCache
+  if (_apiKeysPromise) return _apiKeysPromise
+  _apiKeysPromise = (async () => {
+    const keys = await _fetchKeysViaRpc()
+    _apiKeysCache = keys || { claude:'', openai:'', gemini:'', deepseek:'', trello:'' }
+    _apiKeysPromise = null
+    return _apiKeysCache
+  })()
+  return _apiKeysPromise
+}
+
+/** Retorna a key de um provider específico (atalho sobre getApiKeys). */
+export async function getApiKey(provider) {
+  if (!provider) return ''
+  const keys = await getApiKeys()
+  return keys?.[provider] || ''
+}
+
+/** Limpa o cache de chaves — chamar no signOut e após persistApiKeys(). */
+export function clearKeyCache() {
+  _apiKeysCache = null
+  _apiKeysPromise = null
+}
+
+/** Remove qualquer key axis-*-key remanescente do localStorage (Bug AG). */
+export function purgeLegacyKeyStorage() {
+  if (typeof localStorage === 'undefined') return
+  LEGACY_KEY_STORAGE.forEach(k => { try { localStorage.removeItem(k) } catch {} })
+}
+
+/**
+ * @deprecated use getApiKeys() / getApiKey(provider).
+ * Mantida apenas para compatibilidade com chamadores existentes —
+ * ignora userId e devolve as chaves do usuário autenticado via RPC.
+ */
+export async function loadApiKeys(_userId) {
+  const k = await getApiKeys()
+  return {
+    claudeKey: k.claude || '',
+    openaiKey: k.openai || '',
+    geminiKey: k.gemini || '',
+    deepseekKey: k.deepseek || ''
+  }
 }
 
 export async function persistApiKeys(userId, { claudeKey, openaiKey, geminiKey, deepseekKey = '' }) {
@@ -588,6 +651,7 @@ export async function persistApiKeys(userId, { claudeKey, openaiKey, geminiKey, 
       }),
       atualizado_em: new Date().toISOString()
     }, { onConflict: 'chave' })
+    clearKeyCache()
   } catch(e) { console.warn('[AXIS] persistApiKeys:', e.message) }
 }
 

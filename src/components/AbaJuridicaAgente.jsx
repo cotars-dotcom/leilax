@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { C, K, btn, card } from '../appConstants.js'
 import { supabase, getDocumentosJuridicos, salvarDocumentoJuridico, limparPDFsDuplicados,
-         reclassificarImovel, loadApiKeys } from '../lib/supabase.js'
+         reclassificarImovel, loadApiKeys, getApiKeys } from '../lib/supabase.js'
 import { buscarDocumentosAuto, analisarTextoJuridicoGemini,
          analisarPDFBase64Gemini, calcularNovoScoreJuridico } from '../lib/agenteJuridico.js'
 import { processarDocumentoCompleto } from '../lib/documentosPDF.js'
@@ -357,29 +357,19 @@ export default function AbaJuridicaAgente({ imovel, isAdmin, onReclassificado })
     getDocumentosJuridicos(imovel.id).then(setDocs).catch(() => {})
   }, [imovel?.id])
 
-  const geminiKey = () => localStorage.getItem('axis-gemini-key') || ''
-  const claudeKey = () => localStorage.getItem('axis-api-key') || ''
-
   const carregarDocs = async () => {
     const data = await getDocumentosJuridicos(imovel.id).catch(() => [])
     setDocs(data || [])
   }
 
   const syncChaves = async () => {
-    let gKey = geminiKey(), cKey = claudeKey()
-    let oKey = localStorage.getItem('axis-openai-key') || ''
-    if (!gKey || !cKey || !oKey) {
-      try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (user) {
-            const keys = await loadApiKeys(user.id)
-          if (keys.geminiKey) { gKey = keys.geminiKey; localStorage.setItem('axis-gemini-key', gKey) }
-          if (keys.claudeKey) { cKey = keys.claudeKey; localStorage.setItem('axis-api-key', cKey) }
-          if (keys.openaiKey) { oKey = keys.openaiKey; localStorage.setItem('axis-openai-key', oKey) }
-        }
-      } catch(e) { console.warn('[Juridico] Erro ao processar campo:', e) }
+    // Sprint 43: chaves vêm do servidor via RPC carregar_keys_seguro
+    const k = await getApiKeys().catch(() => null)
+    return {
+      gKey: k?.gemini || '',
+      cKey: k?.claude || '',
+      oKey: k?.openai || ''
     }
-    return { gKey, cKey, oKey }
   }
 
   const buscarAuto = async () => {
@@ -510,7 +500,8 @@ export default function AbaJuridicaAgente({ imovel, isAdmin, onReclassificado })
             }
           }
         } else if (tipo === 'imagem') {
-          const oKey = localStorage.getItem('axis-openai-key') || ''
+          const _kk = await getApiKeys().catch(() => null)
+          const oKey = _kk?.openai || ''
           const base64 = await new Promise((res, rej) => {
             const r = new FileReader(); r.onload = () => res(r.result.split(',')[1]); r.onerror = rej; r.readAsDataURL(file)
           })

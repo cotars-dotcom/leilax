@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, lazy, Suspense } from "react"
 import { C, K, RED, btn, inp, card, fmtC, fmtD, scoreColor, scoreLabel, scoreDisplay, recColor, mapDisplay, normalizarTextoAlerta, ESTRATEGIA_CONFIG, LIQUIDEZ_MAP } from "../appConstants.js"
-import { supabase, saveImovelCompleto, saveObservacao, loadApiKeys, logAtividade, criarLinkPublico, registrarResultadoLeilao, saveAvaliacao, getAvaliacoes } from "../lib/supabase.js"
+import { supabase, saveImovelCompleto, saveObservacao, loadApiKeys, getApiKey, getApiKeys, logAtividade, criarLinkPublico, registrarResultadoLeilao, saveAvaliacao, getAvaliacoes } from "../lib/supabase.js"
 // motorIA: import dinâmico em handleReanalyze
 // trelloService: import dinâmico em handleTrello
 import CalculadoraROI from "./CalculadoraROI.jsx"
@@ -304,7 +304,7 @@ function GaleriaFotos({ fotos = [], foto_principal = null, url = null, imovelId 
     setBuscando(true); setMsgFoto('')
     try {
       const { buscarFotosImovel } = await import('../lib/buscadorFotos.js')
-      const geminiKey = localStorage.getItem('axis-gemini-key') || ''
+      const geminiKey = await getApiKey('gemini')
       const resultado = await buscarFotosImovel({ fonte_url: url, id: imovelId }, geminiKey, setMsgFoto)
       if (resultado.fotos.length > 0 || resultado.foto_principal) {
         setFotosLocais(resultado.fotos)
@@ -632,8 +632,9 @@ function AbaArremates({ imovel }) {
   }, [imovel?.id])
 
   const buscar = async () => {
-    const openaiKey = localStorage.getItem('axis-openai-key') || ''
-    const geminiKey = localStorage.getItem('axis-gemini-key') || ''
+    const _kk = await getApiKeys()
+    const openaiKey = _kk?.openai || ''
+    const geminiKey = _kk?.gemini || ''
     if (!openaiKey && !geminiKey) { setMsg('Configure OpenAI ou Gemini em Admin → API Keys'); return }
     setLoading(true); setMsg('Pesquisando arremates similares...')
     try {
@@ -1104,6 +1105,7 @@ export default function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze
   const [avaliacoes, setAvaliacoes] = useState([])
   const [minhaAvaliacao, setMinhaAvaliacao] = useState(null)
   const [oportunidadesLeilao, setOportunidadesLeilao] = useState([])
+  const [keysDisponiveis, setKeysDisponiveis] = useState({ gemini:false, claude:false, openai:false, deepseek:false })
 
   useEffect(() => {
     if (!p?.id) return
@@ -1112,6 +1114,12 @@ export default function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze
       getAvaliacoes(p.id).then(setAvaliacoes).catch(() => {})
     })
   }, [p?.id])
+
+  useEffect(() => {
+    getApiKeys().then(k => setKeysDisponiveis({
+      gemini: !!k?.gemini, claude: !!k?.claude, openai: !!k?.openai, deepseek: !!k?.deepseek
+    })).catch(() => {})
+  }, [])
 
   // Buscar oportunidades melhores (leilão + mercado mais barato)
   useEffect(() => {
@@ -1203,7 +1211,7 @@ export default function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze
     const timer = setTimeout(async () => {
       try {
         const { buscarFotosImovel } = await import('../lib/buscadorFotos.js')
-        const geminiKey = localStorage.getItem('axis-gemini-key') || ''
+        const geminiKey = await getApiKey('gemini')
         const resultado = await buscarFotosImovel({ fonte_url: p.fonte_url, id: p.id }, geminiKey)
         if (resultado.fotos?.length > 0 || resultado.foto_principal) {
           if (onUpdateProp) onUpdateProp(p.id, { ...p, fotos: resultado.fotos, foto_principal: resultado.foto_principal })
@@ -1257,8 +1265,7 @@ export default function Detail({p,onDelete,onNav,trello,onUpdateProp,onReanalyze
     if (!isAdmin) return
     setGenSintese(true)
     try {
-      const keys = await loadApiKeys(session?.user?.id)
-      const geminiKey = keys?.gemini_key || localStorage.getItem('axis-gemini-key')
+      const geminiKey = await getApiKey('gemini')
       if (!geminiKey) { alert('Configure a chave Gemini em Admin → Diagnóstico'); return }
       const { chamarGeminiCascata, parseJSONResposta } = await import('../lib/constants.js')
       const prompt = `Você é analista de leilões judiciais imobiliários em BH/MG.
@@ -1294,21 +1301,10 @@ Responda apenas com o texto da síntese, sem JSON, sem markdown.`
 
   const handleReanalyze=async()=>{
     if(!p?.fonte_url){setMsg("⚠️ Imóvel sem URL de origem para reanalisar");return}
-    // Buscar chaves — localStorage primeiro, banco como fallback
-    let geminiKey = localStorage.getItem("axis-gemini-key") || ""
-    let claudeKey = localStorage.getItem("axis-api-key") || ""
-    // Sempre sincronizar chaves do banco — garante funcionamento em qualquer dispositivo
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        const keys = await loadApiKeys(user.id)
-        // Sobrescrever localStorage com banco (banco é fonte da verdade)
-        if (keys.geminiKey) { geminiKey = keys.geminiKey; localStorage.setItem('axis-gemini-key', geminiKey) }
-        if (keys.claudeKey) { claudeKey = keys.claudeKey; localStorage.setItem('axis-api-key', claudeKey) }
-        if (keys.openaiKey) localStorage.setItem('axis-openai-key', keys.openaiKey)
-        if (keys.deepseekKey) localStorage.setItem('axis-deepseek-key', keys.deepseekKey)
-      }
-    } catch(e) { console.warn('[AXIS] Sync chaves do banco:', e.message) }
+    // Sprint 43: chaves vêm do servidor (RPC carregar_keys_seguro)
+    const _keys = await getApiKeys()
+    const geminiKey = _keys?.gemini || ''
+    const claudeKey = _keys?.claude || ''
     if(!geminiKey && !claudeKey){setMsg("⚠️ Configure ao menos a Gemini API Key em Admin → API Keys");return}
     // Verificar permissão de uso da API
     try {
@@ -1322,7 +1318,7 @@ Responda apenas com o texto da síntese, sem JSON, sem markdown.`
     if(!confirm("Reanalisar este imóvel com a IA? Os dados serão atualizados.")) return
     setReanalyzing(true);setMsg("")
     try {
-      const openaiKey=localStorage.getItem("axis-openai-key")||""
+      const openaiKey = _keys?.openai || ''
       let novaAnalise
       // Cascata: Gemini (~$0.002) → Claude Sonnet (fallback)
       if (geminiKey) {
@@ -1461,8 +1457,8 @@ for (const s of SCORES) {
         {isAdmin&&<>
               <button style={{...btn("s"),background:`${K.amb}15`,color:K.amb,border:`1px solid ${K.amb}30`}} onClick={handleReanalyze} disabled={reanalyzing}>
                 {reanalyzing?`⏳ ${reStep||'Reanalisando...'}`:
-                  localStorage.getItem("axis-gemini-key")?"🤖 Reanalisar (Gemini)":
-                  localStorage.getItem("axis-api-key")?"🔄 Reanalisar (Claude)":"🔄 Reanalisar"}
+                  keysDisponiveis.gemini?"🤖 Reanalisar (Gemini)":
+                  keysDisponiveis.claude?"🔄 Reanalisar (Claude)":"🔄 Reanalisar"}
               </button>
             </>}
         {isAdmin&&<div style={{position:'relative',display:'inline-block'}}>

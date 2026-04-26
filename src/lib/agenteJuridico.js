@@ -424,7 +424,8 @@ Analise juridicamente este documento e retorne APENAS JSON válido (sem markdown
       return { ...e.parsed, _schema_incompleto: true, _ausentes: e.ausentes }
     }
     // Fallback: tentar com Claude se disponível
-    const claudeKey = typeof localStorage !== 'undefined' ? localStorage.getItem('axis-api-key') : null
+    const { getApiKey: _getApiKeyClaude } = await import('./supabase.js')
+    const claudeKey = await _getApiKeyClaude('claude')
     if (claudeKey && !geminiKey?.startsWith('sk-ant')) {
       try {
         const { CLAUDE_HAIKU: _haiku, ANTHROPIC_VERSION: _av, parseJSONResposta: _parse, SCHEMA_OCR_DOCUMENTO: _schema } = await import('./constants.js')

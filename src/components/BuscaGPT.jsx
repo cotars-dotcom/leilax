@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useIsMobile } from "../hooks/useIsMobile.js";
 import { MODELOS_GEMINI } from "../lib/constants.js";
+import { getApiKeys, persistApiKeys, clearKeyCache, supabase } from "../lib/supabase.js";
 
 const K = {
   bg:"#080B10", s1:"#111620", s2:"#171E2C", bd:"#1C2438",
@@ -112,15 +113,37 @@ export default function BuscaGPT({ onAnalisar }) {
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState(null);
   const [error, setError] = useState("");
-  const [openaiKey, setOpenaiKey] = useState(() => localStorage.getItem("axis-openai-key") || "");
-  const geminiKey = localStorage.getItem("axis-gemini-key") || "";
+  const [openaiKey, setOpenaiKey] = useState("");
+  const [geminiKey, setGeminiKey] = useState("");
   const [showKey, setShowKey] = useState(false);
 
-  const saveKey = (k) => { setOpenaiKey(k); localStorage.setItem("axis-openai-key", k); };
+  useEffect(() => {
+    getApiKeys().then(k => {
+      setOpenaiKey(k?.openai || "");
+      setGeminiKey(k?.gemini || "");
+    }).catch(() => {});
+  }, []);
+
+  // Persiste no Supabase (RPC); não toca localStorage.
+  const saveKey = async (k) => {
+    setOpenaiKey(k);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const cur = await getApiKeys();
+        await persistApiKeys(user.id, {
+          claudeKey: cur?.claude || '',
+          openaiKey: k,
+          geminiKey: cur?.gemini || '',
+          deepseekKey: cur?.deepseek || ''
+        });
+        clearKeyCache();
+      }
+    } catch (e) { console.warn('[BuscaGPT] saveKey:', e.message); }
+  };
 
   const buscar = async () => {
     if (!cidade.trim()) { setError("Informe a cidade"); return; }
-    const geminiKey = localStorage.getItem("axis-gemini-key") || ""
     if (!openaiKey.trim() && !geminiKey) { setError("Configure a API Key do ChatGPT ou Gemini"); setShowKey(true); return; }
     // Verificar permissão de uso da API
     try {

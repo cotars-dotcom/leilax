@@ -134,11 +134,18 @@ async function pingClaude(claudeKey) {
 export async function rodarHealthCheck(keys = {}) {
   const inicio = new Date().toISOString()
 
-  // Carregar chaves do localStorage se não passadas
-  const geminiKey   = keys.geminiKey   ?? (typeof localStorage !== 'undefined' ? localStorage.getItem('axis-gemini-key')   : null)
-  const deepseekKey = keys.deepseekKey ?? (typeof localStorage !== 'undefined' ? localStorage.getItem('axis-deepseek-key') : null)
-  const openaiKey   = keys.openaiKey   ?? (typeof localStorage !== 'undefined' ? localStorage.getItem('axis-openai-key')   : null)
-  const claudeKey   = keys.claudeKey   ?? (typeof localStorage !== 'undefined' ? localStorage.getItem('axis-api-key')      : null)
+  // Carregar chaves do servidor (RPC carregar_keys_seguro) se não passadas
+  let serverKeys = null
+  if (!keys.geminiKey || !keys.deepseekKey || !keys.openaiKey || !keys.claudeKey) {
+    try {
+      const { getApiKeys } = await import('./supabase.js')
+      serverKeys = await getApiKeys()
+    } catch(e) { console.warn('[AXIS healthCheck] getApiKeys:', e.message) }
+  }
+  const geminiKey   = keys.geminiKey   ?? serverKeys?.gemini   ?? null
+  const deepseekKey = keys.deepseekKey ?? serverKeys?.deepseek ?? null
+  const openaiKey   = keys.openaiKey   ?? serverKeys?.openai   ?? null
+  const claudeKey   = keys.claudeKey   ?? serverKeys?.claude   ?? null
 
   // Disparar pings em paralelo (cada um para um servidor diferente — sem conflito de rate limit)
   // Pings são leves (5 tokens) e usam quotas distintas por provedor.

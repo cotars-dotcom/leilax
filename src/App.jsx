@@ -6,7 +6,7 @@ import { useIsMobile } from "./hooks/useIsMobile.js"
 const LazyBuscaGPT = lazy(() => import('./components/BuscaGPT.jsx'))
 import { useAuth } from "./lib/AuthContext.jsx"
 import Login from "./pages/Login.jsx"
-import { supabase, getImoveis, deleteImovel, persistApiKeys, verificarImovelDuplicado, getDocumentosJuridicos, salvarDocumentoJuridico, getBancoArquivados, desarquivarImovel, saveImovelCompleto, gerarAxisId, arquivarImovel, signOut } from "./lib/supabase.js"
+import { supabase, getImoveis, deleteImovel, persistApiKeys, verificarImovelDuplicado, getDocumentosJuridicos, salvarDocumentoJuridico, getBancoArquivados, desarquivarImovel, saveImovelCompleto, gerarAxisId, arquivarImovel, signOut, getApiKey, getApiKeys, clearKeyCache, purgeLegacyKeyStorage } from "./lib/supabase.js"
 import { detectarTipoTransacao, isMercadoDireto } from "./lib/detectarFonte.js"
 const LazyTarefas = lazy(() => import('./pages/Tarefas.jsx'))
 const LazySharedViewer = lazy(() => import('./components/SharedViewer.jsx'))
@@ -493,31 +493,30 @@ function ModalAuditoriaTrello({ config, imoveis, onClose }) {
 
 // ── API KEY MODAL ─────────────────────────────────────────────────────────────
 function ApiKeyModal({onClose, session}) {
- const [key,setKey]=useState(localStorage.getItem("axis-api-key")||"")
- const [oaiKey,setOaiKey]=useState(localStorage.getItem("axis-openai-key")||"")
- const [geminiKey,setGeminiKey]=useState(localStorage.getItem("axis-gemini-key")||"")
- const [deepseekKey,setDeepseekKey]=useState(localStorage.getItem("axis-deepseek-key")||"")
+ const [key,setKey]=useState("")
+ const [oaiKey,setOaiKey]=useState("")
+ const [geminiKey,setGeminiKey]=useState("")
+ const [deepseekKey,setDeepseekKey]=useState("")
  const [modoTeste,setModoTeste]=useState(localStorage.getItem('axis-modo-teste')==='true')
  const [saving,setSaving]=useState(false)
- // Carregar do Supabase ao abrir (se logado)
+ // Sprint 43: chaves vivem no servidor — carregar via RPC carregar_keys_seguro
  useEffect(()=>{
-   if(!session?.user?.id) return
-   import('./lib/supabase.js').then(({loadApiKeys})=>{
-     loadApiKeys(session.user.id).then(({claudeKey,openaiKey,geminiKey,deepseekKey})=>{
-       if(claudeKey){setKey(claudeKey);localStorage.setItem('axis-api-key',claudeKey)}
-       if(openaiKey){setOaiKey(openaiKey);localStorage.setItem('axis-openai-key',openaiKey)}
-       if(geminiKey){setGeminiKey(geminiKey);localStorage.setItem('axis-gemini-key',geminiKey)}
-       if(deepseekKey){setDeepseekKey(deepseekKey);localStorage.setItem('axis-deepseek-key',deepseekKey)}
-     })
-   })
- },[session])
+   getApiKeys().then(k=>{
+     setKey(k?.claude||'')
+     setOaiKey(k?.openai||'')
+     setGeminiKey(k?.gemini||'')
+     setDeepseekKey(k?.deepseek||'')
+   }).catch(()=>{})
+ },[session?.user?.id])
  const save=async()=>{
    const k=key.trim(),ok=oaiKey.trim()
-   if(k)localStorage.setItem("axis-api-key",k)
-   if(ok)localStorage.setItem("axis-openai-key",ok)
-   if(session?.user?.id&&(k||geminiKey||deepseekKey)){
+   if(session?.user?.id){
      setSaving(true)
-     try{await persistApiKeys(session.user.id,{claudeKey:k,openaiKey:ok,geminiKey:geminiKey||'',deepseekKey:deepseekKey||''})}catch(e){console.warn('[AXIS] save keys:',e)}finally{setSaving(false)}
+     try{
+       await persistApiKeys(session.user.id,{claudeKey:k,openaiKey:ok,geminiKey:geminiKey||'',deepseekKey:deepseekKey||''})
+       clearKeyCache()
+     }catch(e){console.warn('[AXIS] save keys:',e)}
+     finally{setSaving(false)}
    }
    onClose()
  }
@@ -528,9 +527,8 @@ function ApiKeyModal({onClose, session}) {
         {[
           ['Claude', key, 'claude'],
           ['OpenAI', oaiKey, 'openai'],
-          ['Gemini', localStorage.getItem('axis-gemini-key')||'', 'gemini'],
-          ['DeepSeek', localStorage.getItem('axis-deepseek-key')||'', 'deepseek'],
-          ['Trello', localStorage.getItem('axis-trello-key')||'', 'trello'],
+          ['Gemini', geminiKey, 'gemini'],
+          ['DeepSeek', deepseekKey, 'deepseek'],
         ].map(([label, val]) => (
           <div key={label} style={{
             display:'flex',alignItems:'center',gap:4,
@@ -566,14 +564,14 @@ function ApiKeyModal({onClose, session}) {
  </div>
  <div style={{marginTop:"16px",marginBottom:"8px"}}>
   <div style={{fontSize:"10px",color:K.t3,textTransform:"uppercase",letterSpacing:"1px",marginBottom:"5px"}}>Gemini API Key — motor principal (~R$0,03)</div>
-  <input style={inp()} type="password" placeholder="AIza..." value={geminiKey} onChange={e=>{setGeminiKey(e.target.value);localStorage.setItem('axis-gemini-key',e.target.value||'')}}/>
+  <input style={inp()} type="password" placeholder="AIza..." value={geminiKey} onChange={e=>setGeminiKey(e.target.value)}/>
  </div>
  <div style={{fontSize:"11px",color:K.t3,marginBottom:"18px"}}>
   Obtenha grátis em: <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" style={{color:K.blue}}>aistudio.google.com</a> · Motor principal — analisa + fotos
  </div>
  <div style={{marginTop:"16px",marginBottom:"8px"}}>
   <div style={{fontSize:"10px",color:K.t3,textTransform:"uppercase",letterSpacing:"1px",marginBottom:"5px"}}>DeepSeek API Key — fallback (~R$0,08)</div>
-  <input style={inp()} type="password" placeholder="sk-..." value={deepseekKey} onChange={e=>{setDeepseekKey(e.target.value);localStorage.setItem('axis-deepseek-key',e.target.value||'')}}/>
+  <input style={inp()} type="password" placeholder="sk-..." value={deepseekKey} onChange={e=>setDeepseekKey(e.target.value)}/>
  </div>
  <div style={{fontSize:"11px",color:K.t3,marginBottom:"18px"}}>
   Opcional: <a href="https://platform.deepseek.com/api_keys" target="_blank" rel="noopener noreferrer" style={{color:K.blue}}>platform.deepseek.com</a> · Usado se Gemini falhar
@@ -608,17 +606,16 @@ function NovoImovel({onSave,onCancel,onNav,trello,parametrosBanco,criteriosBanco
   const fileRef=useRef(null)
 
   // Indicar qual motor IA será usado — feedback antes de analisar
-  const motorHint = (() => {
-    const g = localStorage.getItem('axis-gemini-key')
-    const d = localStorage.getItem('axis-deepseek-key')
-    const o = localStorage.getItem('axis-openai-key')
-    const cl = localStorage.getItem('axis-api-key')
-    if (g) return '⚡ Gemini 2.5 Flash'
-    if (d) return '🤖 DeepSeek V3'
-    if (o) return '🤖 GPT-4o-mini'
-    if (cl) return '🤖 Claude Sonnet'
-    return null
-  })()
+  const [motorHint, setMotorHint] = useState(null)
+  useEffect(() => {
+    getApiKeys().then(k => {
+      if (k?.gemini) setMotorHint('⚡ Gemini 2.5 Flash')
+      else if (k?.deepseek) setMotorHint('🤖 DeepSeek V3')
+      else if (k?.openai) setMotorHint('🤖 GPT-4o-mini')
+      else if (k?.claude) setMotorHint('🤖 Claude Sonnet')
+      else setMotorHint(null)
+    }).catch(() => {})
+  }, [])
 
   const analyze = async () => {
     if(!url.trim()){setError("Cole o link do leilão");return}
@@ -647,7 +644,7 @@ function NovoImovel({onSave,onCancel,onNav,trello,parametrosBanco,criteriosBanco
       const { isCondominioPage, extrairLinksCondominio } = await import('./lib/scraperImovel.js')
       if (isCondominioPage(urlTrimmed)) {
         setLoading(true); setStep('🏢 Página de condomínio detectada — buscando imóveis individuais...')
-        const geminiKey = localStorage.getItem("axis-gemini-key") || ""
+        const geminiKey = await getApiKey('gemini')
         const info = await extrairLinksCondominio(urlTrimmed, geminiKey)
         setLoading(false)
 
@@ -676,8 +673,9 @@ function NovoImovel({onSave,onCancel,onNav,trello,parametrosBanco,criteriosBanco
               for (let i = 0; i < info.links.length; i++) {
                 setStep(`🏠 Analisando imóvel ${i + 1}/${info.links.length}...`)
                 try {
-                  const openaiKey = localStorage.getItem("axis-openai-key") || ""
-                  const claudeKeyReal = localStorage.getItem("axis-api-key") || ""
+                  const _kk = await getApiKeys()
+                  const openaiKey = _kk?.openai || ''
+                  const claudeKeyReal = _kk?.claude || ''
                   const { analisarImovelCompleto: _analisarImovelCompleto } = await import('./lib/motorIA.js')
                   const data = await _analisarImovelCompleto(info.links[i], claudeKeyReal, openaiKey, parametrosBanco, criteriosBanco, (msg) => setStep(`[${i+1}/${info.links.length}] ${msg}`), [], null, null)
                   data.fonte_url = info.links[i]
@@ -711,8 +709,9 @@ function NovoImovel({onSave,onCancel,onNav,trello,parametrosBanco,criteriosBanco
                 try {
                   // Se tem link individual → usar pipeline normal
                   if (im.link && im.link.includes('/imovel/')) {
-                    const openaiKey = localStorage.getItem("axis-openai-key") || ""
-                    const claudeKeyReal = localStorage.getItem("axis-api-key") || ""
+                    const _kk2 = await getApiKeys()
+                    const openaiKey = _kk2?.openai || ''
+                    const claudeKeyReal = _kk2?.claude || ''
                     const { analisarImovelCompleto: _analisarImovelCompleto } = await import('./lib/motorIA.js')
                     const data = await _analisarImovelCompleto(im.link, claudeKeyReal, openaiKey, parametrosBanco, criteriosBanco, (msg) => setStep(`[${i+1}/${imoveisGrounding.length}] ${msg}`), [], null, null)
                     data.fonte_url = im.link
@@ -767,9 +766,10 @@ function NovoImovel({onSave,onCancel,onNav,trello,parametrosBanco,criteriosBanco
         }
       }
     } catch(e) { console.warn('[AXIS] Detecção condomínio:', e.message) }
-    const hasKey = localStorage.getItem("axis-api-key")
-    const hasGemini = localStorage.getItem("axis-gemini-key")
-    const hasDeepseek = localStorage.getItem("axis-deepseek-key")
+    const _allKeys = await getApiKeys()
+    const hasKey = _allKeys?.claude
+    const hasGemini = _allKeys?.gemini
+    const hasDeepseek = _allKeys?.deepseek
     if(!hasKey && !hasGemini && !hasDeepseek){setError("Configure ao menos uma chave de IA nas Configurações (⚙️): Gemini (grátis), DeepSeek ou Claude.");return}
     // Verificar permissão de uso da API
     try {
@@ -797,8 +797,8 @@ function NovoImovel({onSave,onCancel,onNav,trello,parametrosBanco,criteriosBanco
     setStep("🔍 Buscando informações do imóvel...")
     try {
       setStep("🧠 IA analisando: score, risco jurídico, mercado...")
-      const openaiKey = localStorage.getItem("axis-openai-key") || ""
-      const claudeKeyReal = localStorage.getItem("axis-api-key") || ""
+      const openaiKey = _allKeys?.openai || ''
+      const claudeKeyReal = _allKeys?.claude || ''
         const { analisarImovelCompleto: _analisarImovelCompleto } = await import('./lib/motorIA.js')
         const data = await _analisarImovelCompleto(url.trim(), claudeKeyReal, openaiKey, parametrosBanco, criteriosBanco, (msg) => setStep(msg), anexos, null, null)
       data.fonte_url = url.trim()
@@ -1333,8 +1333,9 @@ function Lista({props,onNav,onDelete,trello,onUpdateProp}) {
     if (!selecionados.length) return
     if (!confirm(`Analisar documentos de ${selecionados.length} imóvel(is)? Isso pode levar alguns minutos.`)) return
     setLoteProcessando(true)
-    const gKey = localStorage.getItem('axis-gemini-key') || ''
-    const cKey = localStorage.getItem('axis-api-key') || ''
+    const _kk = await getApiKeys().catch(() => null)
+    const gKey = _kk?.gemini || ''
+    const cKey = _kk?.claude || ''
     if (!gKey && !cKey) { setLoteProgresso('⚠️ Configure Gemini ou Claude em Admin → API Keys'); setLoteProcessando(false); return }
 
     let ok = 0, errs = 0, docsTotal = 0
@@ -1814,7 +1815,7 @@ export default function App() {
   const [parametrosBanco,setParametrosBanco]=useState([])
   const [criteriosBanco,setCriteriosBanco]=useState([])
   const [urlParaAnalisar,setUrlParaAnalisar]=useState('')  // Link vindo da BuscaGPT
-  const [apiOk,setApiKey]=useState(localStorage.getItem("axis-api-key"))
+  const [apiOk,setApiKey]=useState(null)  // hidratado pelo useEffect via getApiKeys() — Sprint 43
   const isMobile = useIsMobile(900)
   const isPhone  = useIsMobile(480)
   useEffect(()=>{async function lp(){try{const{data:pr}=await supabase.from("parametros_score").select("*");if(pr)setParametrosBanco(pr)}catch(e){console.warn("parametros:",e)}}lp()
@@ -1838,29 +1839,32 @@ export default function App() {
     } catch {}
   }, [])
 
-  // Sync API keys from Supabase por usuário (cross-device)
+  // Sprint 43 — Bug AG: chaves vivem 100% no servidor (RPC carregar_keys_seguro).
+  // Hidrata o state apiKey da RPC e limpa qualquer key legada que esteja no localStorage.
   useEffect(()=>{
     if(!session?.user?.id) return
-    import('./lib/supabase.js').then(({loadApiKeys})=>{
-      loadApiKeys(session.user.id).then(({claudeKey,openaiKey,geminiKey,deepseekKey})=>{
-        if(claudeKey&&!localStorage.getItem('axis-api-key')){localStorage.setItem('axis-api-key',claudeKey);setApiKey(claudeKey)}
-        if(openaiKey&&!localStorage.getItem('axis-openai-key')){localStorage.setItem('axis-openai-key',openaiKey)}
-        // Sempre sincronizar do banco (sobrescreve localStorage para garantir consistência)
-      if(geminiKey){localStorage.setItem('axis-gemini-key',geminiKey)}
-      }).catch(()=>{})
-    }).catch(()=>{})
+    purgeLegacyKeyStorage()
+    getApiKeys().then(k=>{ if(k?.claude) setApiKey(k.claude) }).catch(()=>{})
   },[session])
 
   useEffect(()=>{(async()=>{
-    // Migração: leilax-* → axis-* (preservar dados do rebrand)
-    const MIGRATE = [['leilax-props','axis-props'],['leilax-trello','axis-trello'],['leilax-api-key','axis-api-key'],['leilax-openai-key','axis-openai-key']]
+    // Migração: leilax-* → axis-* (preservar dados do rebrand) — apenas non-key payloads
+    const MIGRATE = [['leilax-props','axis-props'],['leilax-trello','axis-trello']]
     for(const [old,nw] of MIGRATE){
       const v=localStorage.getItem(old)
       if(v&&!localStorage.getItem(nw)){localStorage.setItem(nw,v);localStorage.removeItem(old)}
     }
+    // Sprint 43: purgar keys legadas que possam ter sobrado de versões anteriores
+    purgeLegacyKeyStorage()
+    // Remover migrações antigas de API key — elas vão para o servidor agora
+    try { localStorage.removeItem('leilax-api-key'); localStorage.removeItem('leilax-openai-key') } catch {}
     const t=await stLoad("axis-trello")
     if(t)setTrello(t); React.startTransition(()=>setL(true))
-    if(!localStorage.getItem("axis-api-key")) setTimeout(()=>setShowApiKey(true),1000)
+    // Mostrar modal se nenhuma key configurada no servidor
+    try {
+      const _k = await getApiKeys()
+      if (!(_k?.claude || _k?.gemini || _k?.openai || _k?.deepseek)) setTimeout(()=>setShowApiKey(true),1000)
+    } catch {}
     if(session) {
       try {
         if(!localStorage.getItem('axis-migracao-concluida')){
