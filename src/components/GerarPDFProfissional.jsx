@@ -1,6 +1,15 @@
 /**
- * AXIS IP — Relatorio PDF Profissional v3
- * 7 paginas: Capa | Resumo | Investimento+2aPraca | Reformas | Juridico+Docs | Mercado | Fotos
+ * AXIS IP — Relatorio PDF Profissional v4 (sprint 45)
+ * 8 paginas: Capa | DECISAO OPERACIONAL | Resumo+Score | Investimento | Matriz | Juridico | Mercado | Fotos
+ *
+ * v4 changelog:
+ * - Nova pagina 2 "Decisao Operacional" como resumo decisorio (tetos, sensibilidade, riscos, timeline)
+ * - Capa: linha de tetos abaixo do ROI (Flip / Locacao / Recomendado)
+ * - Pagina Investimento: nomes mais acionaveis, coluna LUCRO em R$
+ * - Riscos com probabilidades estimadas
+ * - Timeline operacional D+0 -> D+180
+ * - Comparacao 1a vs 2a praca expandida
+ * - Matriz reforma x revenda x ganho (lucro absoluto)
  */
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
@@ -90,7 +99,7 @@ export async function gerarPDFProfissional(p, onProgress = () => {}) {
   const holdingMensal = condoMensal + iptuMensal
   const holdingTotal = HOLDING_MESES_PADRAO * holdingMensal
   const score = parseFloat(p.score_total || 0)
-  const totalPg = 7
+  const totalPg = 8
 
   onProgress('Convertendo fotos...')
   const fotosRaw = [p.foto_principal, ...(p.fotos || [])].filter(Boolean)
@@ -124,6 +133,58 @@ export async function gerarPDFProfissional(p, onProgress = () => {}) {
 
   // Docs do agente juridico
   const docs = Array.isArray(p.resumo_documentos) ? p.resumo_documentos : []
+
+  // ============ CALCULOS PONTUAIS PARA NOVA PAGINA DECISAO (v4) ============
+  // Lucro absoluto por cenario (mercado pos-reforma - investimento total)
+  const fatoresValoriz = [1.00, 1.00, 1.08, 1.20]
+  const reformasCustos = [0, reformas[0]?.custo || 0, reformas[1]?.custo || 0, reformas[2]?.custo || 0]
+  const investsCenario = reformasCustos.map(c => lance + bd.totalCustos + c + bd.holding + bd.debitosArrematante)
+  const valoresPosReforma = fatoresValoriz.map(f => Math.round(mercado * f))
+  const lucrosCenario = investsCenario.map((inv, i) => valoresPosReforma[i] - inv)
+  const roisCenario = investsCenario.map((inv, i) => inv > 0 ? Math.round((valoresPosReforma[i] - inv) / inv * 1000) / 10 : 0)
+
+  // Melhor cenario flip (maior ROI positivo)
+  const melhorIdxFlip = roisCenario.reduce((bi, r, i) => r > roisCenario[bi] ? i : bi, 0)
+  const cenarioLabels = ['Sem Reforma', 'Reforma Basica', 'Reforma Media', 'Reforma Completa']
+
+  // Sensibilidade de lance: simula 5 niveis de lance
+  const lancesSensibilidade = lance > 0 ? [
+    Math.round(lance * 0.85),
+    lance,
+    Math.round(lance * 1.10),
+    Math.round(lance * 1.25),
+    Math.round(lance * 1.35)
+  ] : []
+  const sensRows = lancesSensibilidade.map(l => {
+    const reforma = reformasCustos[1] // basica como cenario base
+    const inv = l + Math.round(l * 0.155) + reforma + bd.holding // taxas ~15.5% + reforma + holding
+    const lucro = Math.round(mercado * 1.0) - inv
+    const roi = inv > 0 ? Math.round(lucro / inv * 1000) / 10 : 0
+    const yieldL = inv > 0 ? Math.round((aluguel * 12) / inv * 1000) / 10 : 0
+    return { lance: l, inv, lucro, roi, yieldL }
+  })
+
+  // Caixa necessario no dia (lance + custos imediatos)
+  const caixaDia = lance + bd.totalCustos
+
+  // Riscos com probabilidades estimadas (heuristica TJMG / boa pratica leiloes)
+  const riscosOp = [
+    { risco: 'Embargo / suspensao do leilao', prob: p.score_juridico >= 7 ? 5 : p.score_juridico >= 5 ? 12 : 25, mit: p.matricula_status === 'Regular' ? 'Cadeia regular, sem litigios' : 'Conferir matricula' },
+    { risco: 'Nao desocupacao amigavel', prob: p.ocupacao === 'desocupado' ? 8 : p.ocupacao === 'inquilino' ? 35 : p.ocupacao === 'devedor' ? 55 : 25, mit: p.ocupacao === 'desocupado' ? 'Desocupado conforme oficial' : 'Acao de imissao na posse' },
+    { risco: 'Lance superior na praca', prob: 35, mit: 'Teto operacional definido' },
+    { risco: 'Reforma estourar +30%', prob: 25, mit: 'Cenario base = refresh' },
+    { risco: 'Mercado correcao -10%', prob: 15, mit: p.mercado_tendencia === 'alta' ? 'Bairro em alta' : 'Monitorar' },
+  ]
+
+  // Timeline operacional
+  const timelineOp = [
+    { d: 'D+0', e: !eMercado ? `Leilao (${tem2aP && p.recomendacao === 'AGUARDAR' ? '2a praca' : '1a praca'})` : 'Compra fechada' },
+    { d: 'D+1', e: 'Pagamento integral + assinatura' },
+    { d: 'D+30', e: 'Carta arrematacao registrada' },
+    { d: 'D+45', e: 'Inicio reforma' },
+    { d: 'D+90', e: 'Fim reforma + anuncio' },
+    { d: `D+${(p.prazo_revenda_meses || 6) * 30}`, e: 'Revenda esperada' },
+  ]
 
   // ============ PAGINA 1 — CAPA ============
   onProgress('Gerando capa...')
@@ -175,9 +236,168 @@ export async function gerarPDFProfissional(p, onProgress = () => {}) {
     doc.setTextColor(...C.red); doc.text(`+${Math.abs(descMercado)}%`, 101, y)
   }
   if (!eMercado) { doc.setTextColor(...C.gray); doc.text('Avaliacao:', 110, y); doc.setTextColor(...C.navy); doc.text(fmt(avaliacao), 133, y) }
+  y += 8
+
+  // Linha de tetos (NOVO v4) — destaque acima de tudo
+  if (maoFlip > 0 || maoLoc > 0 || p.lance_maximo_definido > 0) {
+    doc.setFillColor(...C.navyL); doc.roundedRect(15, y, 180, 14, 2, 2, 'F')
+    doc.setFontSize(7); doc.setFont('helvetica', 'bold'); doc.setTextColor(...C.gray)
+    doc.text('LIMITES OPERACIONAIS DE LANCE', 20, y + 4.5)
+    doc.setFontSize(8); doc.setFont('helvetica', 'normal')
+    let lx = 20
+    if (maoFlip > 0) {
+      doc.setTextColor(...C.gray); doc.text('Teto Flip:', lx, y + 11)
+      doc.setFont('helvetica', 'bold'); doc.setTextColor(...C.navy); doc.text(fmt(maoFlip), lx + 16, y + 11)
+      doc.setFont('helvetica', 'normal'); lx += 60
+    }
+    if (maoLoc > 0) {
+      doc.setTextColor(...C.gray); doc.text('Teto Locacao:', lx, y + 11)
+      doc.setFont('helvetica', 'bold'); doc.setTextColor(...C.purple); doc.text(fmt(maoLoc), lx + 22, y + 11)
+      doc.setFont('helvetica', 'normal'); lx += 65
+    }
+    if (parseFloat(p.lance_maximo_definido || 0) > 0) {
+      doc.setTextColor(...C.gray); doc.text('Recomendado:', lx, y + 11)
+      doc.setFont('helvetica', 'bold'); doc.setTextColor(...C.green); doc.text(fmt(p.lance_maximo_definido), lx + 22, y + 11)
+    }
+  }
   foot(doc, p, 1, totalPg)
 
-  // ============ PAGINA 2 — RESUMO EXECUTIVO ============
+  // ============ PAGINA 2 — DECISAO OPERACIONAL (NOVO v4) ============
+  onProgress('Decisao operacional...')
+  doc.addPage(); y = 15
+
+  // Banner grande de decisao
+  const banderTexto = p.recomendacao === 'COMPRAR'
+    ? `EXECUTAR ARREMATACAO ATE ${fmt(p.lance_maximo_definido || lance)}`
+    : p.recomendacao === 'EVITAR'
+    ? 'NAO EXECUTAR — INVIABILIDADE FINANCEIRA OU JURIDICA'
+    : tem2aP
+    ? `AGUARDAR 2a PRACA — LANCE ATE ${fmt(p.lance_maximo_definido || lance)}`
+    : `AGUARDAR — TETO ${fmt(p.lance_maximo_definido || lance)}`
+  doc.setFillColor(...recBg); doc.roundedRect(15, y, 180, 18, 2, 2, 'F')
+  doc.setDrawColor(...recFg); doc.setLineWidth(0.8); doc.line(15, y, 15, y + 18)
+  doc.setFontSize(7); doc.setFont('helvetica', 'bold'); doc.setTextColor(...recFg); doc.text('DECISAO RECOMENDADA', 20, y + 5)
+  doc.setFontSize(13); doc.text(banderTexto, 20, y + 13)
+  y += 22
+
+  // 3 KPIs gigantes de tetos
+  const kpiH = 26
+  const kpis = [
+    { label: 'TETO FLIP (ROI 25%)', value: maoFlip > 0 ? fmt(maoFlip) : '--', sub: maoFlip > 0 ? 'Lance maximo p/ revenda' : '', color: C.navy, bg: C.navyL },
+    { label: 'TETO LOCACAO (yield 7%)', value: maoLoc > 0 ? fmt(maoLoc) : '--', sub: maoLoc > 0 ? 'Lance maximo p/ aluguel' : '', color: C.purple, bg: C.purpleL },
+    { label: 'LANCE RECOMENDADO', value: parseFloat(p.lance_maximo_definido) > 0 ? fmt(p.lance_maximo_definido) : '--', sub: 'Teto operacional seguro', color: C.green, bg: C.greenL },
+  ]
+  kpis.forEach((k, i) => {
+    const kx = 15 + i * 62
+    doc.setFillColor(...k.bg); doc.roundedRect(kx, y, 58, kpiH, 2, 2, 'F')
+    doc.setDrawColor(...k.color); doc.setLineWidth(0.8); doc.line(kx, y, kx, y + kpiH)
+    doc.setFontSize(6.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(...C.gray)
+    const lbl = doc.splitTextToSize(k.label, 50); doc.text(lbl, kx + 4, y + 5)
+    doc.setFontSize(15); doc.setTextColor(...k.color); doc.text(k.value, kx + 4, y + 16)
+    doc.setFontSize(6.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(...C.gray); doc.text(k.sub, kx + 4, y + 22)
+  })
+  y += kpiH + 6
+
+  // Linha de caixa necessario + lucro melhor cenario
+  doc.setFillColor(...C.bg); doc.roundedRect(15, y, 180, 12, 1.5, 1.5, 'F')
+  doc.setFontSize(7); doc.setFont('helvetica', 'bold'); doc.setTextColor(...C.gray)
+  doc.text('CAIXA NECESSARIO NO DIA', 20, y + 5)
+  doc.setFontSize(11); doc.setTextColor(...C.amber); doc.text(fmt(caixaDia), 20, y + 10)
+  doc.setFontSize(6.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(...C.textL)
+  doc.text(`(lance ${fmt(lance)} + taxas ${fmt(bd.totalCustos)})`, 60, y + 10)
+
+  doc.setFontSize(7); doc.setFont('helvetica', 'bold'); doc.setTextColor(...C.gray)
+  doc.text('LUCRO ESTIMADO (melhor cenario)', 110, y + 5)
+  doc.setFontSize(11)
+  const lucroMelhor = lucrosCenario[melhorIdxFlip] || 0
+  doc.setTextColor(...(lucroMelhor > 0 ? C.green : C.red)); doc.text(`${lucroMelhor >= 0 ? '+' : ''}${fmt(lucroMelhor)}`, 110, y + 10)
+  doc.setFontSize(6.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(...C.textL)
+  doc.text(`(${cenarioLabels[melhorIdxFlip]} | ROI ${roisCenario[melhorIdxFlip]}%)`, 145, y + 10)
+  y += 16
+
+  // Estrategia recomendada (frase unica destacada)
+  const estrTxt = p.motivo_recomendacao || p.justificativa || ''
+  if (estrTxt) {
+    y = subH(doc, y, 'Estrategia Recomendada')
+    doc.setFillColor(240, 244, 255); const el = doc.splitTextToSize(estrTxt, 172)
+    const eh = Math.min(el.length * 3.5 + 6, 32)
+    doc.roundedRect(15, y - 2, 180, eh, 1.5, 1.5, 'F')
+    doc.setFontSize(7.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(...C.navy)
+    doc.text(el.slice(0, Math.floor((eh - 4) / 3.5)), 18, y + 2); y += eh + 4
+  }
+
+  // Sensibilidade de lance (lado a lado com riscos)
+  if (sensRows.length > 0 && y < 180) {
+    y = subH(doc, y, 'Sensibilidade de Lance (cenario reforma basica)')
+    tbl({ startY: y, head: [['Lance', 'Invest. Total', 'Lucro (R$)', 'ROI Flip', 'Yield Loc.']], body: sensRows.map(r => [
+      { content: fmt(r.lance), styles: r.lance === lance ? { fontStyle: 'bold', textColor: C.navy } : {} },
+      fmt(r.inv),
+      { content: `${r.lucro >= 0 ? '+' : ''}${fmt(r.lucro)}`, styles: { textColor: r.lucro >= 0 ? C.green : C.red, fontStyle: 'bold' } },
+      { content: `${r.roi >= 0 ? '+' : ''}${r.roi}%`, styles: { textColor: r.roi >= 25 ? C.green : r.roi >= 0 ? C.amber : C.red, fontStyle: 'bold' } },
+      `${r.yieldL}%`,
+    ]), theme: 'grid', styles: { fontSize: 7, cellPadding: 2 }, headStyles: { fillColor: C.navy, textColor: C.white, fontSize: 6.5 }, alternateRowStyles: { fillColor: C.bg }, columnStyles: { 0: { cellWidth: 30, halign: 'right' }, 1: { cellWidth: 30, halign: 'right' }, 2: { cellWidth: 30, halign: 'right' }, 3: { cellWidth: 25, halign: 'right' }, 4: { cellWidth: 25, halign: 'right' } }, margin: { left: 15, right: 15 } })
+    y = lastY + 4
+  }
+
+  // Comparacao 1a vs 2a praca expandida
+  if (!eMercado && lance2p > 0 && parseFloat(p.valor_minimo) > 0 && y < 220) {
+    y = subH(doc, y, 'Comparacao 1a vs 2a Praca')
+    const lance1pNorm = parseFloat(p.valor_minimo)
+    const bd1p = calcularBreakdownFinanceiro(lance1pNorm, p, eMercado)
+    const inv1p = bd1p.investimentoTotal
+    const lucro1p = mercado - inv1p
+    const roi1p = inv1p > 0 ? Math.round(lucro1p / inv1p * 1000) / 10 : 0
+    const inv2pBasica = lance2p + Math.round(lance2p * 0.155) + reformasCustos[1] + bd.holding
+    const lucro2p = Math.round(mercado * 1.0) - inv2pBasica
+    const roi2pBasica = inv2pBasica > 0 ? Math.round(lucro2p / inv2pBasica * 1000) / 10 : 0
+    tbl({ startY: y, head: [['Metrica', '1a Praca', '2a Praca (basica)', 'Diferenca']], body: [
+      ['Lance minimo', fmt(lance1pNorm), fmt(lance2p), fmt(lance2p - lance1pNorm)],
+      ['Investimento total', fmt(inv1p), fmt(inv2pBasica), fmt(inv2pBasica - inv1p)],
+      ['Lucro estimado (R$)',
+        { content: `${lucro1p >= 0 ? '+' : ''}${fmt(lucro1p)}`, styles: { textColor: lucro1p >= 0 ? C.green : C.red } },
+        { content: `${lucro2p >= 0 ? '+' : ''}${fmt(lucro2p)}`, styles: { textColor: lucro2p >= 0 ? C.green : C.red } },
+        { content: `${(lucro2p - lucro1p) >= 0 ? '+' : ''}${fmt(lucro2p - lucro1p)}`, styles: { textColor: (lucro2p - lucro1p) >= 0 ? C.green : C.red } }
+      ],
+      ['ROI Flip',
+        { content: `${roi1p >= 0 ? '+' : ''}${roi1p}%`, styles: { textColor: roi1p >= 25 ? C.green : roi1p >= 0 ? C.amber : C.red, fontStyle: 'bold' } },
+        { content: `${roi2pBasica >= 0 ? '+' : ''}${roi2pBasica}%`, styles: { textColor: roi2pBasica >= 25 ? C.green : roi2pBasica >= 0 ? C.amber : C.red, fontStyle: 'bold' } },
+        `${(roi2pBasica - roi1p).toFixed(1)}pp`
+      ],
+      ['Risco (concorrencia)', 'Alto (mais participantes)', 'Medio (50% desconto)', '-'],
+    ], theme: 'grid', styles: { fontSize: 7, cellPadding: 2 }, headStyles: { fillColor: [88, 28, 135], textColor: C.white, fontSize: 6.5 }, alternateRowStyles: { fillColor: [250, 245, 255] }, columnStyles: { 0: { cellWidth: 50, fontStyle: 'bold' }, 1: { cellWidth: 38, halign: 'right' }, 2: { cellWidth: 50, halign: 'right' }, 3: { cellWidth: 42, halign: 'right' } }, margin: { left: 15, right: 15 } })
+    y = lastY + 4
+  }
+
+  // Riscos com probabilidades
+  if (y < 240) {
+    y = subH(doc, y, 'Analise de Riscos (probabilidade estimada)')
+    tbl({ startY: y, head: [['Risco', 'Prob.', 'Mitigacao']], body: riscosOp.map(r => [
+      r.risco,
+      { content: `${r.prob}%`, styles: { textColor: r.prob >= 30 ? C.red : r.prob >= 15 ? C.amber : C.green, fontStyle: 'bold' } },
+      r.mit
+    ]), theme: 'striped', styles: { fontSize: 6.5, cellPadding: 1.8 }, headStyles: { fillColor: C.navy, textColor: C.white, fontSize: 6 }, alternateRowStyles: { fillColor: C.bg }, columnStyles: { 0: { cellWidth: 65 }, 1: { cellWidth: 18, halign: 'center' }, 2: { cellWidth: 97 } }, margin: { left: 15, right: 15 } })
+    y = lastY + 4
+  }
+
+  // Timeline operacional
+  if (y < 270) {
+    y = subH(doc, y, 'Timeline Operacional')
+    const tx = 15, tw = 180, ty = y + 4
+    // Barra horizontal
+    doc.setDrawColor(...C.gray); doc.setLineWidth(0.4); doc.line(tx + 8, ty + 4, tx + tw - 8, ty + 4)
+    timelineOp.forEach((t, i) => {
+      const px = tx + 8 + (i * (tw - 16) / (timelineOp.length - 1))
+      doc.setFillColor(...(i === 0 ? C.amber : i === timelineOp.length - 1 ? C.green : C.navy))
+      doc.circle(px, ty + 4, 1.8, 'F')
+      doc.setFontSize(6); doc.setFont('helvetica', 'bold'); doc.setTextColor(...C.text)
+      doc.text(t.d, px, ty + 1, { align: 'center' })
+      doc.setFontSize(5.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(...C.gray)
+      const ev = doc.splitTextToSize(t.e, 30); doc.text(ev, px, ty + 8, { align: 'center' })
+    })
+  }
+  foot(doc, p, 2, totalPg)
+
+  // ============ PAGINA 3 — RESUMO EXECUTIVO ============
   onProgress('Resumo executivo...')
   doc.addPage(); y = 15
   y = secH(doc, y, 'Resumo Executivo -- Score AXIS 6D')
@@ -242,7 +462,7 @@ export async function gerarPDFProfissional(p, onProgress = () => {}) {
     const neg = (Array.isArray(p.negativos) ? p.negativos : (p.negativos ? (() => { try { return JSON.parse(p.negativos) } catch { return [] } })() : [])).slice(0, 5)
     neg.forEach(item => { const l = doc.splitTextToSize(`[!]  ${item}`, 175); doc.text(l, 15, y); y += l.length * 3.5 + 1.5 })
   }
-  foot(doc, p, 2, totalPg)
+  foot(doc, p, 3, totalPg)
 
   // ============ PAGINA 3 — INVESTIMENTO + 2a PRACA ============
   onProgress('Analise de investimento...')
@@ -270,14 +490,14 @@ export async function gerarPDFProfissional(p, onProgress = () => {}) {
   tbl({ startY: y, head: [], body: bRows, theme: 'striped', styles: { fontSize: 7.5, cellPadding: 2, textColor: C.text }, alternateRowStyles: { fillColor: C.bg }, columnStyles: { 0: { cellWidth: 75 }, 1: { cellWidth: 40, halign: 'right', fontStyle: 'bold' } }, margin: { left: 15, right: 80 }, tableWidth: 115 })
 
   const eY = y - 5
-  doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(...C.navy); doc.text('Cenarios de Saida', 135, eY)
-  tbl({ startY: eY + 3, head: [['Cenário', 'Limite recomendado', 'Lance atual', 'Status']], body: [
-    ...(maoFlip > 0 ? [['Lance máx. flip (ROI 20%)', fmt(maoFlip), fmt(lance), lance <= maoFlip ? '✅ Dentro' : '⚠️ Acima por ' + fmt(lance - maoFlip)]] : []),
-    ...(maoLoc > 0 ? [['Lance máx. locação (yield 6%)', fmt(maoLoc), fmt(lance), lance <= maoLoc ? '✅ Dentro' : '⚠️ Acima']] : []),
-    ['Investimento total', fmt(bd.investimentoTotal), fmt(bd2p.investimentoTotal), ''],
-    ['Otimista (+15%)', fmt(roi.cenarios?.otimista?.valor), `${roi.cenarios?.otimista?.roi > 0 ? '+' : ''}${roi.cenarios?.otimista?.roi}%`],
-    ['Realista', fmt(roi.cenarios?.realista?.valor), `${roi.cenarios?.realista?.roi > 0 ? '+' : ''}${roi.cenarios?.realista?.roi}%`],
-    ['Venda rapida', fmt(roi.cenarios?.vendaRapida?.valor), `${roi.cenarios?.vendaRapida?.roi > 0 ? '+' : ''}${roi.cenarios?.vendaRapida?.roi}%`],
+  doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(...C.navy); doc.text('Tetos e Cenarios de Saida', 135, eY)
+  tbl({ startY: eY + 3, head: [['Metrica', 'Valor', 'Lance atual', 'Status']], body: [
+    ...(maoFlip > 0 ? [[{ content: 'TETO FLIP (ROI 25%)', styles: { fontStyle: 'bold' } }, fmt(maoFlip), fmt(lance), { content: lance <= maoFlip ? 'OK' : 'ACIMA', styles: { textColor: lance <= maoFlip ? C.green : C.red, fontStyle: 'bold' } }]] : []),
+    ...(maoLoc > 0 ? [[{ content: 'TETO LOCACAO (yield 7%)', styles: { fontStyle: 'bold' } }, fmt(maoLoc), fmt(lance), { content: lance <= maoLoc ? 'OK' : 'ACIMA', styles: { textColor: lance <= maoLoc ? C.green : C.red, fontStyle: 'bold' } }]] : []),
+    ['Invest. total', fmt(bd.investimentoTotal), '', ''],
+    ['Saida Otimista (+15%)', fmt(roi.cenarios?.otimista?.valor), `${roi.cenarios?.otimista?.roi > 0 ? '+' : ''}${roi.cenarios?.otimista?.roi}%`, ''],
+    ['Saida Realista', fmt(roi.cenarios?.realista?.valor), `${roi.cenarios?.realista?.roi > 0 ? '+' : ''}${roi.cenarios?.realista?.roi}%`, ''],
+    ['Saida Rapida', fmt(roi.cenarios?.vendaRapida?.valor), `${roi.cenarios?.vendaRapida?.roi > 0 ? '+' : ''}${roi.cenarios?.vendaRapida?.roi}%`, ''],
   ], theme: 'grid', styles: { fontSize: 6.5, cellPadding: 2 }, headStyles: { fillColor: C.navy, textColor: C.white, fontSize: 6 }, margin: { left: 135 }, tableWidth: 60 })
 
   if (roi.locacao) {
@@ -308,7 +528,7 @@ export async function gerarPDFProfissional(p, onProgress = () => {}) {
     doc.setTextColor(...(gain > 10 ? C.green : C.amber))
     doc.text(gain > 10 ? `[RECOMENDADO] Aguardar 2a praca gera +${gain.toFixed(1)}pp de ROI. Economia de ${fmt(lance - lance2p)} no lance.` : `Diferenca de ${gain.toFixed(1)}pp no ROI. Avaliar risco de perder o imovel vs. ganho marginal.`, 15, y)
   }
-  foot(doc, p, 3, totalPg)
+  foot(doc, p, 4, totalPg)
 
   // ============ PAGINA 4 — MATRIZ UNIFICADA DE INVESTIMENTO ============
   onProgress('Matriz de investimento...')
@@ -335,17 +555,33 @@ export async function gerarPDFProfissional(p, onProgress = () => {}) {
   matrizRows.push([{ content: 'Valor Pos-Reforma', styles: { fontStyle: 'bold' } }, ...valoresPos.map(v => fmt(v))])
   // Lucro flip
   const lucros = invests.map((inv, i) => valoresPos[i] - inv)
-  matrizRows.push([{ content: 'Lucro (Flip)', styles: { fontStyle: 'bold' } }, ...lucros.map(l => ({ content: `${l >= 0 ? '+' : ''}${fmt(l)}`, styles: { textColor: l >= 0 ? C.green : C.red } }))])
+  matrizRows.push([{ content: 'Lucro (Flip)', styles: { fontStyle: 'bold' } }, ...lucros.map(l => ({ content: `${l >= 0 ? '+' : ''}${fmt(l)}`, styles: { textColor: l >= 0 ? C.green : C.red, fontStyle: 'bold' } }))])
   // ROI flip
   const rois = invests.map((inv, i) => inv > 0 ? ((valoresPos[i] - inv) / inv * 100).toFixed(1) : '0')
-  matrizRows.push([{ content: 'ROI Flip', styles: { fontStyle: 'bold' } }, ...rois.map(r => ({ content: `${parseFloat(r) > 0 ? '+' : ''}${r}%`, styles: { textColor: parseFloat(r) >= 10 ? C.green : parseFloat(r) >= 0 ? C.amber : C.red, fontStyle: 'bold' } }))])
+  matrizRows.push([{ content: 'ROI Flip', styles: { fontStyle: 'bold' } }, ...rois.map(r => ({ content: `${parseFloat(r) > 0 ? '+' : ''}${r}%`, styles: { textColor: parseFloat(r) >= 25 ? C.green : parseFloat(r) >= 10 ? C.amber : parseFloat(r) >= 0 ? C.amber : C.red, fontStyle: 'bold' } }))])
+  // Prazo revenda (carta 1m + reforma + 2m venda)
+  const prazosRef = [0, 1.5, 2.5, 4]  // meses de reforma por cenario
+  const prazosTotal = prazosRef.map(pr => 1 + pr + 2)
+  matrizRows.push([{ content: 'Prazo Revenda', styles: { fontStyle: 'bold' } }, ...prazosTotal.map(p => `~${p}m`)])
+  // Recomendacao por cenario flip
+  const recomCenario = rois.map(r => {
+    const rn = parseFloat(r)
+    return rn >= 30 ? { content: 'OTIMA', styles: { textColor: C.green, fontStyle: 'bold' } }
+         : rn >= 15 ? { content: 'BOA', styles: { textColor: C.green } }
+         : rn >= 0  ? { content: 'MARGINAL', styles: { textColor: C.amber } }
+         :            { content: 'EVITAR', styles: { textColor: C.red, fontStyle: 'bold' } }
+  })
+  matrizRows.push([{ content: 'Recomendacao Flip', styles: { fontStyle: 'bold' } }, ...recomCenario])
   // Separador
   matrizRows.push([{ content: 'LOCACAO', styles: { fontStyle: 'bold', textColor: C.navy }, colSpan: 5 }])
   // Aluguel
   const alugs = fatores.map(f => Math.round(aluguel * f))
   matrizRows.push([{ content: 'Aluguel Mensal', styles: { fontStyle: 'bold' } }, ...alugs.map(a => `${fmt(a)}/mes`)])
   // Yield
-  matrizRows.push([{ content: 'Yield Bruto', styles: { fontStyle: 'bold' } }, ...alugs.map((a, i) => invests[i] > 0 ? `${((a * 12) / invests[i] * 100).toFixed(1)}%` : '--')])
+  matrizRows.push([{ content: 'Yield Bruto', styles: { fontStyle: 'bold' } }, ...alugs.map((a, i) => {
+    const yld = invests[i] > 0 ? (a * 12) / invests[i] * 100 : 0
+    return { content: yld > 0 ? `${yld.toFixed(1)}%` : '--', styles: { textColor: yld >= 10 ? C.green : yld >= 6 ? C.amber : C.red, fontStyle: 'bold' } }
+  })])
   // Payback
   matrizRows.push([{ content: 'Payback', styles: { fontStyle: 'bold' } }, ...alugs.map((a, i) => a > 0 ? `${Math.round(invests[i] / (a * 12))} anos` : '--')])
 
@@ -400,7 +636,7 @@ export async function gerarPDFProfissional(p, onProgress = () => {}) {
       tbl({ startY: y, head: [['Atributo', 'Fator', 'Impacto R$']], body: homoRows, theme: 'striped', styles: { fontSize: 7, cellPadding: 2 }, headStyles: { fillColor: C.navy, textColor: C.white, fontSize: 6.5 }, alternateRowStyles: { fillColor: C.bg }, columnStyles: { 0: { cellWidth: 50 }, 1: { cellWidth: 20, halign: 'center' }, 2: { cellWidth: 35, halign: 'right' } }, margin: { left: 15, right: 90 }, tableWidth: 105 })
     }
   }
-  foot(doc, p, 4, totalPg)
+  foot(doc, p, 5, totalPg)
 
   // ============ PAGINA 5 — JURIDICO + DOCUMENTOS DO AGENTE ============
   onProgress('Analise juridica...')
@@ -476,7 +712,7 @@ export async function gerarPDFProfissional(p, onProgress = () => {}) {
     doc.setTextColor(...(p.recomendacao_juridica_docs === 'favoravel' ? C.green : p.recomendacao_juridica_docs === 'desfavoravel' ? C.red : C.amber))
     doc.text(`Parecer consolidado dos documentos: ${(p.recomendacao_juridica_docs || '').toUpperCase()}`, 15, y)
   }
-  foot(doc, p, 5, totalPg)
+  foot(doc, p, 6, totalPg)
 
   // ============ PAGINA 6 — MERCADO ============
   onProgress('Analise de mercado...')
@@ -512,7 +748,7 @@ export async function gerarPDFProfissional(p, onProgress = () => {}) {
     y = subH(doc, y, 'Aluguel Estimado por Cenario')
     tbl({ startY: y, head: [['Cenario', 'Aluguel', 'Yield s/ invest.']], body: [['Sem reforma', 0.90, 0], ['Basica', 1.00, custoRef[1]], ['Media', 1.08, custoRef[2]], ['Completa', 1.20, custoRef[3]]].map(([lb, ft, cr]) => { const al = Math.round(aluguel * ft); const inv = lance + bd.totalCustos + cr + bd.holding + bd.debitosArrematante; return [lb, `${fmt(al)}/mes`, inv > 0 ? `${((al * 12) / inv * 100).toFixed(1)}%` : '--'] }), theme: 'striped', styles: { fontSize: 7.5, cellPadding: 2 }, headStyles: { fillColor: C.navy, textColor: C.white, fontSize: 7 }, alternateRowStyles: { fillColor: C.bg }, margin: { left: 15, right: 105 }, tableWidth: 90 })
   }
-  foot(doc, p, 6, totalPg)
+  foot(doc, p, 7, totalPg)
 
   // ============ PAGINA 7 — FOTOS ============
   onProgress('Galeria de fotos...')
@@ -527,7 +763,7 @@ export async function gerarPDFProfissional(p, onProgress = () => {}) {
       try { doc.setFillColor(...C.bg); doc.roundedRect(fx, fy, imgW, imgH, 2, 2, 'F'); doc.addImage(img, 'JPEG', fx + 1, fy + 1, imgW - 2, imgH - 2); doc.setDrawColor(...C.grayL); doc.setLineWidth(0.3); doc.roundedRect(fx, fy, imgW, imgH, 2, 2, 'S') } catch {}
     })
   } else { doc.setFontSize(10); doc.setTextColor(...C.gray); doc.text('Nenhuma foto disponivel', 105, 150, { align: 'center' }) }
-  foot(doc, p, 7, totalPg)
+  foot(doc, p, 8, totalPg)
 
   onProgress('Finalizando PDF...')
   doc.save(`AXIS_${p.codigo_axis || 'imovel'}_${new Date().toISOString().slice(0, 10)}.pdf`)
