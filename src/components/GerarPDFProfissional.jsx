@@ -147,13 +147,15 @@ export async function gerarPDFProfissional(p, onProgress = () => {}) {
   const melhorIdxFlip = roisCenario.reduce((bi, r, i) => r > roisCenario[bi] ? i : bi, 0)
   const cenarioLabels = ['Sem Reforma', 'Reforma Basica', 'Reforma Media', 'Reforma Completa']
 
-  // Sensibilidade de lance: simula 5 niveis de lance
-  const lancesSensibilidade = lance > 0 ? [
-    Math.round(lance * 0.85),
-    lance,
-    Math.round(lance * 1.10),
-    Math.round(lance * 1.25),
-    Math.round(lance * 1.35)
+  // Sensibilidade de lance: simula 5 niveis CENTRADOS no lance recomendado (cenario oficial)
+  // Sprint 45: usar p.cenario_oficial.lance se existir, senao p.lance_maximo_definido, senao lance da capa
+  const lanceCentro = parseFloat(p.cenario_oficial?.lance) || parseFloat(p.lance_maximo_definido) || lance
+  const lancesSensibilidade = lanceCentro > 0 ? [
+    Math.round(lanceCentro * 0.80),
+    Math.round(lanceCentro * 0.90),
+    lanceCentro,
+    Math.round(lanceCentro * 1.10),
+    Math.round(lanceCentro * 1.20)
   ] : []
   const sensRows = lancesSensibilidade.map(l => {
     const reforma = reformasCustos[1] // basica como cenario base
@@ -161,7 +163,7 @@ export async function gerarPDFProfissional(p, onProgress = () => {}) {
     const lucro = Math.round(mercado * 1.0) - inv
     const roi = inv > 0 ? Math.round(lucro / inv * 1000) / 10 : 0
     const yieldL = inv > 0 ? Math.round((aluguel * 12) / inv * 1000) / 10 : 0
-    return { lance: l, inv, lucro, roi, yieldL }
+    return { lance: l, inv, lucro, roi, yieldL, isCentro: l === lanceCentro }
   })
 
   // Caixa necessario no dia (lance + custos imediatos)
@@ -215,49 +217,78 @@ export async function gerarPDFProfissional(p, onProgress = () => {}) {
   doc.setFontSize(42); doc.setFont('helvetica', 'bold'); doc.setTextColor(...scoreColor(score)); doc.text(score.toFixed(1), 170, y - 5, { align: 'center' })
   doc.setFontSize(12); doc.text('/10', 186, y - 5)
   doc.setFontSize(7); doc.setTextColor(...C.gray); doc.text('SCORE AXIS', 175, y + 1, { align: 'center' })
-  y += 10
-
-  const lanceLabel = eMercado ? 'Preco Pedido' : (tem2aP && p.recomendacao === 'AGUARDAR' ? '2a Praca (min.)' : '1a Praca (min.)')
-  kpi(doc, 15, y, 56, 22, lanceLabel, fmt(lance), C.amber, C.amberL)
-  kpi(doc, 77, y, 56, 22, 'Mercado Estimado', fmt(mercado), C.navy, C.navyL)
-  kpi(doc, 139, y, 56, 22, 'Aluguel Estimado', aluguel ? `${fmt(aluguel)}/mes` : '--', C.purple, C.purpleL)
-  y += 28
-  const roiV = roi?.roi ?? 0
-  const roiLabel = tem2aP && p.recomendacao === 'AGUARDAR' ? 'ROI (2a praca):' : 'ROI Estimado:'
-  doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(...C.gray); doc.text(roiLabel, 15, y)
-  doc.setTextColor(...(roiV >= 15 ? C.green : roiV >= 0 ? C.amber : C.red)); doc.text(`${roiV > 0 ? '+' : ''}${roiV}%`, 45, y)
-  // Desconto sobre mercado real (não sobre avaliação judicial)
-  const descMercado = mercado > 0 && lance > 0 ? Math.round((1 - lance / mercado) * 100) : 0
-  if (descMercado > 0) {
-    doc.setTextColor(...C.gray); doc.text('Desc. s/ mercado:', 70, y)
-    doc.setTextColor(...C.green); doc.text(`${descMercado}%`, 101, y)
-  } else if (descMercado < 0) {
-    doc.setTextColor(...C.gray); doc.text('Acima do mercado:', 70, y)
-    doc.setTextColor(...C.red); doc.text(`+${Math.abs(descMercado)}%`, 101, y)
-  }
-  if (!eMercado) { doc.setTextColor(...C.gray); doc.text('Avaliacao:', 110, y); doc.setTextColor(...C.navy); doc.text(fmt(avaliacao), 133, y) }
   y += 8
 
-  // Linha de tetos (NOVO v4) — destaque acima de tudo
-  if (maoFlip > 0 || maoLoc > 0 || p.lance_maximo_definido > 0) {
-    doc.setFillColor(...C.navyL); doc.roundedRect(15, y, 180, 14, 2, 2, 'F')
-    doc.setFontSize(7); doc.setFont('helvetica', 'bold'); doc.setTextColor(...C.gray)
-    doc.text('LIMITES OPERACIONAIS DE LANCE', 20, y + 4.5)
-    doc.setFontSize(8); doc.setFont('helvetica', 'normal')
-    let lx = 20
+  // ============ CAPA v5: KPIs do CENARIO OFICIAL ============
+  // Sprint 45: capa deriva de p.cenario_oficial (single source of truth)
+  // Fallback para campos legados se cenario_oficial nao existir
+  const co = p.cenario_oficial || null
+  const lanceCapa = co?.lance || parseFloat(p.lance_maximo_definido) || lance
+  const caixaDiaCapa = parseFloat(p.caixa_arrematacao) || (lanceCapa + bd.totalCustos)
+  const caixaTotalCapa = parseFloat(p.caixa_projeto) || bd.investimentoTotal
+  const roiLiqCapa = parseFloat(p.roi_liquido_oficial)
+  const yieldLiqCapa = parseFloat(p.yield_liquido_pct)
+  const lanceLabelCapa = co ? `LANCE RECOMENDADO ${co.praca === 2 ? '(2a praca)' : co.praca === 1 ? '(1a praca)' : ''}` : (eMercado ? 'PRECO PEDIDO' : 'LANCE')
+
+  kpi(doc, 15, y, 43, 22, lanceLabelCapa, fmt(lanceCapa), C.green, C.greenL)
+  kpi(doc, 60, y, 43, 22, 'CAIXA NO DIA', fmt(caixaDiaCapa), C.amber, C.amberL)
+  kpi(doc, 105, y, 43, 22, 'CAIXA TOTAL', fmt(caixaTotalCapa), C.navy, C.navyL)
+  if (!isNaN(roiLiqCapa) && roiLiqCapa !== 0) {
+    kpi(doc, 150, y, 45, 22, 'ROI LIQUIDO', `${roiLiqCapa > 0 ? '+' : ''}${roiLiqCapa.toFixed(1)}%`, roiLiqCapa >= 25 ? C.green : roiLiqCapa >= 10 ? C.amber : C.red, roiLiqCapa >= 0 ? C.greenL : C.redL)
+  } else {
+    // Fallback: mostrar mercado estimado se nao tiver ROI liquido oficial
+    kpi(doc, 150, y, 45, 22, 'MERCADO EST.', fmt(mercado), C.purple, C.purpleL)
+  }
+  y += 26
+
+  // Banner do cenario oficial (NOVO v5) — declara as premissas usadas nos KPIs acima
+  if (co) {
+    const reformaLbl = { sem_reforma: 'Sem Reforma', basica: 'Reforma Basica', media: 'Reforma Media', completa: 'Reforma Completa' }[co.reforma_escopo] || co.reforma_escopo
+    doc.setFillColor(245, 250, 255); doc.roundedRect(15, y, 180, 11, 1.5, 1.5, 'F')
+    doc.setDrawColor(...C.navy); doc.setLineWidth(0.4); doc.line(15, y, 15, y + 11)
+    doc.setFontSize(6.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(...C.navy)
+    doc.text('CENARIO OFICIAL DA RECOMENDACAO', 18, y + 4)
+    doc.setFontSize(7); doc.setFont('helvetica', 'normal'); doc.setTextColor(...C.text)
+    const cenarioStr = `${co.praca === 2 ? '2a praca' : co.praca === 1 ? '1a praca' : 'Mercado'}  |  ${reformaLbl} (${fmt(co.reforma_custo)})  |  Holding ${co.holding_meses}m  |  ${co.irpf_isento ? 'IRPF isento' : `IR ${co.ir_lucro_pct}% s/ ganho`}  |  Corretagem ${co.corretagem_pct}%`
+    doc.text(cenarioStr, 18, y + 8.5)
+    y += 14
+  }
+
+  // Linha secundaria: yield liquido + desconto + avaliacao
+  doc.setFontSize(7.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(...C.gray)
+  let lx2 = 15
+  if (!isNaN(yieldLiqCapa) && yieldLiqCapa > 0) {
+    doc.text('Yield liq. (locacao):', lx2, y)
+    doc.setTextColor(...(yieldLiqCapa >= 8 ? C.green : yieldLiqCapa >= 5 ? C.amber : C.red))
+    doc.setFont('helvetica', 'bold'); doc.text(`${yieldLiqCapa.toFixed(1)}% a.a.`, lx2 + 30, y)
+    doc.setFont('helvetica', 'normal'); doc.setTextColor(...C.gray); lx2 += 60
+  }
+  const descMercado = mercado > 0 && lanceCapa > 0 ? Math.round((1 - lanceCapa / mercado) * 100) : 0
+  if (descMercado !== 0) {
+    doc.text('Desc. s/ mercado:', lx2, y)
+    doc.setTextColor(...(descMercado > 0 ? C.green : C.red))
+    doc.setFont('helvetica', 'bold'); doc.text(`${descMercado > 0 ? '' : '+'}${descMercado > 0 ? descMercado : Math.abs(descMercado)}%`, lx2 + 28, y)
+    doc.setFont('helvetica', 'normal'); doc.setTextColor(...C.gray); lx2 += 60
+  }
+  if (!eMercado) { doc.text('Avaliacao:', lx2, y); doc.setTextColor(...C.navy); doc.setFont('helvetica', 'bold'); doc.text(fmt(avaliacao), lx2 + 17, y); doc.setFont('helvetica', 'normal') }
+  y += 8
+
+  // Linha de tetos tecnicos (mantem do v4 mas reorganizada)
+  if (maoFlip > 0 || maoLoc > 0) {
+    doc.setFillColor(...C.navyL); doc.roundedRect(15, y, 180, 11, 1.5, 1.5, 'F')
+    doc.setFontSize(6.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(...C.gray)
+    doc.text('TETOS TECNICOS DE LANCE (referencia)', 18, y + 4)
+    doc.setFontSize(7.5); doc.setFont('helvetica', 'normal')
+    let lx = 18
     if (maoFlip > 0) {
-      doc.setTextColor(...C.gray); doc.text('Teto Flip:', lx, y + 11)
-      doc.setFont('helvetica', 'bold'); doc.setTextColor(...C.navy); doc.text(fmt(maoFlip), lx + 16, y + 11)
-      doc.setFont('helvetica', 'normal'); lx += 60
+      doc.setTextColor(...C.gray); doc.text('Flip (ROI 25%):', lx, y + 8.5)
+      doc.setFont('helvetica', 'bold'); doc.setTextColor(...C.navy); doc.text(fmt(maoFlip), lx + 25, y + 8.5)
+      doc.setFont('helvetica', 'normal'); lx += 70
     }
     if (maoLoc > 0) {
-      doc.setTextColor(...C.gray); doc.text('Teto Locacao:', lx, y + 11)
-      doc.setFont('helvetica', 'bold'); doc.setTextColor(...C.purple); doc.text(fmt(maoLoc), lx + 22, y + 11)
-      doc.setFont('helvetica', 'normal'); lx += 65
-    }
-    if (parseFloat(p.lance_maximo_definido || 0) > 0) {
-      doc.setTextColor(...C.gray); doc.text('Recomendado:', lx, y + 11)
-      doc.setFont('helvetica', 'bold'); doc.setTextColor(...C.green); doc.text(fmt(p.lance_maximo_definido), lx + 22, y + 11)
+      doc.setTextColor(...C.gray); doc.text('Locacao (yield 7%):', lx, y + 8.5)
+      doc.setFont('helvetica', 'bold'); doc.setTextColor(...C.purple); doc.text(fmt(maoLoc), lx + 31, y + 8.5)
+      doc.setFont('helvetica', 'normal')
     }
   }
   foot(doc, p, 1, totalPg)
@@ -328,15 +359,22 @@ export async function gerarPDFProfissional(p, onProgress = () => {}) {
 
   // Sensibilidade de lance (lado a lado com riscos)
   if (sensRows.length > 0 && y < 180) {
-    y = subH(doc, y, 'Sensibilidade de Lance (cenario reforma basica)')
-    tbl({ startY: y, head: [['Lance', 'Invest. Total', 'Lucro (R$)', 'ROI Flip', 'Yield Loc.']], body: sensRows.map(r => [
-      { content: fmt(r.lance), styles: r.lance === lance ? { fontStyle: 'bold', textColor: C.navy } : {} },
-      fmt(r.inv),
-      { content: `${r.lucro >= 0 ? '+' : ''}${fmt(r.lucro)}`, styles: { textColor: r.lucro >= 0 ? C.green : C.red, fontStyle: 'bold' } },
-      { content: `${r.roi >= 0 ? '+' : ''}${r.roi}%`, styles: { textColor: r.roi >= 25 ? C.green : r.roi >= 0 ? C.amber : C.red, fontStyle: 'bold' } },
-      `${r.yieldL}%`,
-    ]), theme: 'grid', styles: { fontSize: 7, cellPadding: 2 }, headStyles: { fillColor: C.navy, textColor: C.white, fontSize: 6.5 }, alternateRowStyles: { fillColor: C.bg }, columnStyles: { 0: { cellWidth: 30, halign: 'right' }, 1: { cellWidth: 30, halign: 'right' }, 2: { cellWidth: 30, halign: 'right' }, 3: { cellWidth: 25, halign: 'right' }, 4: { cellWidth: 25, halign: 'right' } }, margin: { left: 15, right: 15 } })
-    y = lastY + 4
+    const lanceRecomLbl = (parseFloat(p.cenario_oficial?.lance) || parseFloat(p.lance_maximo_definido)) > 0 ? 'lance recomendado' : 'lance da capa'
+    y = subH(doc, y, `Sensibilidade de Lance (centrada no ${lanceRecomLbl}, reforma basica)`)
+    tbl({ startY: y, head: [['Lance', 'Invest. Total', 'Lucro (R$)', 'ROI Flip', 'Yield Loc.']], body: sensRows.map(r => {
+      const isCentro = r.isCentro
+      const styleCentro = isCentro ? { fontStyle: 'bold', fillColor: C.greenL } : {}
+      return [
+        { content: isCentro ? `${fmt(r.lance)} *` : fmt(r.lance), styles: { ...styleCentro, textColor: isCentro ? C.green : C.text } },
+        { content: fmt(r.inv), styles: styleCentro },
+        { content: `${r.lucro >= 0 ? '+' : ''}${fmt(r.lucro)}`, styles: { ...styleCentro, textColor: r.lucro >= 0 ? C.green : C.red, fontStyle: 'bold' } },
+        { content: `${r.roi >= 0 ? '+' : ''}${r.roi}%`, styles: { ...styleCentro, textColor: r.roi >= 25 ? C.green : r.roi >= 0 ? C.amber : C.red, fontStyle: 'bold' } },
+        { content: `${r.yieldL}%`, styles: styleCentro },
+      ]
+    }), theme: 'grid', styles: { fontSize: 7, cellPadding: 2 }, headStyles: { fillColor: C.navy, textColor: C.white, fontSize: 6.5 }, alternateRowStyles: { fillColor: C.bg }, columnStyles: { 0: { cellWidth: 30, halign: 'right' }, 1: { cellWidth: 30, halign: 'right' }, 2: { cellWidth: 30, halign: 'right' }, 3: { cellWidth: 25, halign: 'right' }, 4: { cellWidth: 25, halign: 'right' } }, margin: { left: 15, right: 15 } })
+    y = lastY + 2
+    doc.setFontSize(6); doc.setFont('helvetica', 'italic'); doc.setTextColor(...C.gray)
+    doc.text('* lance recomendado (cenario oficial)', 15, y); y += 4
   }
 
   // Comparacao 1a vs 2a praca expandida
@@ -469,6 +507,8 @@ export async function gerarPDFProfissional(p, onProgress = () => {}) {
   doc.addPage(); y = 15
   y = secH(doc, y, 'Analise de Investimento')
 
+  // roiV: ROI bruto runtime cenário "realista" — usado em comparações desta pagina e na pag 3
+  const roiV = roi?.roi ?? 0
   kpi(doc, 15, y, 43, 18, eMercado ? 'Preco' : 'Lance 1aP', fmt(lance), C.amber, C.amberL)
   kpi(doc, 60, y, 43, 18, 'Custos Aq.', fmt(bd.totalCustos), C.navy, C.navyL)
   kpi(doc, 105, y, 43, 18, 'Invest. Total', fmt(bd.investimentoTotal), C.navy, C.bg)
